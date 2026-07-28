@@ -11977,13 +11977,33 @@ document.addEventListener('click', function(e){
           log('info', '[JAC] ' + tabla + ': ' + cambiadas.length + ' escritas, ' + borradas.length + ' borradas');
       }
 
+      /* Bloques de modulos. REGLA: nunca se escribe un bloque vacio encima de
+         uno que tiene datos. Un vacio casi siempre significa "todavia no se
+         ha cargado", no "el usuario borro todo". Sin esta guarda, abrir el
+         CRM antes de que llegue la lectura borraba el contenido en la base. */
       var MODULOS = {
         iseguros_polizas: function () { return window._ISPols || []; },
         iseguros_comisiones: function () { return window._IS || {cortes: []}; },
         bluecross_asegurados: function () { return window._BCBSDataDefault || {asegurados: []}; }
       };
+      function vacio(v) {
+        if (!v) return true;
+        if (Array.isArray(v)) return v.length === 0;
+        if (v.asegurados) return v.asegurados.length === 0;
+        if (v.cortes) return v.cortes.length === 0;
+        return Object.keys(v).length === 0;
+      }
       for (var mk in MODULOS) {
-        var mv = JSON.stringify(MODULOS[mk]());
+        var local = MODULOS[mk]();
+        if (vacio(local)) {
+          var actual = await d.from('crm_meta').select('valor').eq('clave', mk).maybeSingle();
+          if (actual && actual.data && !vacio(actual.data.valor)) {
+            log('warn', '[JAC] ' + mk + ' esta vacio en memoria pero tiene datos en la base: '
+              + 'no se sobrescribe.');
+            continue;
+          }
+        }
+        var mv = JSON.stringify(local);
         if (_base['_meta_' + mk] === hash(mv)) continue;
         var rmod = await d.from('crm_meta').upsert(
           { clave: mk, valor: JSON.parse(mv) }, { onConflict: 'clave' });
@@ -11992,6 +12012,7 @@ document.addEventListener('click', function(e){
 
       for (var c = 0; c < CATALOGOS.length; c++) {
         var cat = CATALOGOS[c];
+        if (!S[cat] || !S[cat].length) continue;   /* nunca vaciar un catalogo */
         var val = JSON.stringify(S[cat] || []);
         if (_base['_meta_' + cat] === hash(val)) continue;
         var rm = await d.from('crm_meta').upsert(
