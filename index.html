@@ -11953,6 +11953,19 @@ document.addEventListener('click', function(e){
           log('info', '[JAC] ' + tabla + ': ' + cambiadas.length + ' escritas, ' + borradas.length + ' borradas');
       }
 
+      var MODULOS = {
+        iseguros_polizas: function () { return window._ISPols || []; },
+        iseguros_comisiones: function () { return window._IS || {cortes: []}; },
+        bluecross_asegurados: function () { return window._BCBSDataDefault || {asegurados: []}; }
+      };
+      for (var mk in MODULOS) {
+        var mv = JSON.stringify(MODULOS[mk]());
+        if (_base['_meta_' + mk] === hash(mv)) continue;
+        var rmod = await d.from('crm_meta').upsert(
+          { clave: mk, valor: JSON.parse(mv) }, { onConflict: 'clave' });
+        if (!rmod.error) _base['_meta_' + mk] = hash(mv);
+      }
+
       for (var c = 0; c < CATALOGOS.length; c++) {
         var cat = CATALOGOS[c];
         var val = JSON.stringify(S[cat] || []);
@@ -12023,7 +12036,19 @@ document.addEventListener('click', function(e){
         S[clave] = todo.map(aObjeto);
       }
       var rm = await d.from('crm_meta').select('*');
-      if (rm.data) rm.data.forEach(function (f) { S[f.clave] = f.valor; });
+      if (rm.data) rm.data.forEach(function (f) {
+        /* Los bloques de iSeguros/BlueCross no viven en S sino en variables
+           globales del modulo. Se restauran desde la base, no desde el codigo. */
+        if (f.clave === 'iseguros_polizas')          window._ISPols = f.valor || [];
+        else if (f.clave === 'iseguros_comisiones')  window._IS = f.valor || {cortes: []};
+        else if (f.clave === 'bluecross_asegurados') window._BCBSDataDefault = f.valor || {asegurados: []};
+        else S[f.clave] = f.valor;
+      });
+      try {
+        if (typeof window.ISRender === 'function') window.ISRender();
+        if (typeof window.renderIS === 'function') window.renderIS();
+        if (typeof window.RD === 'function' && location.hash.indexOf('iseg') > -1) window.RD();
+      } catch (e) {}
       try { localStorage.setItem('jacv10', JSON.stringify(S)); } catch (e) {}
       log('info', '[JAC] Cargado: ' + (S.clientes || []).length + ' clientes, '
         + (S.polizas || []).length + ' pólizas');
@@ -12224,6 +12249,253 @@ document.addEventListener('click', function(e){
   window.doLoginPin = function () {
     err('El acceso por PIN fue retirado. Entra con tu correo y contraseña.');
   };
+})();
+
+</script>
+
+<script>
+/* ============================================================
+   Panel de KPIs para Informes — JAC Seguros
+   Cuatro grupos: cartera y produccion, comisiones, renovaciones
+   y distribucion. Tarjetas + graficas SVG, sin librerias.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var C = { azul:'#1E3A8A', verde:'#15803D', rojo:'#DC2626', ambar:'#D97706',
+            morado:'#7C3AED', cian:'#0891B2', gris:'#64748B', rosa:'#DB2777' };
+  var PALETA = [C.azul, C.verde, C.ambar, C.morado, C.cian, C.rojo, C.rosa, C.gris];
+
+  function n(v) { var x = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(x) ? x : 0; }
+  function money(v) {
+    try { if (typeof fmt2 === 'function') return '$' + fmt2(v); } catch (e) {}
+    return '$' + (Math.round(v * 100) / 100).toLocaleString('es-PA', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  function pct(a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; }
+  function hoy() { return new Date().toISOString().slice(0, 10); }
+  function masDias(d) { var x = new Date(); x.setDate(x.getDate() + d); return x.toISOString().slice(0, 10); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  /* ---------- tarjeta ---------- */
+  function tarjeta(t) {
+    return '<div class="card" style="padding:14px;border-left:4px solid ' + t.color + ';min-width:0">'
+      + '<div style="font-size:21px;font-weight:900;color:' + t.color + ';line-height:1.15;'
+      + 'overflow-wrap:anywhere">' + t.val + '</div>'
+      + '<div style="font-size:11px;color:var(--mu);margin-top:3px">' + t.icon + ' ' + t.label + '</div>'
+      + (t.sub ? '<div style="font-size:10px;color:var(--mu);opacity:.75;margin-top:2px">' + t.sub + '</div>' : '')
+      + '</div>';
+  }
+  function grid(tarjetas) {
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">'
+      + tarjetas.map(tarjeta).join('') + '</div>';
+  }
+  function seccion(titulo, cuerpo) {
+    return '<div class="card" style="padding:16px;margin-bottom:14px">'
+      + '<div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;'
+      + 'color:var(--mu);margin-bottom:12px">' + titulo + '</div>' + cuerpo + '</div>';
+  }
+
+  /* ---------- grafica de barras horizontales ---------- */
+  function barras(datos, opt) {
+    opt = opt || {};
+    if (!datos.length) return '<div style="color:var(--mu);font-size:12px">Sin datos</div>';
+    var max = Math.max.apply(null, datos.map(function (d) { return d.valor; })) || 1;
+    var alto = 26, gap = 8, H = datos.length * (alto + gap);
+    var etiquetaAncho = 130, valorAncho = 95, W = 640;
+    var barraMax = W - etiquetaAncho - valorAncho - 10;
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;max-height:' + (H + 10) + 'px" '
+      + 'preserveAspectRatio="xMinYMin meet" role="img">';
+    datos.forEach(function (d, i) {
+      var y = i * (alto + gap), w = Math.max(2, d.valor / max * barraMax);
+      var col = d.color || PALETA[i % PALETA.length];
+      s += '<text x="0" y="' + (y + alto * 0.68) + '" font-size="12" fill="currentColor" opacity=".85">'
+         + esc(d.etiqueta.length > 20 ? d.etiqueta.slice(0, 19) + '\u2026' : d.etiqueta) + '</text>';
+      s += '<rect x="' + etiquetaAncho + '" y="' + y + '" width="' + w + '" height="' + alto
+         + '" rx="4" fill="' + col + '" opacity=".88"/>';
+      s += '<text x="' + (etiquetaAncho + w + 8) + '" y="' + (y + alto * 0.68)
+         + '" font-size="12" font-weight="700" fill="currentColor">' + esc(d.texto) + '</text>';
+    });
+    return s + '</svg>';
+  }
+
+  /* ---------- grafica de dona ---------- */
+  function dona(datos) {
+    var total = datos.reduce(function (a, d) { return a + d.valor; }, 0);
+    if (!total) return '<div style="color:var(--mu);font-size:12px">Sin datos</div>';
+    var R = 78, r = 48, cx = 92, cy = 92, ang = -Math.PI / 2, s = '';
+    datos.forEach(function (d, i) {
+      var frac = d.valor / total, a2 = ang + frac * Math.PI * 2;
+      var grande = frac > 0.5 ? 1 : 0;
+      var p = [
+        'M', cx + R * Math.cos(ang), cy + R * Math.sin(ang),
+        'A', R, R, 0, grande, 1, cx + R * Math.cos(a2), cy + R * Math.sin(a2),
+        'L', cx + r * Math.cos(a2), cy + r * Math.sin(a2),
+        'A', r, r, 0, grande, 0, cx + r * Math.cos(ang), cy + r * Math.sin(ang), 'Z'
+      ].join(' ');
+      s += '<path d="' + p + '" fill="' + (d.color || PALETA[i % PALETA.length]) + '" opacity=".9"/>';
+      ang = a2;
+    });
+    var leyenda = datos.map(function (d, i) {
+      return '<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:4px">'
+        + '<span style="width:10px;height:10px;border-radius:2px;flex:0 0 auto;background:'
+        + (d.color || PALETA[i % PALETA.length]) + '"></span>'
+        + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+        + esc(d.etiqueta) + '</span>'
+        + '<strong>' + pct(d.valor, total) + '%</strong></div>';
+    }).join('');
+    return '<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">'
+      + '<svg viewBox="0 0 184 184" style="width:184px;height:184px;flex:0 0 auto">' + s + '</svg>'
+      + '<div style="flex:1;min-width:180px">' + leyenda + '</div></div>';
+  }
+
+  /* ============================================================
+     Calculo de los KPIs
+     ============================================================ */
+  function calcular() {
+    var pol = (typeof S !== 'undefined' && S.polizas) || [];
+    var cli = (typeof S !== 'undefined' && S.clientes) || [];
+    var com = (typeof S !== 'undefined' && S.comisiones) || [];
+    var h = hoy(), anio = h.slice(0, 4), mes = h.slice(0, 7);
+    var vig = pol.filter(function (p) { return p.estado === 'Vigente'; });
+
+    var k = {};
+    k.polTotal = pol.length;
+    k.polVigentes = vig.length;
+    k.primaVigente = vig.reduce(function (a, p) { return a + n(p.prima); }, 0);
+    k.primaEmitidaAnio = pol.filter(function (p) { return (p.fechaInicio || '').slice(0, 4) === anio; })
+                            .reduce(function (a, p) { return a + n(p.prima); }, 0);
+    k.polEmitidasAnio = pol.filter(function (p) { return (p.fechaInicio || '').slice(0, 4) === anio; }).length;
+    k.primaPromedio = k.polVigentes ? k.primaVigente / k.polVigentes : 0;
+
+    /* comisiones: primero la tabla propia, si no desde las polizas */
+    k.comAnio = com.filter(function (c) { return String(c.mes || '').slice(0, 4) === anio; })
+                   .reduce(function (a, c) { return a + n(c.monto); }, 0);
+    k.comMes = com.filter(function (c) { return String(c.mes || '').slice(0, 7) === mes; })
+                  .reduce(function (a, c) { return a + n(c.monto); }, 0);
+    if (!k.comAnio) {
+      k.comAnio = pol.filter(function (p) { return (p.fechaInicio || '').slice(0, 4) === anio; })
+                     .reduce(function (a, p) { return a + n(p.comision); }, 0);
+      k.comFuente = 'calculada desde pólizas';
+    } else { k.comFuente = 'tabla de comisiones'; }
+    k.comPend = com.filter(function (c) {
+      var e = String(c.estado || '').toLowerCase();
+      return e && e.indexOf('pag') === -1 && e.indexOf('cobrad') === -1;
+    }).reduce(function (a, c) { return a + n(c.monto); }, 0);
+    k.comVigente = vig.reduce(function (a, p) { return a + n(p.comision); }, 0);
+
+    /* renovaciones */
+    function porVencer(d) {
+      var lim = masDias(d);
+      return vig.filter(function (p) { return p.fechaFin && p.fechaFin >= h && p.fechaFin <= lim; });
+    }
+    k.v30 = porVencer(30); k.v60 = porVencer(60); k.v90 = porVencer(90);
+    k.vencidas = pol.filter(function (p) { return p.fechaFin && p.fechaFin < h && p.estado !== 'Cancelada'; });
+
+    /* tasa de renovacion: de las que vencieron en 12 meses, cuantas tienen
+       una poliza posterior del mismo cliente en el mismo ramo */
+    var hace12 = new Date(); hace12.setFullYear(hace12.getFullYear() - 1);
+    var lim12 = hace12.toISOString().slice(0, 10);
+    var venc12 = pol.filter(function (p) { return p.fechaFin && p.fechaFin >= lim12 && p.fechaFin < h; });
+    var renovadas = venc12.filter(function (p) {
+      return pol.some(function (q) {
+        return q !== p && q.clienteId && q.clienteId === p.clienteId
+          && (q.ramo || '') === (p.ramo || '')
+          && q.fechaInicio && q.fechaInicio >= p.fechaFin;
+      });
+    });
+    k.tasaRenov = pct(renovadas.length, venc12.length);
+    k.venc12 = venc12.length; k.renov12 = renovadas.length;
+
+    /* distribucion */
+    function agrupar(lista, campo, valorFn) {
+      var m = {};
+      lista.forEach(function (p) { var k2 = p[campo] || 'Sin definir'; m[k2] = (m[k2] || 0) + valorFn(p); });
+      return Object.keys(m).map(function (kk) { return { etiqueta: kk, valor: m[kk] }; })
+                   .sort(function (a, b) { return b.valor - a.valor; });
+    }
+    k.porAseg = agrupar(vig, 'aseg', function (p) { return n(p.prima); }).slice(0, 8);
+    k.porRamo = agrupar(vig, 'ramo', function (p) { return n(p.prima); }).slice(0, 8);
+    k.polPorAseg = agrupar(vig, 'aseg', function () { return 1; }).slice(0, 8);
+    k.comPorAseg = agrupar(vig, 'aseg', function (p) { return n(p.comision); }).slice(0, 8);
+
+    k.cliTotal = cli.length;
+    k.canceladas = pol.filter(function (p) { return p.estado === 'Cancelada'; }).length;
+    k.cancel12 = pol.filter(function (p) {
+      return p.estado === 'Cancelada' && (p.fechaCancelada || p.fechaFin || '') >= lim12; }).length;
+    k.nuevas12 = pol.filter(function (p) { return (p.fechaInicio || '') >= lim12; }).length;
+    return k;
+  }
+
+  /* ============================================================
+     Render
+     ============================================================ */
+  function render() {
+    var cont = document.getElementById('jac-kpis');
+    if (!cont) return;
+    var k = calcular();
+    var html = '';
+
+    html += grid([
+      {label:'Prima vigente', val:money(k.primaVigente), color:C.azul, icon:'💼',
+       sub:k.polVigentes + ' pólizas vigentes'},
+      {label:'Prima emitida ' + hoy().slice(0,4), val:money(k.primaEmitidaAnio), color:C.cian, icon:'📈',
+       sub:k.polEmitidasAnio + ' pólizas emitidas'},
+      {label:'Prima promedio', val:money(k.primaPromedio), color:C.morado, icon:'📊', sub:'por póliza vigente'},
+      {label:'Comisión del año', val:money(k.comAnio), color:C.verde, icon:'💵', sub:k.comFuente},
+      {label:'Comisión del mes', val:money(k.comMes), color:C.verde, icon:'🗓️'},
+      {label:'Comisión pendiente', val:money(k.comPend), color:C.ambar, icon:'⏳', sub:'sin marcar como pagada'}
+    ]);
+
+    html += grid([
+      {label:'Vencen en 30 días', val:k.v30.length, color:C.rojo, icon:'🔴',
+       sub:money(k.v30.reduce(function(a,p){return a+n(p.prima);},0)) + ' en prima'},
+      {label:'Vencen en 60 días', val:k.v60.length, color:C.ambar, icon:'🟠',
+       sub:money(k.v60.reduce(function(a,p){return a+n(p.prima);},0)) + ' en prima'},
+      {label:'Vencen en 90 días', val:k.v90.length, color:C.cian, icon:'🟡',
+       sub:money(k.v90.reduce(function(a,p){return a+n(p.prima);},0)) + ' en prima'},
+      {label:'Tasa de renovación', val:k.tasaRenov + '%', color:k.tasaRenov >= 70 ? C.verde : C.ambar,
+       icon:'🔄', sub:k.renov12 + ' de ' + k.venc12 + ' en 12 meses'},
+      {label:'Vencidas sin renovar', val:k.vencidas.length, color:C.rojo, icon:'⚠️'},
+      {label:'Canceladas 12 meses', val:k.cancel12, color:C.gris, icon:'❌',
+       sub:'contra ' + k.nuevas12 + ' nuevas'}
+    ]);
+
+    html += seccion('Cartera por aseguradora — prima vigente',
+      barras(k.porAseg.map(function (d) { return {etiqueta:d.etiqueta, valor:d.valor, texto:money(d.valor)}; })));
+
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">'
+      + seccion('Distribución por ramo', dona(k.porRamo))
+      + seccion('Pólizas por aseguradora',
+          barras(k.polPorAseg.map(function (d) { return {etiqueta:d.etiqueta, valor:d.valor, texto:d.valor + ' pól.'}; })))
+      + '</div>';
+
+    html += seccion('Comisión anual por aseguradora',
+      barras(k.comPorAseg.map(function (d) { return {etiqueta:d.etiqueta, valor:d.valor, texto:money(d.valor)}; })));
+
+    cont.innerHTML = html;
+  }
+
+  /* insertar el contenedor y engancharse a renderInformes */
+  function montar() {
+    if (document.getElementById('jac-kpis')) return true;
+    var ref = document.getElementById('inf-stats');
+    if (!ref) return false;
+    var div = document.createElement('div');
+    div.id = 'jac-kpis';
+    div.style.marginBottom = '18px';
+    ref.parentNode.insertBefore(div, ref);
+    return true;
+  }
+
+  var original = window.renderInformes;
+  window.renderInformes = function () {
+    try { if (typeof original === 'function') original.apply(this, arguments); }
+    catch (e) { try { console.warn('[JAC KPI] informes original:', e); } catch (e2) {} }
+    try { if (montar()) render(); }
+    catch (e) { try { console.warn('[JAC KPI]', e); } catch (e2) {} }
+  };
+  window.jacKPIs = function () { montar(); render(); };
 })();
 
 </script>
