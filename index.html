@@ -1701,7 +1701,7 @@ function startSession(){
  sessionStorage.setItem('jac_s','ok');
  try{
  var __sbU='about:blank#proyecto-viejo-desactivado/rest/v1/jac_crm_data?select=data&user_id=eq.df11ca77-c38d-41a4-b2fe-380ea4d9bea6';
- var __sbK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6amV1YXV3cHNienFrbm1pZmtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5MDc1NDYsImV4cCI6MjA5NDQ4MzU0Nn0.HtVsjtfCIEfULL3GH5rRaF0zUS5y6D37CGaBoipbM5s';
+ var __sbK='';
  fetch(__sbU,{headers:{apikey:__sbK,Authorization:'Bearer '+__sbK}}).then(function(r){return r.json();}).then(function(rows){
   try{
    var sbData=(rows&&rows[0]&&rows[0].data)?rows[0].data:null;
@@ -5059,7 +5059,7 @@ function syncToCloud(){
   try{var obj=JSON.parse(raw);obj._ts=Date.now();raw=JSON.stringify(obj);localStorage.setItem("jacv10",raw);}catch(e){return;}
  try{
  var __sbU2='about:blank#proyecto-viejo-desactivado/rest/v1/jac_crm_data?on_conflict=user_id';
- var __sbK2='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6amV1YXV3cHNienFrbm1pZmtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5MDc1NDYsImV4cCI6MjA5NDQ4MzU0Nn0.HtVsjtfCIEfULL3GH5rRaF0zUS5y6D37CGaBoipbM5s';
+ var __sbK2='';
  fetch(__sbU2,{method:'POST',headers:{apikey:__sbK2,Authorization:'Bearer '+__sbK2,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:'df11ca77-c38d-41a4-b2fe-380ea4d9bea6',data:obj,updated_at:new Date().toISOString()})}).catch(function(__pe2){ if(typeof __crmErr==='function') __crmErr(__pe2); });
  }catch(__pte){ if(typeof __crmErr==='function') __crmErr(__pte); }
 
@@ -5412,9 +5412,14 @@ function syncPolPagos(){var aseg=(document.getElementById("p-as")||{}).value||""
  'use strict';
 
  // ── CONFIGURACIÓN (reemplaza con tus valores de Supabase) ──
- const __jacCfg=(function(){try{return JSON.parse(localStorage.getItem('jac_sb_cfg')||'null');}catch(e){return null;}})();
-  const SUPABASE_URL = (__jacCfg&&__jacCfg.url)||'';
-  const SUPABASE_KEY = (__jacCfg&&__jacCfg.key)||''; // clave pública (anon key)
+ /* Credenciales publicas por diseno: la clave publishable esta pensada para vivir
+   en codigo de cliente. Lo que protege los datos es RLS + Supabase Auth, no
+   esconder esta clave. Con esto el CRM abre en cualquier dispositivo con solo
+   correo y contrasena. Para cambiar de proyecto: reconfigurar() en la consola. */
+  window.__jacDefaults = {url:'https://xiogddofwmwfacmnsojg.supabase.co', key:'sb_publishable_V2t5S6Q-xUr5H11PmUfknw_H0XSv5uo'};
+  const __jacCfg=(function(){try{return JSON.parse(localStorage.getItem('jac_sb_cfg')||'null')||window.__jacDefaults;}catch(e){return window.__jacDefaults;}})();
+  const SUPABASE_URL = (__jacCfg&&__jacCfg.url)||window.__jacDefaults.url;
+  const SUPABASE_KEY = (__jacCfg&&__jacCfg.key)||window.__jacDefaults.key; // clave pública (anon key)
 
  // ── CLIENTE SUPABASE ──────────────────────────────────────
  var db;
@@ -11051,7 +11056,7 @@ function syncToCloudDebounced(){
 async function pullFromCloud(){
  try{
   var url='about:blank#proyecto-viejo-desactivado/rest/v1/jac_crm_data?select=data&user_id=eq.df11ca77-c38d-41a4-b2fe-380ea4d9bea6';
-  var key='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6amV1YXV3cHNienFrbm1pZmtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5MDc1NDYsImV4cCI6MjA5NDQ4MzU0Nn0.HtVsjtfCIEfULL3GH5rRaF0zUS5y6D37CGaBoipbM5s';
+  var key='';
   var r=await fetch(url,{headers:{apikey:key,Authorization:'Bearer '+key},cache:'no-store'});
   if(!r.ok)return;
   var rows=await r.json();
@@ -12106,9 +12111,13 @@ document.addEventListener('click', function(e){
       if (/^sb_secret_/.test(key)) {
         m.innerHTML = '<span style="color:#f85149">Esa es la Secret key. Usa la Publishable key.</span>'; return;
       }
-      if (/^sb_publishable_/.test(key)) {
+      if (/https?:|\/|\s/.test(key)) {
+        m.innerHTML = '<span style="color:#f85149">Esa clave trae una direccion web pegada. '
+          + 'Usa el boton de copiar del panel, no seleccion con el raton.</span>'; return;
+      }
+      if (/^sb_publishable_[A-Za-z0-9_-]+$/.test(key)) {
         /* formato nuevo: correcto */
-      } else if (/^eyJ/.test(key)) {
+      } else if (/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(key)) {
         try {
           var p = JSON.parse(atob(key.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
           if (p.role && p.role !== 'anon') {
@@ -12157,7 +12166,14 @@ document.addEventListener('click', function(e){
     return filas;
   };
 
-  if (!cfg()) {
+  /* Permite reconfigurar a mano si algun dia cambia el proyecto:
+     escribir reconfigurar() en la consola. */
+  window.reconfigurar = function () {
+    localStorage.removeItem('jac_sb_cfg');
+    pantallaSetup();
+  };
+
+  if (!cfg() && !window.__jacDefaults) {
     if (document.readyState === 'loading')
       document.addEventListener('DOMContentLoaded', pantallaSetup);
     else pantallaSetup();
