@@ -11897,6 +11897,29 @@ document.addEventListener('click', function(e){
     return o;
   }
 
+  /* Deteccion de entorno sin almacenamiento (vistas previas, iframes con
+     sandbox, about:srcdoc). Ahi el navegador bloquea localStorage, Supabase
+     no puede guardar la sesion y nada se sincroniza. Mejor decirlo claro
+     que dejar un SecurityError suelto en la consola. */
+  var _sinAlmacen = (function () {
+    try { localStorage.setItem('__jac_t', '1'); localStorage.removeItem('__jac_t'); return false; }
+    catch (e) { return true; }
+  })();
+
+  if (_sinAlmacen) {
+    log('warn', '[JAC] Este documento no tiene acceso al almacenamiento del navegador. '
+      + 'Estas viendo una vista previa, no el sitio. Abre https://crm.jacsegurospa.com');
+    document.addEventListener('DOMContentLoaded', function () {
+      var b = document.createElement('div');
+      b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483647;'
+        + 'background:#7f1d1d;color:#fff;padding:12px 16px;font:600 13px/1.5 system-ui,sans-serif;'
+        + 'text-align:center';
+      b.innerHTML = 'Esto es una vista previa sin acceso al almacenamiento: no hay sesion '
+        + 'ni sincronizacion. Abre <u>crm.jacsegurospa.com</u> para usar el CRM.';
+      document.body.appendChild(b);
+    });
+  }
+
   var _base = {};            // {tabla: {id: hash}} última copia confirmada
   var _timer = null, _corriendo = false, _pendiente = false;
 
@@ -11912,6 +11935,7 @@ document.addEventListener('click', function(e){
   }
 
   async function volcar() {
+    if (_sinAlmacen) return;
     var d = db(); if (!d || typeof S === 'undefined') return;
     if (_corriendo) { _pendiente = true; return; }
     _corriendo = true;
@@ -12035,26 +12059,86 @@ document.addEventListener('click', function(e){
           _base[tabla][String(todo[i].id)] = hash(JSON.stringify(aFila(aObjeto(todo[i]), tabla)));
         S[clave] = todo.map(aObjeto);
       }
-      var rm = await d.from('crm_meta').select('*');
-      if (rm.data) rm.data.forEach(function (f) {
-        /* Los bloques de iSeguros/BlueCross no viven en S sino en variables
-           globales del modulo. Se restauran desde la base, no desde el codigo. */
-        if (f.clave === 'iseguros_polizas')          window._ISPols = f.valor || [];
-        else if (f.clave === 'iseguros_comisiones')  window._IS = f.valor || {cortes: []};
-        else if (f.clave === 'bluecross_asegurados') window._BCBSDataDefault = f.valor || {asegurados: []};
-        else S[f.clave] = f.valor;
-      });
-      try {
-        if (typeof window.ISRender === 'function') window.ISRender();
-        if (typeof window.renderIS === 'function') window.renderIS();
-        if (typeof window.RD === 'function' && location.hash.indexOf('iseg') > -1) window.RD();
-      } catch (e) {}
+      await window.cargarMeta();
       try { localStorage.setItem('jacv10', JSON.stringify(S)); } catch (e) {}
       log('info', '[JAC] Cargado: ' + (S.clientes || []).length + ' clientes, '
         + (S.polizas || []).length + ' pólizas');
       return true;
     } catch (e) { log('error', '[JAC cargarDesdeNube]', e); return false; }
   };
+
+  /* Catalogos y bloques de modulos (iSeguros/BlueCross). Se leen SIEMPRE,
+     aunque la carga de tablas se salte por las guardas: no viven en
+     localStorage, asi que sin esto quedan vacios al recargar la pagina. */
+  window.cargarMeta = async function () {
+    var d = db(); if (!d) return false;
+    try {
+      var rm = await d.from('crm_meta').select('*');
+      if (rm.error) { log('warn', '[JAC crm_meta] ' + rm.error.message); return false; }
+      (rm.data || []).forEach(function (f) {
+        if (f.clave === 'iseguros_polizas')          window._ISPols = f.valor || [];
+        else if (f.clave === 'iseguros_comisiones')  window._IS = f.valor || { cortes: [] };
+        else if (f.clave === 'bluecross_asegurados') window._BCBSDataDefault = f.valor || { asegurados: [] };
+        else if (typeof S !== 'undefined')           S[f.clave] = f.valor;
+      });
+      try {
+        if (typeof window.ISRender === 'function') window.ISRender();
+        if (typeof window.renderIS === 'function') window.renderIS();
+      } catch (e) {}
+      log('info', '[JAC] Modulos cargados: ' + (window._ISPols || []).length + ' polizas iSeguros, '
+        + (((window._BCBSDataDefault || {}).asegurados) || []).length + ' asegurados BlueCross');
+      return true;
+    } catch (e) { log('error', '[JAC cargarMeta] ' + e); return false; }
+  };
+
+  /* Sincronizacion al abrir. Antes el CRM restauraba desde localStorage y no
+     volvia a consultar la base, asi que cada dispositivo se quedaba con su
+     copia vieja y al guardar la subia encima. Ahora, con sesion activa, la
+     base manda al abrir. Las guardas de cargarDesdeNube siguen protegiendo
+     el caso de nube vacia o muy incompleta. */
+  window.sincronizar = async function () {
+    var d = db(); if (!d) return false;
+    var s2 = await d.auth.getSession();
+    if (!s2 || !s2.data || !s2.data.session) {
+      log('warn', '[JAC] Sin sesion: no se puede sincronizar.');
+      return false;
+    }
+    var ok = await window.cargarDesdeNube();
+    await window.cargarMeta();
+    try {
+      if (typeof renderKPIs === 'function') renderKPIs();
+      if (typeof RD === 'function') RD();
+      if (typeof window.jacKPIs === 'function') window.jacKPIs();
+    } catch (e) {}
+    if (window.toast) toast(ok ? 'Sincronizado con la nube' : 'Se conservaron los datos locales', ok ? 'ok' : 'err');
+    return ok;
+  };
+
+  (function autoSync() {
+    if (_sinAlmacen) return;
+    var intentos = 0;
+    var t = setInterval(function () {
+      intentos++;
+      if (intentos > 40) { clearInterval(t); return; }
+      var d = db();
+      if (!d) return;
+      d.auth.getSession().then(function (s2) {
+        if (s2 && s2.data && s2.data.session) {
+          clearInterval(t);
+          window.sincronizar();
+        }
+      }).catch(function () {});
+    }, 700);
+  })();
+
+  /* Al volver a la pestana tras 2 minutos fuera, refrescar desde la base. */
+  var _ultimaSync = Date.now();
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - _ultimaSync < 120000) return;
+    _ultimaSync = Date.now();
+    try { window.sincronizar(); } catch (e) {}
+  });
 
   /* ---- desactivar las rutas viejas que subían el blob completo ---- */
   window.syncToCloud = function () {};
