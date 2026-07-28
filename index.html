@@ -922,6 +922,11 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <a class="bni" onclick="toggleBnMore()" id="bn-more"><div class="ico">☰</div><div class="lbl">Más</div></a>
 </div></div>
 <div class="bmm" id="bmm">
+ <a onclick="SH('cal');try{renderCal()}catch(e){};closeBnMore()"><span style="font-size:16px">📅</span>Agenda</a>
+ <a onclick="SH('inf');try{renderInformes()}catch(e){};closeBnMore()"><span style="font-size:16px">📊</span>Informes</a>
+ <a onclick="SH('is');try{isRender('cartera')}catch(e){};closeBnMore()"><span style="font-size:16px">🏥</span>iSeguros</a>
+ <a onclick="SH('cotp');try{cotpInit()}catch(e){};closeBnMore()"><span style="font-size:16px">🧮</span>Cotizador</a>
+ <a onclick="SH('uv');closeBnMore()"><span style="font-size:16px">🔗</span>UniVivir</a>
  <a onclick="SH('pipe');closeBnMore()"><span style="font-size:16px">📈</span>Pipeline</a>
  <a onclick="SH('vc');closeBnMore()"><span style="font-size:16px">🔄</span>V.Cruzada</a>
  <a onclick="SH('ren');closeBnMore()"><span style="font-size:16px">🔔</span>Renovar</a>
