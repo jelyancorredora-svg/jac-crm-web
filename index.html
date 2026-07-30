@@ -11864,7 +11864,7 @@ document.addEventListener('click', function(e){
     comisiones: 'comisiones', prospectos: 'prospectos',
     ventasCruzadas: 'ventas_cruzadas'
   };
-  var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg', 'univivir'];
+  var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg', 'comisCfg', 'univivir'];
   var COLS = window.__JAC_COLS || {};
 
   function snake(c) {
@@ -12782,38 +12782,6 @@ document.addEventListener('click', function(e){
   });
   window.jacResetManual = function () { _manual = {}; };
 
-  var _onRC = window.onRC;
-  window.onRC = function () {
-    /* Lo estructural del original (co-corredor, coberturas) se conserva. */
-    try {
-      var r = V('p-ra');
-      var isG = (typeof GENERALES !== 'undefined' && GENERALES.has) ? GENERALES.has(r) : false;
-      var ccrow = document.getElementById('ccrow');
-      if (ccrow) ccrow.style.display = isG ? 'block' : 'none';
-      if (!isG) {
-        var phc = document.getElementById('p-hc'); if (phc) phc.checked = false;
-        var cob3 = document.getElementById('cob3'); if (cob3) cob3.className = 'cob';
-      }
-
-      /* Valores guardados para ese ramo. Si no hay nada guardado, los campos
-         quedan vacios para que los pongas a mano. */
-      var c = cfgRamos()[r] || {};
-      var it = document.getElementById('p-it');
-      var cb = document.getElementById('p-cb');
-
-      if (it && !_manual['p-it']) {
-        it.value = (c.itbms !== undefined && c.itbms !== null && c.itbms !== '') ? String(c.itbms) : '';
-      }
-      if (cb && !_manual['p-cb']) {
-        cb.value = (c.com !== undefined && c.com !== null && c.com !== '') ? String(c.com) : '';
-      }
-      if (typeof CT === 'function') CT();
-    } catch (e) {
-      log('warn', '[JAC onRC] ' + e);
-      try { if (typeof _onRC === 'function') _onRC(); } catch (e2) {}
-    }
-  };
-
   /* ---------- recalculo con formato ---------- */
   window.CT = function () {
     try {
@@ -12838,90 +12806,7 @@ document.addEventListener('click', function(e){
     } catch (e) { log('warn', '[JAC CT] ' + e); }
   };
 
-  /* ---------- panel de configuracion por ramo ---------- */
-  function panelHTML() {
-    var c = cfgRamos();
-    var filas = RAMOS.map(function (r) {
-      var v = c[r] || {};
-      return '<tr>'
-        + '<td style="font-size:12px">' + r + '</td>'
-        + '<td><input type="number" step="0.01" inputmode="decimal" class="fc" style="width:90px" '
-        + 'data-ramo="' + encodeURIComponent(r) + '" data-campo="com" '
-        + 'value="' + (v.com !== undefined ? v.com : '') + '" placeholder="—"></td>'
-        + '<td><input type="number" step="0.01" inputmode="decimal" class="fc" style="width:90px" '
-        + 'data-ramo="' + encodeURIComponent(r) + '" data-campo="itbms" '
-        + 'value="' + (v.itbms !== undefined ? v.itbms : '') + '" placeholder="—"></td>'
-        + '</tr>';
-    }).join('');
-    return '<div class="card" id="jac-ramos-cfg" style="padding:16px;margin-top:16px">'
-      + '<div style="font-size:13px;font-weight:800;margin-bottom:4px">Comisión e ITBMS por ramo</div>'
-      + '<div style="font-size:12px;color:var(--mu);margin-bottom:12px">'
-      + 'Al elegir un ramo en una póliza nueva, estos valores se colocan solos. '
-      + 'Siempre los puedes cambiar a mano en la póliza. Los que dejes vacíos aquí '
-      + 'quedarán vacíos en el formulario.</div>'
-      + '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse">'
-      + '<thead><tr style="text-align:left;font-size:11px;color:var(--mu)">'
-      + '<th style="padding:6px 4px">Ramo</th><th style="padding:6px 4px">% Comisión</th>'
-      + '<th style="padding:6px 4px">% ITBMS</th></tr></thead>'
-      + '<tbody>' + filas + '</tbody></table></div>'
-      + '<div style="margin-top:14px;display:flex;gap:8px;align-items:center">'
-      + '<button class="btn" style="background:#15803D;color:#fff;border-color:#15803D" '
-      + 'onclick="jacGuardarRamos()">Guardar porcentajes</button>'
-      + '<span id="jac-ramos-msg" style="font-size:12px;color:var(--mu)"></span></div>'
-      + '</div>';
-  }
-
-  window.jacGuardarRamos = function () {
-    var cont = document.getElementById('jac-ramos-cfg');
-    if (!cont) return;
-    var c = cfgRamos();
-    cont.querySelectorAll('input[data-ramo]').forEach(function (inp) {
-      var r = decodeURIComponent(inp.getAttribute('data-ramo'));
-      var campo = inp.getAttribute('data-campo');
-      var v = inp.value.trim();
-      if (!c[r]) c[r] = {};
-      if (v === '') delete c[r][campo];
-      else c[r][campo] = parseFloat(v);
-      if (!Object.keys(c[r]).length) delete c[r];
-    });
-    try { if (typeof save === 'function') save(); } catch (e) {}
-    var m = document.getElementById('jac-ramos-msg');
-    if (m) {
-      m.textContent = 'Guardado · ' + new Date().toLocaleTimeString('es-PA', {hour:'2-digit', minute:'2-digit'});
-      setTimeout(function () { m.textContent = ''; }, 4000);
-    }
-    if (window.toast) toast('Porcentajes por ramo guardados', 'ok');
-  };
-
-  function montarPanel() {
-    if (document.getElementById('jac-ramos-cfg')) return true;
-    /* Los contenedores de seccion se llaman pg-<modulo>, no <modulo>.
-       Buscar solo 'cfg' hacia que el panel no se montara nunca, sin error. */
-    var host = document.getElementById('pg-cfg')
-            || document.getElementById('cfg')
-            || document.querySelector('[id$="-cfg"]');
-    if (!host) { log('warn', '[JAC] No encontre el contenedor de Configuracion.'); return false; }
-    var div = document.createElement('div');
-    div.innerHTML = panelHTML();
-    host.appendChild(div.firstChild);
-    return true;
-  }
-  window.jacMontarRamos = montarPanel;
-
-  var _RCfg = window.RCfg;
-  window.RCfg = function () {
-    try { if (typeof _RCfg === 'function') _RCfg.apply(this, arguments); } catch (e) { log('warn', e); }
-    /* Un reintento corto: si la seccion aun no esta dibujada, se monta al aparecer. */
-    var n = 0;
-    var t = setInterval(function () {
-      n++;
-      var ok = false;
-      try { ok = montarPanel(); } catch (e) { log('warn', '[JAC cfg ramos] ' + e); }
-      if (ok || n > 12) clearInterval(t);
-    }, 300);
-  };
-
-  log('info', '[JAC] Mejoras activas: formato de miles, ITBMS sin default, config por ramo');
+  log('info', '[JAC] Formato de miles y lectura numerica tolerante activos');
 })();
 
 </script>
@@ -13239,6 +13124,320 @@ document.addEventListener('click', function(e){
   };
 
   log('info', '[JAC] Importador de portales listo — jacImportarPortal()');
+})();
+
+</script>
+
+<script>
+/* ============================================================
+   Comision e ITBMS configurables — JAC Seguros
+   Cuatro niveles, del mas general al mas especifico:
+     1. por ramo
+     2. por aseguradora
+     3. por combinacion aseguradora + ramo   (manda sobre los dos anteriores)
+     4. co-corretaje: participacion por agencia
+   Al crear una poliza se resuelve en ese orden y se rellena solo.
+   Todo se guarda en S.comisCfg y sube a Supabase.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function log(n, a) { try { var c = console; var f = c && (c[n] || c.log); if (f) f.call(c, a); } catch (e) {} }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  var SEP = '||';
+
+  var RAMOS = (typeof RAMOS_ALL !== 'undefined' && RAMOS_ALL.length) ? RAMOS_ALL
+    : ['AUTOS/VEHÍCULOS','MOTOS','VIDA','SALUD/MÉDICOS','INCENDIO Y LÍNEAS ALIADAS','HOGAR',
+       'ACCIDENTES PERSONALES','FIANZAS/ROBO/SUSTRACCIÓN','RESPONSABILIDAD CIVIL','SOAT',
+       'CUMPLIMIENTO','VIAJES/TURISMO'];
+
+  function aseguradoras() {
+    var out = [];
+    try {
+      (S.aseguradoras || []).forEach(function (a) {
+        var n = a && (a.nombre || a.nom); if (n) out.push(n);
+      });
+    } catch (e) {}
+    if (!out.length) {
+      var sel = document.getElementById('p-as');
+      if (sel) [].forEach.call(sel.options, function (o) { if (o.value) out.push(o.value); });
+    }
+    return out.sort();
+  }
+
+  function agencias() {
+    var out = [];
+    var sel = document.getElementById('p-cc');
+    if (sel) [].forEach.call(sel.options, function (o) { if (o.value || o.text.trim() !== '—') {
+      var v = (o.value || o.text).trim(); if (v && v !== '—') out.push(v); } });
+    try { Object.keys((S.comisCfg || {}).cocor || {}).forEach(function (k) {
+      if (out.indexOf(k) === -1) out.push(k); }); } catch (e) {}
+    return out;
+  }
+
+  /* ---------- almacenamiento ---------- */
+  function cfg() {
+    if (typeof S === 'undefined') return { ramos:{}, asegs:{}, combos:{}, cocor:{} };
+    if (!S.comisCfg || typeof S.comisCfg !== 'object') S.comisCfg = {};
+    var c = S.comisCfg;
+    ['ramos','asegs','combos','cocor'].forEach(function (k) {
+      if (!c[k] || typeof c[k] !== 'object') c[k] = {};
+    });
+    /* Traer lo que ya estaba guardado en la version anterior. */
+    if (S.ramosCfg && Object.keys(S.ramosCfg).length) {
+      Object.keys(S.ramosCfg).forEach(function (r) {
+        if (!c.ramos[r]) c.ramos[r] = S.ramosCfg[r];
+      });
+    }
+    return c;
+  }
+
+  /* ---------- resolucion ---------- */
+  window.jacResolverPct = function (aseg, ramo) {
+    var c = cfg(), r = {};
+    function tomar(o) {
+      if (!o) return;
+      if (r.com === undefined && o.com !== undefined && o.com !== '') r.com = o.com;
+      if (r.itbms === undefined && o.itbms !== undefined && o.itbms !== '') r.itbms = o.itbms;
+    }
+    if (aseg && ramo) tomar(c.combos[aseg + SEP + ramo]);
+    if (aseg) tomar(c.asegs[aseg]);
+    if (ramo) tomar(c.ramos[ramo]);
+    return r;
+  };
+
+  window.jacResolverCoCor = function (agencia) {
+    var c = cfg();
+    var o = agencia ? c.cocor[agencia] : null;
+    return (o && o.part !== undefined && o.part !== '') ? o.part : undefined;
+  };
+
+  /* ---------- autorrelleno en el formulario ---------- */
+  var _manual = {};
+  function marcarManual(e) {
+    var id = e.target && e.target.id;
+    if (id === 'p-cb' || id === 'p-it' || id === 'p-cp') _manual[id] = true;
+  }
+  document.addEventListener('input', marcarManual, true);
+  window.jacResetManual = function () { _manual = {}; };
+
+  function rellenar() {
+    try {
+      var aseg = (typeof V === 'function') ? V('p-as') : '';
+      var ramo = (typeof V === 'function') ? V('p-ra') : '';
+      var res = window.jacResolverPct(aseg, ramo);
+
+      var cb = document.getElementById('p-cb');
+      var it = document.getElementById('p-it');
+      if (cb && !_manual['p-cb']) cb.value = (res.com !== undefined) ? String(res.com) : '';
+      if (it && !_manual['p-it']) it.value = (res.itbms !== undefined) ? String(res.itbms) : '';
+
+      var ag = (typeof V === 'function') ? V('p-cc') : '';
+      var cp = document.getElementById('p-cp');
+      var part = window.jacResolverCoCor(ag);
+      if (cp && !_manual['p-cp']) cp.value = (part !== undefined) ? String(part) : '';
+
+      if (typeof CT === 'function') CT();
+    } catch (e) { log('warn', '[JAC rellenar] ' + e); }
+  }
+  window.jacRellenarPct = rellenar;
+
+  /* engancharse a los tres selectores sin tocar su HTML */
+  document.addEventListener('change', function (e) {
+    var id = e.target && e.target.id;
+    if (id === 'p-as' || id === 'p-ra' || id === 'p-cc') setTimeout(rellenar, 0);
+  }, true);
+
+  /* onRC del original conserva lo estructural y delega el relleno */
+  var _onRC = window.onRC;
+  window.onRC = function () {
+    try {
+      var r = (typeof V === 'function') ? V('p-ra') : '';
+      var isG = (typeof GENERALES !== 'undefined' && GENERALES.has) ? GENERALES.has(r) : false;
+      var ccrow = document.getElementById('ccrow');
+      if (ccrow) ccrow.style.display = isG ? 'block' : 'none';
+      if (!isG) {
+        var phc = document.getElementById('p-hc'); if (phc) phc.checked = false;
+        var cob3 = document.getElementById('cob3'); if (cob3) cob3.className = 'cob';
+      }
+    } catch (e) { try { if (typeof _onRC === 'function') _onRC(); } catch (e2) {} }
+    rellenar();
+  };
+
+  /* ---------- panel de configuracion ---------- */
+  var _tab = 'ramos';
+
+  function fila(clave, obj, etiqueta, grupo) {
+    var v = obj || {};
+    return '<tr>'
+      + '<td style="font-size:12px;padding:4px 6px">' + esc(etiqueta) + '</td>'
+      + '<td style="padding:4px 6px"><input type="number" step="0.01" inputmode="decimal" class="fc" '
+      + 'style="width:88px" data-g="' + grupo + '" data-k="' + encodeURIComponent(clave) + '" data-c="com" '
+      + 'value="' + (v.com !== undefined ? v.com : '') + '" placeholder="—"></td>'
+      + '<td style="padding:4px 6px"><input type="number" step="0.01" inputmode="decimal" class="fc" '
+      + 'style="width:88px" data-g="' + grupo + '" data-k="' + encodeURIComponent(clave) + '" data-c="itbms" '
+      + 'value="' + (v.itbms !== undefined ? v.itbms : '') + '" placeholder="—"></td>'
+      + (grupo === 'combos' ? '<td style="padding:4px 6px"><button class="btn bgh" style="padding:2px 8px" '
+          + 'onclick="jacBorrarCombo(\'' + encodeURIComponent(clave) + '\')">✕</button></td>' : '')
+      + '</tr>';
+  }
+
+  function tabla(filas, conAccion) {
+    return '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse">'
+      + '<thead><tr style="text-align:left;font-size:11px;color:var(--mu,#64748b)">'
+      + '<th style="padding:6px">Aplica a</th><th style="padding:6px">% Comisión</th>'
+      + '<th style="padding:6px">% ITBMS</th>' + (conAccion ? '<th></th>' : '')
+      + '</tr></thead><tbody>' + (filas || '<tr><td colspan="4" style="padding:10px;font-size:12px;'
+      + 'color:var(--mu,#64748b)">Sin registros todavía.</td></tr>') + '</tbody></table></div>';
+  }
+
+  function cuerpo() {
+    var c = cfg();
+    if (_tab === 'ramos') {
+      return tabla(RAMOS.map(function (r) { return fila(r, c.ramos[r], r, 'ramos'); }).join(''), false)
+        + '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:8px">'
+        + 'Base general. Se usa cuando no hay nada más específico.</div>';
+    }
+    if (_tab === 'asegs') {
+      var as = aseguradoras();
+      return tabla(as.map(function (a) { return fila(a, c.asegs[a], a, 'asegs'); }).join(''), false)
+        + '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:8px">'
+        + 'Manda sobre el ramo. Útil cuando una compañía te paga distinto en todo.</div>';
+    }
+    if (_tab === 'combos') {
+      var ks = Object.keys(c.combos).sort();
+      var filas = ks.map(function (k) {
+        var p = k.split(SEP);
+        return fila(k, c.combos[k], p[0] + ' · ' + p[1], 'combos');
+      }).join('');
+      var as2 = aseguradoras();
+      return tabla(filas, true)
+        + '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bd,#e2e8f0)">'
+        + '<div style="font-size:12px;font-weight:700;margin-bottom:6px">Agregar combinación</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+        + '<select class="fc" id="jac-nc-as" style="min-width:200px"><option value="">Aseguradora…</option>'
+        + as2.map(function (a) { return '<option>' + esc(a) + '</option>'; }).join('') + '</select>'
+        + '<select class="fc" id="jac-nc-ra" style="min-width:190px"><option value="">Ramo…</option>'
+        + RAMOS.map(function (r) { return '<option>' + esc(r) + '</option>'; }).join('') + '</select>'
+        + '<button class="btn" style="background:#1E3A8A;color:#fff;border-color:#1E3A8A" '
+        + 'onclick="jacAgregarCombo()">Agregar</button></div>'
+        + '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:8px">'
+        + 'Lo más específico: manda sobre aseguradora y sobre ramo.</div></div>';
+    }
+    /* co-corretaje */
+    var ags = agencias();
+    var fc = ags.map(function (a) {
+      var v = c.cocor[a] || {};
+      return '<tr><td style="font-size:12px;padding:4px 6px">' + esc(a) + '</td>'
+        + '<td style="padding:4px 6px"><input type="number" step="0.01" inputmode="decimal" class="fc" '
+        + 'style="width:88px" data-g="cocor" data-k="' + encodeURIComponent(a) + '" data-c="part" '
+        + 'value="' + (v.part !== undefined ? v.part : '') + '" placeholder="—"></td></tr>';
+    }).join('');
+    return '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse">'
+      + '<thead><tr style="text-align:left;font-size:11px;color:var(--mu,#64748b)">'
+      + '<th style="padding:6px">Agencia</th><th style="padding:6px">% Participación</th>'
+      + '</tr></thead><tbody>' + (fc || '<tr><td colspan="2" style="padding:10px;font-size:12px">Sin agencias.</td></tr>')
+      + '</tbody></table></div>'
+      + '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:8px">'
+      + 'Al elegir la agencia en una póliza, este porcentaje se coloca solo en Part. CoCor.</div>';
+  }
+
+  function panelHTML() {
+    var tabs = [['ramos','Por ramo'],['asegs','Por aseguradora'],['combos','Aseguradora + ramo'],['cocor','Co-corretaje']];
+    return '<div class="card" id="jac-comis-cfg" style="padding:16px;margin-top:16px">'
+      + '<div style="font-size:13px;font-weight:800">Comisión, ITBMS y co-corretaje</div>'
+      + '<div style="font-size:12px;color:var(--mu,#64748b);margin:4px 0 12px">'
+      + 'Al crear una póliza se busca primero la combinación aseguradora + ramo, luego la aseguradora, '
+      + 'luego el ramo. Lo que escribas a mano en la póliza nunca se sobrescribe.</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+      + tabs.map(function (t) {
+          return '<button class="btn' + (_tab === t[0] ? '' : ' bgh') + '" style="padding:5px 12px;font-size:12px'
+            + (_tab === t[0] ? ';background:#1E3A8A;color:#fff;border-color:#1E3A8A' : '')
+            + '" onclick="jacTabComis(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join('')
+      + '</div><div id="jac-comis-cuerpo">' + cuerpo() + '</div>'
+      + '<div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      + '<button class="btn" style="background:#15803D;color:#fff;border-color:#15803D" '
+      + 'onclick="jacGuardarComis()">Guardar</button>'
+      + '<span id="jac-comis-msg" style="font-size:12px;color:var(--mu,#64748b)"></span></div></div>';
+  }
+
+  window.jacTabComis = function (t) {
+    window.jacGuardarComis(true);
+    _tab = t;
+    var p = document.getElementById('jac-comis-cfg');
+    if (p) p.outerHTML = panelHTML();
+  };
+
+  window.jacAgregarCombo = function () {
+    var a = (document.getElementById('jac-nc-as') || {}).value || '';
+    var r = (document.getElementById('jac-nc-ra') || {}).value || '';
+    if (!a || !r) { if (window.toast) toast('Elige aseguradora y ramo', 'err'); return; }
+    var c = cfg();
+    if (!c.combos[a + SEP + r]) c.combos[a + SEP + r] = {};
+    if (typeof save === 'function') save();
+    window.jacTabComis('combos');
+  };
+
+  window.jacBorrarCombo = function (k) {
+    var c = cfg();
+    delete c.combos[decodeURIComponent(k)];
+    if (typeof save === 'function') save();
+    window.jacTabComis('combos');
+  };
+
+  window.jacGuardarComis = function (silencioso) {
+    var p = document.getElementById('jac-comis-cfg');
+    if (!p) return;
+    var c = cfg();
+    p.querySelectorAll('input[data-g]').forEach(function (inp) {
+      var g = inp.getAttribute('data-g');
+      var k = decodeURIComponent(inp.getAttribute('data-k'));
+      var campo = inp.getAttribute('data-c');
+      var v = inp.value.trim();
+      if (!c[g][k]) c[g][k] = {};
+      if (v === '') delete c[g][k][campo];
+      else c[g][k][campo] = parseFloat(v);
+      if (!Object.keys(c[g][k]).length && g !== 'combos') delete c[g][k];
+    });
+    if (typeof save === 'function') save();
+    if (silencioso) return;
+    var m = document.getElementById('jac-comis-msg');
+    if (m) {
+      m.textContent = 'Guardado · ' + new Date().toLocaleTimeString('es-PA', {hour:'2-digit', minute:'2-digit'});
+      setTimeout(function () { m.textContent = ''; }, 4000);
+    }
+    if (window.toast) toast('Porcentajes guardados', 'ok');
+  };
+
+  function montar() {
+    if (document.getElementById('jac-comis-cfg')) return true;
+    var host = document.getElementById('pg-cfg') || document.getElementById('cfg')
+            || document.querySelector('[id$="-cfg"]');
+    if (!host) { log('warn', '[JAC] No encontre el contenedor de Configuracion.'); return false; }
+    var d = document.createElement('div');
+    d.innerHTML = panelHTML();
+    host.appendChild(d.firstChild);
+    /* quitar el panel viejo si quedo de una version anterior */
+    var viejo = document.getElementById('jac-ramos-cfg');
+    if (viejo) viejo.remove();
+    return true;
+  }
+  window.jacMontarComis = montar;
+
+  var _RCfg = window.RCfg;
+  window.RCfg = function () {
+    try { if (typeof _RCfg === 'function') _RCfg.apply(this, arguments); } catch (e) { log('warn', e); }
+    var n = 0;
+    var t = setInterval(function () {
+      n++;
+      var ok = false;
+      try { ok = montar(); } catch (e) { log('warn', '[JAC cfg comis] ' + e); }
+      if (ok || n > 12) clearInterval(t);
+    }, 300);
+  };
+
+  log('info', '[JAC] Config de comisiones lista: ramo, aseguradora, combinacion y co-corretaje');
 })();
 
 </script>
