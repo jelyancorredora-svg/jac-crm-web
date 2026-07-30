@@ -1,6 +1,26 @@
 <!DOCTYPE html><!-- v128 -->
 <html lang="es">
 <head>
+<script>
+/* Relleno de consola. Algunos entornos (vistas previas, iframes con sandbox,
+   webviews) no traen console.info, console.debug o console.table. El codigo
+   del CRM los llama y revienta con "is not a function". Esto los completa
+   antes de que cargue nada mas. */
+(function () {
+  try {
+    if (typeof console === 'undefined') { window.console = {}; }
+    var base = (typeof console.log === 'function')
+      ? function () { console.log.apply(console, arguments); }
+      : function () {};
+    ['log','info','debug','warn','error','table','group','groupEnd','trace','dir','time','timeEnd','assert','count']
+      .forEach(function (m) {
+        if (typeof console[m] !== 'function') { console[m] = base; }
+      });
+  } catch (e) {}
+})();
+
+</script>
+
 <meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <script>if(location.protocol==='http:'&&location.hostname!=='localhost'&&location.hostname!=='127.0.0.1'){location.replace('https://'+location.host+location.pathname+location.search+location.hash);}
 // v121: Fix cloud sync PJ tipo
@@ -1434,18 +1454,18 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <div class="fl"><label>Cobertura</label><input class="fc" id="p-cob"></div>
  <span class="sl">💰 PRIMAS Y COMISIONES</span>
  <div class="fl"><label>Prima Neta ($) <span>*</span></label><input class="fc" id="p-pr" type="number" step="0.01" oninput="CT()" inputmode="decimal"></div>
- <div class="fl"><label>% ITBMS</label><select class="fc" id="p-it" onchange="CT()"><option value="6" selected>6%</option><option value="5">5%</option><option value="0">0%</option></select></div>
- <div class="fl"><label>ITBMS ($)</label><input class="fc ro" id="p-ib" type="number" readonly></div>
+ <div class="fl"><label>% ITBMS</label><select class="fc" id="p-it" onchange="CT()"><option value="" selected>—</option><option value="6">6%</option><option value="5">5%</option><option value="0">0%</option></select></div>
+ <div class="fl"><label>ITBMS ($)</label><input class="fc ro" id="p-ib" type="text" inputmode="decimal" readonly></div>
  <div class="fl"><label>Gastos Expedición ($)</label><input class="fc" id="p-ge" type="number" step="0.01" oninput="CT()" inputmode="decimal"></div>
  <div class="fl"><label>Valor Financiación ($)</label><input class="fc" id="p-vf" type="number" step="0.01" inputmode="decimal"></div>
- <div class="fl"><label>Prima Total c/ITBMS ($)</label><input class="fc ro" id="p-tot" type="number" readonly style="font-weight:700;color:#1D4ED8"></div>
+ <div class="fl"><label>Prima Total c/ITBMS ($)</label><input class="fc ro" id="p-tot" type="text" inputmode="decimal" readonly style="font-weight:700;color:#1D4ED8"></div>
  <div class="fl"><label>Cuota Mensual c/ITBMS ($)</label><input class="fc ro" id="p-cmes" type="number" readonly style="color:#15803D"></div>
  <div class="fl"><label>Cuota Trimestral c/ITBMS ($)</label><input class="fc ro" id="p-ctri" type="number" readonly style="color:#15803D"></div>
  <div class="fl"><label>Cuota Semestral c/ITBMS ($)</label><input class="fc ro" id="p-csem" type="number" readonly style="color:#15803D"></div>
  <div class="fl"><label>Cuota Anual c/ITBMS ($)</label><input class="fc ro" id="p-canu" type="number" readonly style="color:#1D4ED8;font-weight:700"></div>
  <div class="fl"><label>% Comisión Aseg. <button onclick="syncPolComPct()" style="font-size:9px;padding:1px 6px;margin-left:4px;cursor:pointer;background:#e0f2fe;border:1px solid #38bdf8;border-radius:3px" title="Sync del portal">&#x1F504;</button></label><input class="fc" id="p-cb" type="number" step="0.1" oninput="CT()" inputmode="decimal" placeholder="ej. 12"></div>
  <div class="fl"><label>Participación JAC (%)</label><input class="fc" id="p-pa" type="number" step="0.1" value="100" oninput="CT()" inputmode="decimal"></div>
- <div class="fl"><label>Comisión JAC ($) <span style="font-size:9px;color:#64748b;font-weight:400">editable</span></label><input class="fc" id="p-co" type="number" step="0.01" inputmode="decimal" style="font-weight:700;color:#15803D" title="Auto-calculada. Puedes editarla manualmente."></div>
+ <div class="fl"><label>Comisión JAC ($) <span style="font-size:9px;color:#64748b;font-weight:400">editable</span></label><input class="fc" id="p-co" type="text" inputmode="decimal" step="0.01" inputmode="decimal" style="font-weight:700;color:#15803D" title="Auto-calculada. Puedes editarla manualmente."></div>
  <span class="sl" style="cursor:pointer" onclick="document.getElementById('p-hc').click()">🤝 CO-CORRETAJE</span>
  <div style="grid-column:1/-1" id="ccrow">
  <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--bl);cursor:pointer">
@@ -1455,7 +1475,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <div class="cob" id="cob3"><div class="fg3">
  <div class="fl"><label>Agencia</label><select class="fc" id="p-cc" onchange="CT()"><option value="">—</option><option>FF Seguros</option><option>Capital Care &amp; Co</option></select></div>
  <div class="fl"><label>Part. CoCor (%)</label><input class="fc" id="p-cp" type="number" step="0.1" oninput="CT()"></div>
- <div class="fl"><label>Com. CoCor ($)</label><input class="fc ro" id="p-cc2" type="number" readonly></div>
+ <div class="fl"><label>Com. CoCor ($)</label><input class="fc ro" id="p-cc2" type="text" inputmode="decimal" readonly></div>
  </div></div>
  <span class="sl">👤 ASEGURADO / TOMADOR / BENEFICIARIO</span>
  <div class="fl"><label>Nombre Asegurado</label><input class="fc" id="p-nas"></div>
@@ -1472,7 +1492,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <div class="fl"><label>Fecha Cancelada</label><input class="fc" id="p-fca" type="date"></div>
  <div class="fl"><label>Forma de Pago</label><select class="fc" id="p-fp"><option>Fraccionado</option><option>Contado</option><option>Financiado</option></select></div>
  <div class="fl"><label>Periodicidad</label><select class="fc" id="p-pe" onchange="updateLetraPrima()"><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></select></div>
- <div class="fl"><label>Nro. Pagos Realizados <button onclick="syncPolPagos()" style="font-size:9px;padding:1px 6px;margin-left:4px;cursor:pointer;background:#e0f2fe;border:1px solid #38bdf8;border-radius:3px" title="Sync del portal">&#x1F504;</button></label><input class="fc" id="p-npag" type="number" oninput="CT()" step="1" min="0" inputmode="numeric" placeholder="0" style="width:90px"></div>
+ <div class="fl"><label>Nro. Pagos <button onclick="syncPolPagos()" style="font-size:9px;padding:1px 6px;margin-left:4px;cursor:pointer;background:#e0f2fe;border:1px solid #38bdf8;border-radius:3px" title="Sync del portal">&#x1F504;</button></label><input class="fc" id="p-npag" type="number" oninput="CT()" step="1" min="0" inputmode="numeric" placeholder="0" style="width:90px"></div>
  <div class="fl"><label>Letra Prima</label><input class="fc" id="p-lp" readonly placeholder="auto" style="width:90px;background:#f8fafc;color:#555"></div>
  <div class="fl"><label>Medio de Pago</label><select class="fc" id="p-me"><option>Tarjeta crédito</option><option>Tarjeta débito</option><option>Transferencia</option><option>Efectivo</option><option>Cheque</option></select></div>
  <div class="fl"><label>Banco</label><input class="fc" id="p-ban"></div>
@@ -11838,7 +11858,7 @@ document.addEventListener('click', function(e){
     comisiones: 'comisiones', prospectos: 'prospectos',
     ventasCruzadas: 'ventas_cruzadas'
   };
-  var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas'];
+  var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg'];
   var COLS = window.__JAC_COLS || {};
 
   function snake(c) {
@@ -11906,10 +11926,19 @@ document.addEventListener('click', function(e){
      sandbox, about:srcdoc). Ahi el navegador bloquea localStorage, Supabase
      no puede guardar la sesion y nada se sincroniza. Mejor decirlo claro
      que dejar un SecurityError suelto en la consola. */
-  var _sinAlmacen = (function () {
-    try { localStorage.setItem('__jac_t', '1'); localStorage.removeItem('__jac_t'); return false; }
-    catch (e) { return true; }
+  var _almacen = (function () {
+    try {
+      localStorage.setItem('__jac_t', '1'); localStorage.removeItem('__jac_t');
+      return 'ok';
+    } catch (e) {
+      /* Lleno no es lo mismo que bloqueado. Safari en iPhone limita a ~5 MB
+         por sitio; con la cartera completa se llena. Eso NO impide usar el
+         CRM: los datos viven en la base, la copia local es solo un cache. */
+      var q = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
+      return q ? 'lleno' : 'bloqueado';
+    }
   })();
+  var _sinAlmacen = (_almacen === 'bloqueado');
 
   if (_sinAlmacen) {
     log('warn', '[JAC] Este documento no tiene acceso al almacenamiento del navegador. '
@@ -11925,6 +11954,14 @@ document.addEventListener('click', function(e){
     });
   }
 
+  if (_almacen === 'lleno') {
+    log('warn', '[JAC] Cache local lleno (limite del navegador). El CRM funciona igual: '
+      + 'los datos se leen y se guardan en la base.');
+    /* Liberar espacio: la copia local es prescindible. */
+    try { localStorage.removeItem('jacv10'); } catch (e) {}
+  }
+
+  var _avisoSesion = false;
   var _base = {};            // {tabla: {id: hash}} última copia confirmada
   var _timer = null, _corriendo = false, _pendiente = false;
 
@@ -11947,12 +11984,16 @@ document.addEventListener('click', function(e){
     try {
       var ses = await d.auth.getSession();
       if (!ses || !ses.data || !ses.data.session) {
-        log('error', '[JAC] NO HAY SESION DE SUPABASE — nada se esta guardando en la nube. '
-          + 'Inicia sesion con: await window.db.auth.signInWithPassword({email:"tu@correo", password:"tuclave"})');
-        if (window.toast) toast('⚠ Sin sesión de Supabase: los datos NO se están guardando', 'err');
+        if (!_avisoSesion) {
+          _avisoSesion = true;
+          log('warn', '[JAC] Sin sesion iniciada: los cambios se guardan solo en este '
+            + 'navegador y no suben a la base. Inicia sesion para sincronizar.');
+          if (window.toast) toast('Sin sesión: los cambios no se están sincronizando', 'err');
+        }
         _corriendo = false; return;
       }
 
+      _avisoSesion = false;
       for (var clave in TABLAS) {
         var tabla = TABLAS[clave];
         var lista = S[clave] || [];
@@ -12017,7 +12058,9 @@ document.addEventListener('click', function(e){
 
       for (var c = 0; c < CATALOGOS.length; c++) {
         var cat = CATALOGOS[c];
-        if (!S[cat] || !S[cat].length) continue;   /* nunca vaciar un catalogo */
+        var vc = S[cat];
+        var vacioCat = !vc || (Array.isArray(vc) ? !vc.length : !Object.keys(vc).length);
+        if (vacioCat) continue;   /* nunca vaciar un catalogo */
         var val = JSON.stringify(S[cat] || []);
         if (_base['_meta_' + cat] === hash(val)) continue;
         var rm = await d.from('crm_meta').upsert(
@@ -12044,7 +12087,7 @@ document.addEventListener('click', function(e){
   window.save = function () {
     try { S._ts = Date.now(); } catch (e) {}
     try { localStorage.setItem('jacv10', JSON.stringify(S)); }
-    catch (e) { if (window.toast) toast('Almacenamiento local lleno — exporta un backup', 'err'); }
+    catch (e) { /* cache opcional: la base es la fuente de verdad */ }
     clearTimeout(_timer);
     _timer = setTimeout(volcar, 2000);
     try { if (typeof renderKPIs === 'function') renderKPIs(); } catch (e) {}
@@ -12052,16 +12095,66 @@ document.addEventListener('click', function(e){
   };
 
   /* ---- carga inicial desde las tablas normalizadas ---- */
-  window.cargarDesdeNube = async function () {
-    var d = db(); if (!d) return false;
+  /* Vuelca crm_meta en S y en los globales de los modulos. */
+  function _aplicarMeta(rm) {
+    if (!rm || rm.error || !rm.data) return;
+    rm.data.forEach(function (f) {
+      if (f.clave === 'iseguros_polizas')          window._ISPols = f.valor || [];
+      else if (f.clave === 'iseguros_comisiones')  window._IS = f.valor || { cortes: [] };
+      else if (f.clave === 'bluecross_asegurados') window._BCBSDataDefault = f.valor || { asegurados: [] };
+      else if (typeof S !== 'undefined')           S[f.clave] = f.valor;
+    });
     try {
-      /* GUARDA: si la base está vacía y hay datos locales, NO se pisa S.
-         Sin esto, entrar con las tablas recién creadas borraría el CRM. */
-      var sonda = await d.from('clientes').select('id', { count: 'exact', head: true });
-      var enNube = (sonda && sonda.count) || 0;
+      if (typeof window.ISRender === 'function') window.ISRender();
+      if (typeof window.renderIS === 'function') window.renderIS();
+    } catch (e) {}
+  }
+
+  /* Lectura de una tabla, paginada solo si hace falta. */
+  async function _leerTabla(d, tabla) {
+    var todo = [], desde = 0;
+    while (true) {
+      var r = await d.from(tabla).select('*').range(desde, desde + 999);
+      if (r.error) { log('error', '[JAC carga ' + tabla + '] ' + r.error.message); break; }
+      todo = todo.concat(r.data || []);
+      if (!r.data || r.data.length < 1000) break;
+      desde += 1000;
+    }
+    return todo;
+  }
+
+  /* Una sola carga a la vez. Antes se disparaba desde el login y desde el
+     arranque automatico, y cada una hacia once consultas en serie: de ahi la
+     demora al entrar y el rato con datos viejos en pantalla. */
+  var _enVuelo = null;
+
+  window.cargarDesdeNube = function () {
+    if (_enVuelo) return _enVuelo;
+    _enVuelo = _cargarTodo();
+    var limpiar = function () { _enVuelo = null; };
+    _enVuelo.then(limpiar, limpiar);
+    return _enVuelo;
+  };
+
+  async function _cargarTodo() {
+    var d = db(); if (!d) return false;
+    var t0 = Date.now();
+    try {
+      var claves = Object.keys(TABLAS);
+
+      /* Todas las tablas y los catalogos a la vez, no una tras otra. */
+      var lotes = await Promise.all(
+        claves.map(function (clave) { return _leerTabla(d, TABLAS[clave]); })
+          .concat([d.from('crm_meta').select('*')])
+      );
+      var meta = lotes.pop();
+
+      var iCli = claves.indexOf('clientes');
+      var enNube = iCli > -1 ? lotes[iCli].length : 0;
       var enLocal = (typeof S !== 'undefined' && S.clientes) ? S.clientes.length : 0;
+
       if (enNube === 0 && enLocal > 0) {
-        log('warn', '[JAC] Base vacía y ' + enLocal + ' clientes locales: se conserva lo local y se sube.');
+        log('warn', '[JAC] Base vacia y ' + enLocal + ' clientes locales: se conserva lo local y se sube.');
         clearTimeout(_timer); _timer = setTimeout(volcar, 500);
         return false;
       }
@@ -12070,28 +12163,23 @@ document.addEventListener('click', function(e){
           + '. Se conserva lo local para no perder datos.');
         return false;
       }
-      for (var clave in TABLAS) {
-        var tabla = TABLAS[clave];
-        var todo = [], desde = 0;
-        while (true) {
-          var r = await d.from(tabla).select('*').range(desde, desde + 999);
-          if (r.error) { log('error', '[JAC carga ' + tabla + ']', r.error.message); break; }
-          todo = todo.concat(r.data || []);
-          if (!r.data || r.data.length < 1000) break;
-          desde += 1000;
-        }
+
+      claves.forEach(function (clave, k) {
+        var tabla = TABLAS[clave], filas = lotes[k] || [];
         _base[tabla] = {};
-        for (var i = 0; i < todo.length; i++)
-          _base[tabla][String(todo[i].id)] = hash(JSON.stringify(aFila(aObjeto(todo[i]), tabla)));
-        S[clave] = todo.map(aObjeto);
-      }
-      await window.cargarMeta();
+        for (var i = 0; i < filas.length; i++)
+          _base[tabla][String(filas[i].id)] = hash(JSON.stringify(aFila(aObjeto(filas[i]), tabla)));
+        S[clave] = filas.map(aObjeto);
+      });
+
+      _aplicarMeta(meta);
+
       try { localStorage.setItem('jacv10', JSON.stringify(S)); } catch (e) {}
-      log('info', '[JAC] Cargado: ' + (S.clientes || []).length + ' clientes, '
-        + (S.polizas || []).length + ' pólizas');
+      log('info', '[JAC] Cargado en ' + (Date.now() - t0) + ' ms: '
+        + (S.clientes || []).length + ' clientes, ' + (S.polizas || []).length + ' polizas');
       return true;
-    } catch (e) { log('error', '[JAC cargarDesdeNube]', e); return false; }
-  };
+    } catch (e) { log('error', '[JAC cargarDesdeNube] ' + e); return false; }
+  }
 
   /* Catalogos y bloques de modulos (iSeguros/BlueCross). Se leen SIEMPRE,
      aunque la carga de tablas se salte por las guardas: no viven en
@@ -12101,16 +12189,7 @@ document.addEventListener('click', function(e){
     try {
       var rm = await d.from('crm_meta').select('*');
       if (rm.error) { log('warn', '[JAC crm_meta] ' + rm.error.message); return false; }
-      (rm.data || []).forEach(function (f) {
-        if (f.clave === 'iseguros_polizas')          window._ISPols = f.valor || [];
-        else if (f.clave === 'iseguros_comisiones')  window._IS = f.valor || { cortes: [] };
-        else if (f.clave === 'bluecross_asegurados') window._BCBSDataDefault = f.valor || { asegurados: [] };
-        else if (typeof S !== 'undefined')           S[f.clave] = f.valor;
-      });
-      try {
-        if (typeof window.ISRender === 'function') window.ISRender();
-        if (typeof window.renderIS === 'function') window.renderIS();
-      } catch (e) {}
+      _aplicarMeta(rm);
       log('info', '[JAC] Modulos cargados: ' + (window._ISPols || []).length + ' polizas iSeguros, '
         + (((window._BCBSDataDefault || {}).asegurados) || []).length + ' asegurados BlueCross');
       return true;
@@ -12140,6 +12219,33 @@ document.addEventListener('click', function(e){
     return ok;
   };
 
+  /* Cortina de carga. Sin esto el CRM pinta primero la copia local vieja y
+     luego la reemplaza con la de la base, que es el parpadeo que se ve al
+     abrir. La cortina tapa hasta que la lectura termina. */
+  function cortina(mostrar) {
+    var el = document.getElementById('jac-cortina');
+    if (mostrar) {
+      if (el) return;
+      el = document.createElement('div');
+      el.id = 'jac-cortina';
+      el.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:#0f172a;'
+        + 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;'
+        + 'color:#e2e8f0;font:600 14px/1.5 system-ui,-apple-system,sans-serif';
+      el.innerHTML = '<div style="width:34px;height:34px;border:3px solid #1e3a8a;'
+        + 'border-top-color:#60a5fa;border-radius:50%;animation:jacgir .8s linear infinite"></div>'
+        + '<div>Cargando tu informacion...</div>'
+        + '<style>@keyframes jacgir{to{transform:rotate(360deg)}}</style>';
+      (document.body || document.documentElement).appendChild(el);
+      /* Nunca dejarla pegada: si algo falla, se quita sola. */
+      setTimeout(function () { cortina(false); }, 15000);
+    } else if (el) {
+      el.style.transition = 'opacity .25s';
+      el.style.opacity = '0';
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 260);
+    }
+  }
+  window.__jacCortina = cortina;
+
   (function autoSync() {
     if (_sinAlmacen) return;
     var intentos = 0;
@@ -12151,7 +12257,9 @@ document.addEventListener('click', function(e){
       d.auth.getSession().then(function (s2) {
         if (s2 && s2.data && s2.data.session) {
           clearInterval(t);
-          window.sincronizar();
+          cortina(true);
+          window.sincronizar().then(function () { cortina(false); })
+            .catch(function () { cortina(false); });
         }
       }).catch(function () {});
     }, 700);
@@ -12606,6 +12714,195 @@ document.addEventListener('click', function(e){
     catch (e) { try { console.warn('[JAC KPI]', e); } catch (e2) {} }
   };
   window.jacKPIs = function () { montar(); render(); };
+})();
+
+</script>
+
+<script>
+/* ============================================================
+   Mejoras solicitadas 2026-07-28
+   1. Formato de miles con coma en todos los montos: 7,500.00
+   2. Sin % de ITBMS por defecto en polizas
+   3. Configuracion de % comision y % ITBMS por ramo, con
+      autocompletado al elegir el ramo y edicion manual
+   4. Etiqueta del campo de cantidad de pagos, simplificada
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function log(n, a) { try { var c = console; var f = c && (c[n] || c.log); if (f) f.call(c, a); } catch (e) {} }
+
+  /* ---------- 1. formato de montos ---------- */
+  window.jacMoneda = function (v) {
+    var n = parseFloat(String(v == null ? '' : v).replace(/,/g, ''));
+    if (!isFinite(n)) n = 0;
+    return n.toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  /* Lectura numerica tolerante a comas: sin esto, formatear los campos
+     calculados rompia el guardado. */
+  var _GF = window.GF;
+  window.GF = function (id) {
+    try {
+      var v = (typeof V === 'function') ? V(id) : null;
+      var n = parseFloat(String(v == null ? '' : v).replace(/,/g, ''));
+      return isFinite(n) ? n : 0;
+    } catch (e) { return typeof _GF === 'function' ? _GF(id) : 0; }
+  };
+
+  /* ---------- 2 y 3. configuracion por ramo ---------- */
+  var RAMOS = (typeof RAMOS_ALL !== 'undefined' && RAMOS_ALL.length)
+    ? RAMOS_ALL
+    : ['AUTOS/VEHÍCULOS','MOTOS','VIDA','SALUD/MÉDICOS','INCENDIO Y LÍNEAS ALIADAS','HOGAR',
+       'ACCIDENTES PERSONALES','FIANZAS/ROBO/SUSTRACCIÓN','RESPONSABILIDAD CIVIL','SOAT',
+       'CUMPLIMIENTO','VIAJES/TURISMO'];
+
+  function cfgRamos() {
+    if (typeof S === 'undefined') return {};
+    if (!S.ramosCfg || typeof S.ramosCfg !== 'object') S.ramosCfg = {};
+    return S.ramosCfg;
+  }
+
+  /* Marca de edicion manual: si escribes un valor a mano, el cambio de ramo
+     no te lo pisa. Se limpia al abrir el formulario de nuevo. */
+  var _manual = {};
+  ['p-cb', 'p-it'].forEach(function (id) {
+    document.addEventListener('input', function (e) {
+      if (e.target && e.target.id === id) _manual[id] = true;
+    }, true);
+    document.addEventListener('change', function (e) {
+      if (e.target && e.target.id === id) _manual[id] = true;
+    }, true);
+  });
+  window.jacResetManual = function () { _manual = {}; };
+
+  var _onRC = window.onRC;
+  window.onRC = function () {
+    /* Lo estructural del original (co-corredor, coberturas) se conserva. */
+    try {
+      var r = V('p-ra');
+      var isG = (typeof GENERALES !== 'undefined' && GENERALES.has) ? GENERALES.has(r) : false;
+      var ccrow = document.getElementById('ccrow');
+      if (ccrow) ccrow.style.display = isG ? 'block' : 'none';
+      if (!isG) {
+        var phc = document.getElementById('p-hc'); if (phc) phc.checked = false;
+        var cob3 = document.getElementById('cob3'); if (cob3) cob3.className = 'cob';
+      }
+
+      /* Valores guardados para ese ramo. Si no hay nada guardado, los campos
+         quedan vacios para que los pongas a mano. */
+      var c = cfgRamos()[r] || {};
+      var it = document.getElementById('p-it');
+      var cb = document.getElementById('p-cb');
+
+      if (it && !_manual['p-it']) {
+        it.value = (c.itbms !== undefined && c.itbms !== null && c.itbms !== '') ? String(c.itbms) : '';
+      }
+      if (cb && !_manual['p-cb']) {
+        cb.value = (c.com !== undefined && c.com !== null && c.com !== '') ? String(c.com) : '';
+      }
+      if (typeof CT === 'function') CT();
+    } catch (e) {
+      log('warn', '[JAC onRC] ' + e);
+      try { if (typeof _onRC === 'function') _onRC(); } catch (e2) {}
+    }
+  };
+
+  /* ---------- recalculo con formato ---------- */
+  window.CT = function () {
+    try {
+      var pr = GF('p-pr'), itp = GF('p-it'), gex = GF('p-ge'),
+          cpct = GF('p-cb'), part = GF('p-pa') || 100, ccp = GF('p-cp');
+      var npag = GF('p-npag') || 0;
+      var itb = pr * itp / 100;
+      var tot = pr + itb + gex;
+      var cb = pr * cpct / 100;
+      var myCom = cb * part / 100;
+      var ccCom = cb * ccp / 100;
+      var F = window.jacMoneda;
+      SVal('p-ib', F(itb));
+      SVal('p-tot', F(tot));
+      SVal('p-cmes', F(tot / 12));
+      SVal('p-ctri', F(tot / 4));
+      SVal('p-csem', F(tot / 2));
+      SVal('p-canu', F(tot));
+      SVal('p-co', F(myCom));
+      SVal('p-cc2', F(ccCom));
+      SVal('p-lp', npag > 0 ? F(tot / npag) : '');
+    } catch (e) { log('warn', '[JAC CT] ' + e); }
+  };
+
+  /* ---------- panel de configuracion por ramo ---------- */
+  function panelHTML() {
+    var c = cfgRamos();
+    var filas = RAMOS.map(function (r) {
+      var v = c[r] || {};
+      return '<tr>'
+        + '<td style="font-size:12px">' + r + '</td>'
+        + '<td><input type="number" step="0.01" inputmode="decimal" class="fc" style="width:90px" '
+        + 'data-ramo="' + encodeURIComponent(r) + '" data-campo="com" '
+        + 'value="' + (v.com !== undefined ? v.com : '') + '" placeholder="—"></td>'
+        + '<td><input type="number" step="0.01" inputmode="decimal" class="fc" style="width:90px" '
+        + 'data-ramo="' + encodeURIComponent(r) + '" data-campo="itbms" '
+        + 'value="' + (v.itbms !== undefined ? v.itbms : '') + '" placeholder="—"></td>'
+        + '</tr>';
+    }).join('');
+    return '<div class="card" id="jac-ramos-cfg" style="padding:16px;margin-top:16px">'
+      + '<div style="font-size:13px;font-weight:800;margin-bottom:4px">Comisión e ITBMS por ramo</div>'
+      + '<div style="font-size:12px;color:var(--mu);margin-bottom:12px">'
+      + 'Al elegir un ramo en una póliza nueva, estos valores se colocan solos. '
+      + 'Siempre los puedes cambiar a mano en la póliza. Los que dejes vacíos aquí '
+      + 'quedarán vacíos en el formulario.</div>'
+      + '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse">'
+      + '<thead><tr style="text-align:left;font-size:11px;color:var(--mu)">'
+      + '<th style="padding:6px 4px">Ramo</th><th style="padding:6px 4px">% Comisión</th>'
+      + '<th style="padding:6px 4px">% ITBMS</th></tr></thead>'
+      + '<tbody>' + filas + '</tbody></table></div>'
+      + '<div style="margin-top:14px;display:flex;gap:8px;align-items:center">'
+      + '<button class="btn" style="background:#15803D;color:#fff;border-color:#15803D" '
+      + 'onclick="jacGuardarRamos()">Guardar porcentajes</button>'
+      + '<span id="jac-ramos-msg" style="font-size:12px;color:var(--mu)"></span></div>'
+      + '</div>';
+  }
+
+  window.jacGuardarRamos = function () {
+    var cont = document.getElementById('jac-ramos-cfg');
+    if (!cont) return;
+    var c = cfgRamos();
+    cont.querySelectorAll('input[data-ramo]').forEach(function (inp) {
+      var r = decodeURIComponent(inp.getAttribute('data-ramo'));
+      var campo = inp.getAttribute('data-campo');
+      var v = inp.value.trim();
+      if (!c[r]) c[r] = {};
+      if (v === '') delete c[r][campo];
+      else c[r][campo] = parseFloat(v);
+      if (!Object.keys(c[r]).length) delete c[r];
+    });
+    try { if (typeof save === 'function') save(); } catch (e) {}
+    var m = document.getElementById('jac-ramos-msg');
+    if (m) {
+      m.textContent = 'Guardado · ' + new Date().toLocaleTimeString('es-PA', {hour:'2-digit', minute:'2-digit'});
+      setTimeout(function () { m.textContent = ''; }, 4000);
+    }
+    if (window.toast) toast('Porcentajes por ramo guardados', 'ok');
+  };
+
+  function montarPanel() {
+    if (document.getElementById('jac-ramos-cfg')) return;
+    var host = document.getElementById('cfg') || document.querySelector('#cfg');
+    if (!host) return;
+    var div = document.createElement('div');
+    div.innerHTML = panelHTML();
+    host.appendChild(div.firstChild);
+  }
+
+  var _RCfg = window.RCfg;
+  window.RCfg = function () {
+    try { if (typeof _RCfg === 'function') _RCfg.apply(this, arguments); } catch (e) { log('warn', e); }
+    try { montarPanel(); } catch (e) { log('warn', '[JAC cfg ramos] ' + e); }
+  };
+
+  log('info', '[JAC] Mejoras activas: formato de miles, ITBMS sin default, config por ramo');
 })();
 
 </script>
