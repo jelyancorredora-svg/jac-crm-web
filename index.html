@@ -12685,6 +12685,35 @@ document.addEventListener('click', function(e){
        sub:'contra ' + k.nuevas12 + ' nuevas'}
     ]);
 
+    /* --- avance de metas, enlazado a lo configurado --- */
+    try {
+      if (typeof window.jacCalcMetas === 'function' && typeof window.jacBarraMeta === 'function') {
+        ['mes', 'anio'].forEach(function (per) {
+          var m = window.jacCalcMetas(per);
+          var hay = m.global.meta > 0 || m.ramos.length || m.asegs.length;
+          if (!hay) return;
+          var titulo = per === 'mes' ? 'Metas de comisión — este mes' : 'Metas de comisión — este año';
+          var cuerpo = '';
+          if (m.global.meta > 0) cuerpo += window.jacBarraMeta(m.global);
+          if (m.ramos.length) {
+            cuerpo += '<div style="font-size:11px;font-weight:700;color:var(--mu);margin:12px 0 6px">POR RAMO</div>';
+            cuerpo += m.ramos.map(window.jacBarraMeta).join('');
+          }
+          if (m.asegs.length) {
+            cuerpo += '<div style="font-size:11px;font-weight:700;color:var(--mu);margin:12px 0 6px">'
+              + 'POR ASEGURADORA <span style="font-weight:400;text-transform:none">('
+              + m.fuenteAseg + ')</span></div>';
+            cuerpo += m.asegs.map(window.jacBarraMeta).join('');
+          }
+          html += seccion(titulo, cuerpo);
+        });
+      } else {
+        html += seccion('Metas de comisión',
+          '<div style="font-size:12px;color:var(--mu)">Define tus metas en Configuración '
+          + 'para ver el avance aquí.</div>');
+      }
+    } catch (e) { try { console.warn('[JAC KPI metas]', e); } catch (e2) {} }
+
     html += seccion('Cartera por aseguradora — prima vigente',
       barras(k.porAseg.map(function (d) { return {etiqueta:d.etiqueta, valor:d.valor, texto:money(d.valor)}; })));
 
@@ -13438,6 +13467,248 @@ document.addEventListener('click', function(e){
   };
 
   log('info', '[JAC] Config de comisiones lista: ramo, aseguradora, combinacion y co-corretaje');
+})();
+
+</script>
+
+<script>
+/* ============================================================
+   Metas de comision por ramo y por aseguradora
+   Se configuran en Configuracion y se muestran como avance en
+   los KPIs de Informes. Conserva las metas globales que ya
+   existian en S.metas.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function log(n, a) { try { var c = console; var f = c && (c[n] || c.log); if (f) f.call(c, a); } catch (e) {} }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function num(v) { var n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
+  function money(v) {
+    if (typeof window.jacMoneda === 'function') return '$' + window.jacMoneda(v);
+    return '$' + (Math.round(v * 100) / 100).toFixed(2);
+  }
+
+  var RAMOS = (typeof RAMOS_ALL !== 'undefined' && RAMOS_ALL.length) ? RAMOS_ALL
+    : ['AUTOS/VEHÍCULOS','MOTOS','VIDA','SALUD/MÉDICOS','INCENDIO Y LÍNEAS ALIADAS','HOGAR',
+       'ACCIDENTES PERSONALES','FIANZAS/ROBO/SUSTRACCIÓN','RESPONSABILIDAD CIVIL','SOAT',
+       'CUMPLIMIENTO','VIAJES/TURISMO'];
+
+  function asegs() {
+    var out = [];
+    try { (S.aseguradoras || []).forEach(function (a) { var n = a && (a.nombre || a.nom); if (n) out.push(n); }); }
+    catch (e) {}
+    return out.sort();
+  }
+
+  function metas() {
+    if (typeof S === 'undefined') return { mensual:0, anual:0, ramos:{}, asegs:{} };
+    if (!S.metas || typeof S.metas !== 'object') S.metas = { mensual:0, anual:0 };
+    if (!S.metas.ramos || typeof S.metas.ramos !== 'object') S.metas.ramos = {};
+    if (!S.metas.asegs || typeof S.metas.asegs !== 'object') S.metas.asegs = {};
+    return S.metas;
+  }
+
+  /* ---------- comision realmente lograda ---------- */
+  function logrado(periodo) {
+    /* periodo: 'mes' o 'anio' */
+    var hoy = new Date().toISOString().slice(0, 10);
+    var pref = periodo === 'mes' ? hoy.slice(0, 7) : hoy.slice(0, 4);
+    var porRamo = {}, porAseg = {}, total = 0;
+
+    var pol = (typeof S !== 'undefined' && S.polizas) || [];
+    pol.forEach(function (p) {
+      var f = String(p.fechaInicio || '');
+      if (f.indexOf(pref) !== 0) return;
+      var c = num(p.comision);
+      if (!c) return;
+      var r = p.ramo || 'Sin ramo', a = p.aseg || 'Sin aseguradora';
+      porRamo[r] = (porRamo[r] || 0) + c;
+      porAseg[a] = (porAseg[a] || 0) + c;
+      total += c;
+    });
+
+    /* Si la tabla de comisiones tiene datos del periodo, manda para el
+       desglose por aseguradora: es lo que la compania efectivamente pago. */
+    var com = (typeof S !== 'undefined' && S.comisiones) || [];
+    var deTabla = {}, hayTabla = false;
+    com.forEach(function (c) {
+      var mes = String(c.mes || '');
+      if (mes.indexOf(pref) !== 0) return;
+      var a = c.aseg || 'Sin aseguradora';
+      deTabla[a] = (deTabla[a] || 0) + num(c.monto);
+      hayTabla = true;
+    });
+    if (hayTabla) porAseg = deTabla;
+
+    return { total: total, ramos: porRamo, asegs: porAseg, fuenteAseg: hayTabla ? 'tabla de comisiones' : 'pólizas' };
+  }
+
+  window.jacCalcMetas = function (periodo) {
+    var m = metas(), l = logrado(periodo);
+    var campo = periodo === 'mes' ? 'mensual' : 'anual';
+    function fila(nombre, meta, real) {
+      return { nombre: nombre, meta: meta, real: real,
+               pct: meta > 0 ? Math.round(real / meta * 1000) / 10 : null,
+               falta: Math.max(0, meta - real) };
+    }
+    var ramos = Object.keys(m.ramos).filter(function (r) { return num((m.ramos[r] || {})[campo]) > 0; })
+      .map(function (r) { return fila(r, num(m.ramos[r][campo]), l.ramos[r] || 0); })
+      .sort(function (a, b) { return (a.pct === null ? 999 : a.pct) - (b.pct === null ? 999 : b.pct); });
+    var aseguradoras = Object.keys(m.asegs).filter(function (a) { return num((m.asegs[a] || {})[campo]) > 0; })
+      .map(function (a) { return fila(a, num(m.asegs[a][campo]), l.asegs[a] || 0); })
+      .sort(function (a, b) { return (a.pct === null ? 999 : a.pct) - (b.pct === null ? 999 : b.pct); });
+    return {
+      periodo: periodo,
+      global: fila('Global', num(m[campo]), l.total),
+      ramos: ramos,
+      asegs: aseguradoras,
+      fuenteAseg: l.fuenteAseg
+    };
+  };
+
+  /* ---------- barra de avance para los KPIs ---------- */
+  window.jacBarraMeta = function (f) {
+    var pct = f.pct === null ? 0 : Math.min(100, f.pct);
+    var col = f.pct === null ? '#64748B' : (f.pct >= 100 ? '#15803D' : (f.pct >= 60 ? '#D97706' : '#DC2626'));
+    return '<div style="margin-bottom:10px">'
+      + '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:3px">'
+      + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(f.nombre) + '</span>'
+      + '<span style="white-space:nowrap"><strong>' + money(f.real) + '</strong>'
+      + '<span style="color:var(--mu,#64748b)"> / ' + money(f.meta) + '</span>'
+      + (f.pct !== null ? ' <strong style="color:' + col + '">' + f.pct + '%</strong>' : '') + '</span></div>'
+      + '<div style="height:7px;border-radius:4px;background:var(--bd,#e2e8f0);overflow:hidden">'
+      + '<div style="height:100%;width:' + pct + '%;background:' + col + '"></div></div>'
+      + (f.falta > 0 ? '<div style="font-size:10px;color:var(--mu,#64748b);margin-top:2px">Faltan '
+          + money(f.falta) + '</div>' : '')
+      + '</div>';
+  };
+
+  /* ---------- panel de configuracion ---------- */
+  var _tab = 'global';
+
+  function filaMeta(grupo, clave, etiqueta, v) {
+    v = v || {};
+    return '<tr>'
+      + '<td style="font-size:12px;padding:4px 6px">' + esc(etiqueta) + '</td>'
+      + '<td style="padding:4px 6px"><input type="number" step="50" class="fc" style="width:110px" '
+      + 'data-mg="' + grupo + '" data-mk="' + encodeURIComponent(clave) + '" data-mc="mensual" '
+      + 'value="' + (v.mensual !== undefined ? v.mensual : '') + '" placeholder="—"></td>'
+      + '<td style="padding:4px 6px"><input type="number" step="500" class="fc" style="width:110px" '
+      + 'data-mg="' + grupo + '" data-mk="' + encodeURIComponent(clave) + '" data-mc="anual" '
+      + 'value="' + (v.anual !== undefined ? v.anual : '') + '" placeholder="—"></td>'
+      + '</tr>';
+  }
+
+  function tabla(filas) {
+    return '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse">'
+      + '<thead><tr style="text-align:left;font-size:11px;color:var(--mu,#64748b)">'
+      + '<th style="padding:6px">Meta de comisión para</th><th style="padding:6px">Mensual ($)</th>'
+      + '<th style="padding:6px">Anual ($)</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+  }
+
+  function cuerpo() {
+    var m = metas();
+    if (_tab === 'global') {
+      return tabla('<tr><td style="font-size:12px;padding:4px 6px">Toda la cartera</td>'
+        + '<td style="padding:4px 6px"><input type="number" step="50" class="fc" style="width:110px" '
+        + 'data-mg="global" data-mk="_" data-mc="mensual" value="' + (m.mensual || '') + '" placeholder="—"></td>'
+        + '<td style="padding:4px 6px"><input type="number" step="500" class="fc" style="width:110px" '
+        + 'data-mg="global" data-mk="_" data-mc="anual" value="' + (m.anual || '') + '" placeholder="—"></td></tr>')
+        + '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:8px">'
+        + 'Es la meta que ya tenías. Se conserva y ahora se ve como avance en Informes.</div>';
+    }
+    if (_tab === 'ramos') {
+      return tabla(RAMOS.map(function (r) { return filaMeta('ramos', r, r, m.ramos[r]); }).join(''))
+        + '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:8px">'
+        + 'El avance por ramo se calcula con la comisión de las pólizas emitidas en el período.</div>';
+    }
+    var as = asegs();
+    return tabla(as.length ? as.map(function (a) { return filaMeta('asegs', a, a, m.asegs[a]); }).join('')
+                           : '<tr><td colspan="3" style="padding:10px;font-size:12px">Sin aseguradoras cargadas.</td></tr>')
+      + '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:8px">'
+      + 'El avance por aseguradora usa la tabla de comisiones si tiene datos del período; '
+      + 'si no, la comisión de las pólizas.</div>';
+  }
+
+  function panelHTML() {
+    var tabs = [['global','Global'],['ramos','Por ramo'],['asegs','Por aseguradora']];
+    return '<div class="card" id="jac-metas-cfg" style="padding:16px;margin-top:16px">'
+      + '<div style="font-size:13px;font-weight:800">Metas de comisión</div>'
+      + '<div style="font-size:12px;color:var(--mu,#64748b);margin:4px 0 12px">'
+      + 'Lo que definas aquí aparece como barras de avance en Informes, con el porcentaje '
+      + 'logrado y cuánto falta.</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+      + tabs.map(function (t) {
+          return '<button class="btn' + (_tab === t[0] ? '' : ' bgh') + '" style="padding:5px 12px;font-size:12px'
+            + (_tab === t[0] ? ';background:#1E3A8A;color:#fff;border-color:#1E3A8A' : '')
+            + '" onclick="jacTabMetas(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join('')
+      + '</div><div>' + cuerpo() + '</div>'
+      + '<div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      + '<button class="btn" style="background:#15803D;color:#fff;border-color:#15803D" '
+      + 'onclick="jacGuardarMetas()">Guardar metas</button>'
+      + '<span id="jac-metas-msg" style="font-size:12px;color:var(--mu,#64748b)"></span></div></div>';
+  }
+
+  window.jacTabMetas = function (t) {
+    window.jacGuardarMetas(true);
+    _tab = t;
+    var p = document.getElementById('jac-metas-cfg');
+    if (p) p.outerHTML = panelHTML();
+  };
+
+  window.jacGuardarMetas = function (silencioso) {
+    var p = document.getElementById('jac-metas-cfg');
+    if (!p) return;
+    var m = metas();
+    p.querySelectorAll('input[data-mg]').forEach(function (inp) {
+      var g = inp.getAttribute('data-mg');
+      var k = decodeURIComponent(inp.getAttribute('data-mk'));
+      var campo = inp.getAttribute('data-mc');
+      var v = inp.value.trim();
+      if (g === 'global') { m[campo] = v === '' ? 0 : parseFloat(v); return; }
+      if (!m[g][k]) m[g][k] = {};
+      if (v === '') delete m[g][k][campo];
+      else m[g][k][campo] = parseFloat(v);
+      if (!Object.keys(m[g][k]).length) delete m[g][k];
+    });
+    if (typeof save === 'function') save();
+    try { if (typeof window.jacKPIs === 'function') window.jacKPIs(); } catch (e) {}
+    if (silencioso) return;
+    var el = document.getElementById('jac-metas-msg');
+    if (el) {
+      el.textContent = 'Guardado · ' + new Date().toLocaleTimeString('es-PA', {hour:'2-digit', minute:'2-digit'});
+      setTimeout(function () { el.textContent = ''; }, 4000);
+    }
+    if (window.toast) toast('Metas guardadas', 'ok');
+  };
+
+  function montar() {
+    if (document.getElementById('jac-metas-cfg')) return true;
+    var host = document.getElementById('pg-cfg') || document.getElementById('cfg')
+            || document.querySelector('[id$="-cfg"]');
+    if (!host) { log('warn', '[JAC] No encontre el contenedor de Configuracion (metas).'); return false; }
+    var d = document.createElement('div');
+    d.innerHTML = panelHTML();
+    host.appendChild(d.firstChild);
+    return true;
+  }
+  window.jacMontarMetas = montar;
+
+  var _RCfg = window.RCfg;
+  window.RCfg = function () {
+    try { if (typeof _RCfg === 'function') _RCfg.apply(this, arguments); } catch (e) { log('warn', e); }
+    var n = 0;
+    var t = setInterval(function () {
+      n++;
+      var ok = false;
+      try { ok = montar(); } catch (e) { log('warn', '[JAC metas] ' + e); }
+      if (ok || n > 12) clearInterval(t);
+    }, 300);
+  };
+
+  log('info', '[JAC] Metas por ramo y aseguradora listas, enlazadas a los KPIs');
 })();
 
 </script>
