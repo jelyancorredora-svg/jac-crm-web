@@ -12894,18 +12894,31 @@ document.addEventListener('click', function(e){
   };
 
   function montarPanel() {
-    if (document.getElementById('jac-ramos-cfg')) return;
-    var host = document.getElementById('cfg') || document.querySelector('#cfg');
-    if (!host) return;
+    if (document.getElementById('jac-ramos-cfg')) return true;
+    /* Los contenedores de seccion se llaman pg-<modulo>, no <modulo>.
+       Buscar solo 'cfg' hacia que el panel no se montara nunca, sin error. */
+    var host = document.getElementById('pg-cfg')
+            || document.getElementById('cfg')
+            || document.querySelector('[id$="-cfg"]');
+    if (!host) { log('warn', '[JAC] No encontre el contenedor de Configuracion.'); return false; }
     var div = document.createElement('div');
     div.innerHTML = panelHTML();
     host.appendChild(div.firstChild);
+    return true;
   }
+  window.jacMontarRamos = montarPanel;
 
   var _RCfg = window.RCfg;
   window.RCfg = function () {
     try { if (typeof _RCfg === 'function') _RCfg.apply(this, arguments); } catch (e) { log('warn', e); }
-    try { montarPanel(); } catch (e) { log('warn', '[JAC cfg ramos] ' + e); }
+    /* Un reintento corto: si la seccion aun no esta dibujada, se monta al aparecer. */
+    var n = 0;
+    var t = setInterval(function () {
+      n++;
+      var ok = false;
+      try { ok = montarPanel(); } catch (e) { log('warn', '[JAC cfg ramos] ' + e); }
+      if (ok || n > 12) clearInterval(t);
+    }, 300);
   };
 
   log('info', '[JAC] Mejoras activas: formato de miles, ITBMS sin default, config por ramo');
