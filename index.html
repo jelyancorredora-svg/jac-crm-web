@@ -942,6 +942,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <a class="bni" onclick="toggleBnMore()" id="bn-more"><div class="ico">☰</div><div class="lbl">Más</div></a>
 </div></div>
 <div class="bmm" id="bmm">
+ <a onclick="jacImportarPortal('is_cartera');closeBnMore()"><span style="font-size:16px">📥</span>Importar portal</a>
  <a onclick="SH('cal');try{renderCal()}catch(e){};closeBnMore()"><span style="font-size:16px">📅</span>Agenda</a>
  <a onclick="SH('inf');try{renderInformes()}catch(e){};closeBnMore()"><span style="font-size:16px">📊</span>Informes</a>
  <a onclick="SH('is');try{isRender('cartera')}catch(e){};closeBnMore()"><span style="font-size:16px">🏥</span>iSeguros</a>
@@ -10060,6 +10061,11 @@ function isRenderSalud() {
 
 function isSyncPortalIS() {
   window.open('https://iseguros.com/corredor_web2/inicio.aspx', 'isPortal', 'width=1100,height=750');
+  /* El portal no expone datos al CRM. Se abre para que copies la tabla y
+     enseguida se ofrece el importador, que la interpreta. */
+  setTimeout(function () {
+    if (typeof window.jacImportarPortal === 'function') window.jacImportarPortal('is_cartera');
+  }, 800);
 }
 
 function isSyncPortalSalud() {
@@ -11858,7 +11864,7 @@ document.addEventListener('click', function(e){
     comisiones: 'comisiones', prospectos: 'prospectos',
     ventasCruzadas: 'ventas_cruzadas'
   };
-  var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg'];
+  var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg', 'univivir'];
   var COLS = window.__JAC_COLS || {};
 
   function snake(c) {
@@ -12903,6 +12909,323 @@ document.addEventListener('click', function(e){
   };
 
   log('info', '[JAC] Mejoras activas: formato de miles, ITBMS sin default, config por ramo');
+})();
+
+</script>
+
+<script>
+/* ============================================================
+   Importador de portales — iSeguros, BlueCross y UniVivir
+   Pegas la tabla del portal y la convierte en registros del CRM,
+   que suben a Supabase como todo lo demas. No guarda contrasenas
+   ni depende del diseno de la pagina, asi que no se rompe cuando
+   el portal cambia.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function log(n, a) { try { var c = console; var f = c && (c[n] || c.log); if (f) f.call(c, a); } catch (e) {} }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function norm(s) {
+    return String(s == null ? '' : s).toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+  function num(v) {
+    var n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+    return isFinite(n) ? n : 0;
+  }
+  function fecha(v) {
+    if (!v) return '';
+    var s = String(v).trim();
+    var m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (m) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+    m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+    return s;
+  }
+
+  /* ---------- destinos ---------- */
+  var DESTINOS = {
+    is_cartera: {
+      titulo: 'iSeguros — Cartera de pólizas',
+      clave: 'n',
+      campos: [
+        {id:'n',  et:'Nº Póliza',   alias:['poliza','nropoliza','numeropoliza','nopoliza','npoliza','contrato']},
+        {id:'c',  et:'Asegurado',   alias:['asegurado','nombreasegurado','nombre','cliente']},
+        {id:'ci', et:'Cédula/Doc',  alias:['cedula','documento','doc','identificacion','ruc','pasaporte']},
+        {id:'contratante', et:'Contratante', alias:['contratante','tomador','titular']},
+        {id:'r',  et:'Ramo',        alias:['ramo','producto','plan','tiposeguro','cobertura']},
+        {id:'pr', et:'Prima',       alias:['prima','primaneta','monto','valor','importe'], tipo:'num'},
+        {id:'es', et:'Estado',      alias:['estado','estatus','situacion','vigencia1']},
+        {id:'fi', et:'Inicio',      alias:['inicio','desde','fechainicio','vigenciadesde','emision'], tipo:'fecha'},
+        {id:'ff', et:'Fin',         alias:['fin','hasta','vence','fechafin','vencimiento','vigenciahasta'], tipo:'fecha'},
+        {id:'fp', et:'Forma pago',  alias:['formapago','formadepago','pago','modalidad']},
+        {id:'pe', et:'Periodo',     alias:['periodo','periodicidad','frecuencia','vigencia']}
+      ]
+    },
+    is_comisiones: {
+      titulo: 'iSeguros — Corte de comisiones',
+      clave: 'recibo',
+      campos: [
+        {id:'dia',       et:'Día',        alias:['dia','fecha','fec']},
+        {id:'poliza',    et:'Póliza',     alias:['poliza','nropoliza','contrato','numero']},
+        {id:'asegurado', et:'Asegurado',  alias:['asegurado','nombre','cliente','contratante']},
+        {id:'recibo',    et:'Recibo',     alias:['recibo','norecibo','comprobante','documento']},
+        {id:'prima',     et:'Prima',      alias:['prima','primaneta','monto'], tipo:'num'},
+        {id:'pctCom',    et:'% Comisión', alias:['pctcom','porcentaje','comisionpct','pcom','porccom'], tipo:'num'},
+        {id:'comNormal', et:'Com. normal',alias:['comnormal','comision','comisionnormal'], tipo:'num'},
+        {id:'sobreCom',  et:'Sobrecom.',  alias:['sobrecom','sobrecomision','sobre'], tipo:'num'},
+        {id:'cobranza',  et:'Cobranza',   alias:['cobranza'], tipo:'num'},
+        {id:'descontada',et:'Descontada', alias:['descontada','descuento'], tipo:'num'},
+        {id:'dbCr',      et:'Débito/Créd',alias:['dbcr','debitocredito','dbcr1','saldo'], tipo:'num'},
+        {id:'total',     et:'Total',      alias:['total','totalpagar','neto'], tipo:'num'}
+      ]
+    },
+    bluecross: {
+      titulo: 'BlueCross — Asegurados',
+      clave: 'poliza',
+      campos: [
+        {id:'poliza',      et:'Póliza',      alias:['poliza','nropoliza','contrato','numero']},
+        {id:'cert',        et:'Certificado', alias:['cert','certificado','nocert']},
+        {id:'tipo',        et:'Tipo',        alias:['tipo','tipoplan','modalidad']},
+        {id:'contratante', et:'Contratante', alias:['contratante','tomador','titular']},
+        {id:'asegurado',   et:'Asegurado',   alias:['asegurado','nombre','beneficiario']},
+        {id:'doc',         et:'Documento',   alias:['doc','documento','cedula','identificacion','pasaporte']},
+        {id:'vigencia',    et:'Vigencia',    alias:['vigencia','periodo','desdehasta']}
+      ]
+    },
+    uv_pagos: {
+      titulo: 'UniVivir — Pagos',
+      clave: 'nroPol',
+      campos: [
+        {id:'nroPol',  et:'Nº Póliza', alias:['poliza','nropol','nropoliza','contrato','numero']},
+        {id:'nombre',  et:'Asegurado', alias:['asegurado','nombre','cliente','contratante']},
+        {id:'prima',   et:'Prima',     alias:['prima','monto','valor','importe'], tipo:'num'},
+        {id:'estatus', et:'Estatus',   alias:['estatus','estado','situacion']},
+        {id:'fecha',   et:'Fecha',     alias:['fecha','fec','fechapago'], tipo:'fecha'}
+      ]
+    },
+    uv_comisiones: {
+      titulo: 'UniVivir — Comisiones',
+      clave: 'poliza',
+      campos: [
+        {id:'poliza',   et:'Nº Póliza', alias:['poliza','nropol','nropoliza','contrato','numero']},
+        {id:'nombre',   et:'Asegurado', alias:['asegurado','nombre','cliente']},
+        {id:'prima',    et:'Prima',     alias:['prima','monto'], tipo:'num'},
+        {id:'comision', et:'Comisión',  alias:['comision','com','montocomision'], tipo:'num'},
+        {id:'fecha',    et:'Fecha',     alias:['fecha','fec','periodo'], tipo:'fecha'}
+      ]
+    }
+  };
+
+  /* ---------- parser de texto pegado ---------- */
+  function partir(linea) {
+    if (linea.indexOf('\t') > -1) return linea.split('\t');
+    if (linea.indexOf('|') > -1) return linea.split('|');
+    if (/\s{2,}/.test(linea)) return linea.split(/\s{2,}/);
+    return linea.split(/\s{1,}/);
+  }
+
+  function analizar(texto, destino) {
+    var def = DESTINOS[destino];
+    var lineas = texto.split(/\r?\n/).map(function (l) { return l.trim(); })
+                      .filter(function (l) { return l.length > 0; });
+    if (!lineas.length) return { error: 'No pegaste nada.' };
+
+    /* La cabecera es la fila con mas coincidencias contra los nombres conocidos. */
+    var mejor = -1, mejorPuntos = 0, mejorCeldas = null;
+    for (var i = 0; i < Math.min(lineas.length, 12); i++) {
+      var celdas = partir(lineas[i]).map(function (c) { return c.trim(); });
+      var puntos = 0;
+      celdas.forEach(function (c) {
+        var n = norm(c);
+        if (!n) return;
+        def.campos.forEach(function (f) {
+          if (f.alias.indexOf(n) > -1) puntos++;
+          else if (n && f.alias.some(function (a) { return n.indexOf(a) === 0 || a.indexOf(n) === 0; })) puntos += 0.5;
+        });
+      });
+      if (puntos > mejorPuntos) { mejorPuntos = puntos; mejor = i; mejorCeldas = celdas; }
+    }
+    if (mejor < 0 || mejorPuntos < 2) {
+      return { error: 'No reconocí una fila de encabezados. Copia la tabla incluyendo los títulos de las columnas.' };
+    }
+
+    /* columna -> campo */
+    var mapa = mejorCeldas.map(function (c) {
+      var n = norm(c);
+      var exacto = null, parcial = null;
+      def.campos.forEach(function (f) {
+        if (f.alias.indexOf(n) > -1) exacto = f.id;
+        else if (!parcial && n && f.alias.some(function (a) { return n.indexOf(a) === 0 || a.indexOf(n) === 0; })) parcial = f.id;
+      });
+      return exacto || parcial || '';
+    });
+
+    var filas = [];
+    for (var j = mejor + 1; j < lineas.length; j++) {
+      var celdas2 = partir(lineas[j]).map(function (c) { return c.trim(); });
+      if (celdas2.length < 2) continue;
+      var reg = {}, algo = false;
+      celdas2.forEach(function (val, k) {
+        var campo = mapa[k];
+        if (!campo || val === '') return;
+        var f = def.campos.filter(function (x) { return x.id === campo; })[0];
+        reg[campo] = f && f.tipo === 'num' ? num(val) : (f && f.tipo === 'fecha' ? fecha(val) : val);
+        algo = true;
+      });
+      if (algo && reg[def.clave]) filas.push(reg);
+    }
+    return { encabezados: mejorCeldas, mapa: mapa, filas: filas };
+  }
+
+  /* ---------- interfaz ---------- */
+  var _analisis = null, _destino = null;
+
+  window.jacImportarPortal = function (destino) {
+    _destino = destino || 'is_cartera';
+    var def = DESTINOS[_destino];
+    var v = document.getElementById('jac-imp');
+    if (v) v.remove();
+    var d = document.createElement('div');
+    d.id = 'jac-imp';
+    d.style.cssText = 'position:fixed;inset:0;z-index:2147483645;background:rgba(2,6,23,.75);'
+      + 'display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto';
+    d.innerHTML = '<div style="background:var(--cd,#fff);color:var(--tx,#0f172a);max-width:900px;width:100%;'
+      + 'border-radius:12px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.4)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">'
+      + '<h3 style="margin:0;font-size:17px">Importar desde el portal</h3>'
+      + '<button class="btn" onclick="document.getElementById(\'jac-imp\').remove()">✕</button></div>'
+      + '<div style="font-size:12px;color:var(--mu,#64748b);margin-bottom:14px">'
+      + 'Abre el portal, selecciona la tabla <strong>con sus títulos de columna</strong>, cópiala y pégala aquí. '
+      + 'No hace falta que el orden coincida: los títulos me dicen qué es cada cosa.</div>'
+      + '<label style="font-size:12px;color:var(--mu,#64748b)">Qué estás importando</label>'
+      + '<select class="fc" id="jac-imp-dest" style="width:100%;margin:4px 0 12px" onchange="jacImportarPortal(this.value)">'
+      + Object.keys(DESTINOS).map(function (k) {
+          return '<option value="' + k + '"' + (k === _destino ? ' selected' : '') + '>' + DESTINOS[k].titulo + '</option>';
+        }).join('') + '</select>'
+      + '<textarea id="jac-imp-txt" class="fc" style="width:100%;height:180px;font-family:ui-monospace,Menlo,monospace;'
+      + 'font-size:12px" placeholder="Pega aquí la tabla del portal..."></textarea>'
+      + '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+      + '<button class="btn" style="background:#1E3A8A;color:#fff;border-color:#1E3A8A" onclick="jacImpAnalizar()">Analizar</button>'
+      + '<button class="btn" id="jac-imp-ok" style="background:#15803D;color:#fff;border-color:#15803D;display:none" '
+      + 'onclick="jacImpAplicar()">Importar</button></div>'
+      + '<div id="jac-imp-prev" style="margin-top:14px"></div>'
+      + '</div>';
+    document.body.appendChild(d);
+  };
+
+  window.jacImpAnalizar = function () {
+    var txt = (document.getElementById('jac-imp-txt') || {}).value || '';
+    var prev = document.getElementById('jac-imp-prev');
+    var btn = document.getElementById('jac-imp-ok');
+    _analisis = analizar(txt, _destino);
+    if (_analisis.error) {
+      prev.innerHTML = '<div style="color:#DC2626;font-size:13px">' + esc(_analisis.error) + '</div>';
+      if (btn) btn.style.display = 'none';
+      return;
+    }
+    var def = DESTINOS[_destino];
+    var noMapeados = _analisis.encabezados.filter(function (h, i) { return !_analisis.mapa[i]; });
+    var faltantes = def.campos.filter(function (f) { return _analisis.mapa.indexOf(f.id) === -1; });
+
+    var tabla = '<div style="overflow:auto;border:1px solid var(--bd,#e2e8f0);border-radius:8px">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:11px">'
+      + '<thead><tr>' + def.campos.map(function (f) {
+          return '<th style="padding:5px 7px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--bd,#e2e8f0)">'
+            + esc(f.et) + '</th>'; }).join('') + '</tr></thead><tbody>'
+      + _analisis.filas.slice(0, 6).map(function (r) {
+          return '<tr>' + def.campos.map(function (f) {
+            return '<td style="padding:4px 7px;border-bottom:1px solid var(--bd,#f1f5f9)">'
+              + esc(r[f.id] === undefined ? '' : r[f.id]) + '</td>'; }).join('') + '</tr>'; }).join('')
+      + '</tbody></table></div>';
+
+    prev.innerHTML = '<div style="font-size:13px;margin-bottom:8px"><strong>'
+      + _analisis.filas.length + ' registros</strong> entendidos'
+      + (_analisis.filas.length > 6 ? ' — muestro los primeros 6' : '') + '.</div>'
+      + tabla
+      + (noMapeados.length ? '<div style="font-size:11px;color:#D97706;margin-top:8px">Columnas que ignoré: '
+          + noMapeados.map(esc).join(', ') + '</div>' : '')
+      + (faltantes.length ? '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:4px">Sin datos para: '
+          + faltantes.map(function (f) { return esc(f.et); }).join(', ') + '</div>' : '')
+      + '<div style="font-size:12px;margin-top:12px">'
+      + '<label><input type="radio" name="jacImpModo" value="fusionar" checked> Actualizar y agregar (recomendado)</label>'
+      + '&nbsp;&nbsp;<label><input type="radio" name="jacImpModo" value="reemplazar"> Reemplazar todo</label></div>'
+      + '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:4px">'
+      + 'Actualizar y agregar respeta lo que ya tienes: solo cambia los registros con el mismo '
+      + esc(def.campos.filter(function (f) { return f.id === def.clave; })[0].et) + ' y añade los nuevos.</div>';
+    if (btn && _analisis.filas.length) btn.style.display = 'inline-flex';
+  };
+
+  window.jacImpAplicar = function () {
+    if (!_analisis || !_analisis.filas || !_analisis.filas.length) return;
+    var def = DESTINOS[_destino], nuevas = _analisis.filas;
+    var modoEl = document.querySelector('input[name="jacImpModo"]:checked');
+    var reemplazar = modoEl && modoEl.value === 'reemplazar';
+
+    function fusionar(actuales) {
+      if (reemplazar) return nuevas.slice();
+      var porClave = {};
+      (actuales || []).forEach(function (r) { porClave[String(r[def.clave])] = r; });
+      nuevas.forEach(function (r) {
+        var k = String(r[def.clave]);
+        porClave[k] = porClave[k] ? Object.assign({}, porClave[k], r) : r;
+      });
+      return Object.keys(porClave).map(function (k) { return porClave[k]; });
+    }
+
+    var resumen = '';
+    try {
+      if (_destino === 'is_cartera') {
+        var antes = (window._ISPols || []).length;
+        window._ISPols = fusionar(window._ISPols || []);
+        resumen = antes + ' → ' + window._ISPols.length + ' pólizas';
+      } else if (_destino === 'bluecross') {
+        window._BCBSDataDefault = window._BCBSDataDefault || { asegurados: [] };
+        var antesB = (window._BCBSDataDefault.asegurados || []).length;
+        window._BCBSDataDefault.asegurados = fusionar(window._BCBSDataDefault.asegurados || []);
+        window._BCBSDataDefault.lastSync = new Date().toISOString().slice(0, 10);
+        resumen = antesB + ' → ' + window._BCBSDataDefault.asegurados.length + ' asegurados';
+      } else if (_destino === 'is_comisiones') {
+        window._IS = window._IS || { cortes: [] };
+        if (!Array.isArray(window._IS.cortes)) window._IS.cortes = [];
+        var fec = new Date().toISOString().slice(0, 10);
+        var existente = window._IS.cortes.filter(function (c) { return c.fecCorte === fec; })[0];
+        if (existente) existente.records = fusionar(existente.records || []);
+        else window._IS.cortes.unshift({ fecCorte: fec, records: nuevas.slice(), totales: {} });
+        window._IS.lastSync = fec;
+        resumen = nuevas.length + ' registros en el corte ' + fec;
+      } else if (_destino === 'uv_pagos' || _destino === 'uv_comisiones') {
+        if (typeof S === 'undefined') throw new Error('CRM no listo');
+        S.univivir = S.univivir || {};
+        var campo = _destino === 'uv_pagos' ? 'pagos' : 'comisiones';
+        var antesU = (S.univivir[campo] || []).length;
+        S.univivir[campo] = fusionar(S.univivir[campo] || []);
+        S.univivir.lastSync = new Date().toISOString();
+        resumen = antesU + ' → ' + S.univivir[campo].length + ' en ' + campo;
+      }
+
+      if (typeof save === 'function') save();
+      log('info', '[JAC importador] ' + def.titulo + ': ' + resumen);
+      if (window.toast) toast('Importado: ' + resumen, 'ok');
+
+      try {
+        if (typeof isRender === 'function' && _destino.indexOf('is_') === 0) isRender('cartera');
+        if (typeof isRender === 'function' && _destino === 'bluecross') isRender('salud');
+        if (typeof uvRenderStats === 'function') uvRenderStats();
+        if (typeof uvRenderTable === 'function') uvRenderTable();
+      } catch (e) {}
+
+      var v = document.getElementById('jac-imp'); if (v) v.remove();
+    } catch (e) {
+      log('error', '[JAC importador] ' + e);
+      if (window.toast) toast('Error al importar: ' + (e.message || e), 'err');
+    }
+  };
+
+  log('info', '[JAC] Importador de portales listo — jacImportarPortal()');
 })();
 
 </script>
