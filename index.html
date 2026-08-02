@@ -1,6 +1,7 @@
 <!DOCTYPE html><!-- v128 -->
 <html lang="es">
 <head>
+<script>window.JAC_SSRP_TXT="Regulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.";</script>
 <script>
 /* Relleno de consola. Algunos entornos (vistas previas, iframes con sandbox,
    webviews) no traen console.info, console.debug o console.table. El codigo
@@ -3093,7 +3094,7 @@ function openEmailForClient(cid){
  const c=GC(cid);if(!c.email){toast('Cliente sin email registrado','err');return;}
  const fn=(c.nombre||'').split(' ')[0];
  const sub=`JAC Seguros — Hola ${fn}`;
- const body=`Estimado/a ${c.nombre},\n\nEspero que se encuentre muy bien.\n\nMe pongo en contacto desde JAC Seguros | Jely An Castro.\n\n\n\nQuedo atenta a su respuesta.\n\nAtentamente,\nJely An Castro Pérez\nJely An Castro\nJAC Seguros | Lic. #6175\n📞 +507 6292-6010`;
+ const body=`Estimado/a ${c.nombre},\n\nEspero que se encuentre muy bien.\n\nMe pongo en contacto desde JAC Seguros | Jely An Castro.\n\n\n\nQuedo atenta a su respuesta.\n\nAtentamente,\nJely An Castro Pérez\nJAC Seguros | Jely An Castro, corredora de seguros\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com\n📧 jelyancorredora@gmail.com\n🌐 www.jacsegurospa.com\n📍 Panamá\n\nRegulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.`;
  openComposeEmail(c.email,c.nombre,sub,body,'cliente',cid);
 }
 function openEmailForPros(pid){
@@ -3101,7 +3102,7 @@ function openEmailForPros(pid){
  const fn=(p.nombre||'').split(' ')[0];
  const interes=(p.interes||[]).join(', ')||'seguros';
  const sub=`JAC Seguros — Cotización ${interes}`;
- const body=`Hola ${fn} 👋\n\nGracias por tu interés en los seguros de ${interes}.\n\nAdjunto / a continuación te comparto la información de la cotización preparada especialmente para ti.\n\nCualquier pregunta, ¡con gusto te atiendo!\n\nAtentamente,\nJely An Castro Pérez\nJely An Castro\nJAC Seguros | Lic. #6175\n📞 +507 6292-6010`;
+ const body=`Hola ${fn} 👋\n\nGracias por tu interés en los seguros de ${interes}.\n\nAdjunto / a continuación te comparto la información de la cotización preparada especialmente para ti.\n\nCualquier pregunta, ¡con gusto te atiendo!\n\nAtentamente,\nJely An Castro Pérez\nJAC Seguros | Jely An Castro, corredora de seguros\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com\n📧 jelyancorredora@gmail.com\n🌐 www.jacsegurospa.com\n📍 Panamá\n\nRegulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.`;
  openComposeEmail(p.email,p.nombre,sub,body,'prospecto',pid);
 }
 function openEmailForPol(pid){
@@ -3110,7 +3111,7 @@ function openEmailForPol(pid){
  const fn=(cl.nombre||p.nombreCliente||'').split(' ')[0];
  const d=dFrom(p.fechaFin);
  const sub=d>=0?`⚠️ Tu póliza ${p.ramo} vence en ${d} días — JAC Seguros`:`Renovación póliza ${p.ramo} — JAC Seguros`;
- const body=`Hola ${fn} 👋\n\nTe contacto respecto a tu póliza de *${p.ramo}* con ${p.aseg} (N° ${p.num}).\n\nFecha de vencimiento: ${fmt(p.fechaFin)}\n${d>=0?`⚠️ Faltan solo ${d} días para vencer.`:'⚠️ Tu póliza ya venció.'}\n\nPara renovarla y mantener tu cobertura sin interrupciones, contáctame.\n\nSaludos,\nJely An Castro Pérez\nJely An Castro\nJAC Seguros | Lic. #6175\n📞 +507 6292-6010`;
+ const body=`Hola ${fn} 👋\n\nTe contacto respecto a tu póliza de *${p.ramo}* con ${p.aseg} (N° ${p.num}).\n\nFecha de vencimiento: ${fmt(p.fechaFin)}\n${d>=0?`⚠️ Faltan solo ${d} días para vencer.`:'⚠️ Tu póliza ya venció.'}\n\nPara renovarla y mantener tu cobertura sin interrupciones, contáctame.\n\nSaludos,\nJely An Castro Pérez\nJAC Seguros | Jely An Castro, corredora de seguros\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com\n📧 jelyancorredora@gmail.com\n🌐 www.jacsegurospa.com\n📍 Panamá\n\nRegulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.`;
  openComposeEmail(email,cl.nombre||p.nombreCliente||'',sub,body,'poliza',pid);
 }
 function openEmailForTarea(tid){
@@ -3121,7 +3122,7 @@ function openEmailForTarea(tid){
  if(!email){toast('Sin email en el contacto relacionado','err');return;}
  const fn=(nombre||'').split(' ')[0];
  const sub=`JAC Seguros — ${t.titulo}`;
- const body=`Hola ${fn} 👋\n\nTe contacto respecto a: ${t.titulo}\n${t.desc?('\n'+t.desc+'\n'):''}\n\nQuedo pendiente.\n\nAtentamente,\nJely An Castro Pérez\nJely An Castro\nJAC Seguros | Lic. #6175\n📞 +507 6292-6010`;
+ const body=`Hola ${fn} 👋\n\nTe contacto respecto a: ${t.titulo}\n${t.desc?('\n'+t.desc+'\n'):''}\n\nQuedo pendiente.\n\nAtentamente,\nJely An Castro Pérez\nJAC Seguros | Jely An Castro, corredora de seguros\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com\n📧 jelyancorredora@gmail.com\n🌐 www.jacsegurospa.com\n📍 Panamá\n\nRegulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.`;
  openComposeEmail(email,nombre,sub,body,'tarea',tid);
 }
 function openEmailForSin(sid){
@@ -3131,7 +3132,7 @@ function openEmailForSin(sid){
  if(!email){toast('Sin email del asegurado registrado','err');return;}
  const fn=(cl.nombre||s.cliente||s.asegurado||'').split(' ')[0];
  const sub=`Actualización siniestro ${s.numCia||s.numSin||''} — JAC Seguros`;
- const body=`Hola ${fn} 👋\n\nTe enviamos una actualización sobre tu siniestro ${s.nombre?' de *'+s.nombre+'*':''} (Ref: ${s.numCia||s.numSin||'—'}).\n\nEstado actual: ${s.estado||'—'}\n${s.seguimiento||s.desc||''}\n\nAnte cualquier consulta, estamos a tu disposición.\n\nAtentamente,\nJely An Castro Pérez\nJely An Castro\nJAC Seguros | Lic. #6175\n📞 +507 6292-6010`;
+ const body=`Hola ${fn} 👋\n\nTe enviamos una actualización sobre tu siniestro ${s.nombre?' de *'+s.nombre+'*':''} (Ref: ${s.numCia||s.numSin||'—'}).\n\nEstado actual: ${s.estado||'—'}\n${s.seguimiento||s.desc||''}\n\nAnte cualquier consulta, estamos a tu disposición.\n\nAtentamente,\nJely An Castro Pérez\nJAC Seguros | Jely An Castro, corredora de seguros\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com\n📧 jelyancorredora@gmail.com\n🌐 www.jacsegurospa.com\n📍 Panamá\n\nRegulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.`;
  openComposeEmail(email,cl.nombre||s.cliente||s.asegurado||'',sub,body,'siniestro',sid);
 }
 function sendEmailViaMailto(){
@@ -5426,7 +5427,7 @@ function syncPolPagos(){var aseg=(document.getElementById("p-as")||{}).value||""
 <!-- ═══ SUPABASE PATCH · JAC Seguros ═══ -->
 <script>
 // ═══════════════════════════════════════════════════════════════
-// JAC Seguros · Lic. #6175 · Parche Supabase
+// JAC Seguros · Parche Supabase
 // ─── INSTRUCCIONES ───────────────────────────────────────────
 // 1. Reemplaza las dos líneas de configuración de abajo con
 // los valores de tu proyecto Supabase.
@@ -5793,7 +5794,7 @@ function syncPolPagos(){var aseg=(document.getElementById("p-as")||{}).value||""
 
 
 // ═══════════════════════════════════════════════════════════════
-// JAC Seguros · Lic. #6175 · Parche v2 — Cumpleaños, Recordatorios,
+// JAC Seguros · Parche v2 — Cumpleaños, Recordatorios,
 // EmailJS, Dashboard mejorado
 // ═══════════════════════════════════════════════════════════════
 
@@ -5827,6 +5828,8 @@ function saveEmailJSConfig() {
  const st = document.getElementById('ejs-status');
  if (st) { st.style.display='block'; st.style.color='#15803D'; st.textContent = '✅ Configuración guardada correctamente.'; }
  if (typeof toast === 'function') toast('EmailJS configurado ✓');
+ try{ S.emailjs = cfg; if(typeof save==='function') save(); }catch(e){}
+ /* vivia solo en localStorage: por eso se perdia al limpiar el cache */
 }
 function testEmailJS() {
  const cfg = JSON.parse(localStorage.getItem('jac_ejs_cfg') || '{}');
@@ -5842,9 +5845,9 @@ function testEmailJS() {
  emailjs.send(cfg['ejs-svc'], cfg['ejs-tpl-bday'], {
  to_name: 'JAC Seguros Test',
  to_email: 'jelyancorredora@gmail.com',
- subject: 'Test EmailJS — JAC Seguros · Lic. #6175',
+ subject: 'Test EmailJS — JAC Seguros',
  message: 'EmailJS está configurado correctamente en tu CRM JAC Seguros.',
- from_name: 'JAC Seguros · Lic. #6175'
+ from_name: 'JAC Seguros | Jely An Castro'
  }).then(() => {
  if (st) { st.style.color='#15803D'; st.textContent = '✅ Email de prueba enviado a jelyancorredora@gmail.com'; }
  }).catch(err => {
@@ -5880,7 +5883,7 @@ async function sendBirthdayEmail(client) {
  if (!tpl || !cfg['ejs-pub'] || !cfg['ejs-svc'] || !window.emailjs) {
  openComposeEmail(client.email, client.nombre,
  `🎂 ¡Feliz Cumpleaños, ${nombre}!`,
- `Estimado/a ${client.nombre},\n\n¡En este día tan especial, todo el equipo de JAC Seguros | Jely An Castro te deseamos un maravilloso cumpleaños lleno de salud, felicidad y bendiciones! 🎂🎉\n\nGracias por confiar en nosotros para proteger lo que más valoras. ¡Que cumplas muchos más! 🌟\n\nCon cariño,\nJely An Castro Pérez\nJely An Castro\nJAC Seguros | Lic. #6175\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com`,
+ `Estimado/a ${client.nombre},\n\n¡En este día tan especial, todo el equipo de JAC Seguros | Jely An Castro te deseamos un maravilloso cumpleaños lleno de salud, felicidad y bendiciones! 🎂🎉\n\nGracias por confiar en nosotros para proteger lo que más valoras. ¡Que cumplas muchos más! 🌟\n\nCon cariño,\nJely An Castro Pérez\nJAC Seguros | Jely An Castro, corredora de seguros\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com\n📧 jelyancorredora@gmail.com\n🌐 www.jacsegurospa.com\n📍 Panamá\n\nRegulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.`,
  'cliente', client.id);
  return;
  }
@@ -5909,7 +5912,7 @@ async function sendBirthdayEmail(client) {
  const nombre2 = client.nombre ? client.nombre.split(' ')[0] : 'estimado/a cliente';
  openComposeEmail(client.email, client.nombre,
  `🎂 ¡Feliz Cumpleaños, ${nombre2}!`,
- `Estimado/a ${client.nombre},\n\n¡En este día tan especial, todo el equipo de JAC Seguros | Jely An Castro te deseamos un maravilloso cumpleaños lleno de salud, felicidad y bendiciones! 🎂🎉\n\nGracias por confiar en nosotros para proteger lo que más valoras. ¡Que cumplas muchos más! 🌟\n\nCon cariño,\nJely An Castro Pérez\nJely An Castro\nJAC Seguros | Lic. #6175\n📞 +507 6292-6010`,
+ `Estimado/a ${client.nombre},\n\n¡En este día tan especial, todo el equipo de JAC Seguros | Jely An Castro te deseamos un maravilloso cumpleaños lleno de salud, felicidad y bendiciones! 🎂🎉\n\nGracias por confiar en nosotros para proteger lo que más valoras. ¡Que cumplas muchos más! 🌟\n\nCon cariño,\nJely An Castro Pérez\nJAC Seguros | Jely An Castro, corredora de seguros\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com\n📧 jelyancorredora@gmail.com\n🌐 www.jacsegurospa.com\n📍 Panamá\n\nRegulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.`,
  'cliente', client.id);
  }
 }
@@ -5927,7 +5930,7 @@ async function sendRenewalEmail(pol, client) {
  const sub2 = diasRestantes >= 0 ? `⚠️ Tu póliza ${pol.ramo} vence en ${diasRestantes} días — JAC Seguros` : `Renovación póliza ${pol.ramo} — JAC Seguros`;
  openComposeEmail(email, client.nombre || pol.nombreCliente || '',
  sub2,
- `Hola ${nombre} 👋\n\nTe contacto desde *JAC Seguros | Jely An Castro* para recordarte que tu póliza de *${pol.ramo}* con *${pol.aseg}* (N° ${pol.polNum || pol.id}) vence el *${fechaFmt2}*.\n${diasRestantes >= 0 ? `⚠️ Faltan solo ${diasRestantes} días para vencer.` : '⚠️ Tu póliza ya venció.'}\n\nPara renovarla y mantener tu cobertura sin interrupciones, contáctame de inmediato.\n\nAtentamente,\nJely An Castro Pérez\nJely An Castro\nJAC Seguros | Lic. #6175\n📞 +507 6292-6010`,
+ `Hola ${nombre} 👋\n\nTe contacto desde *JAC Seguros | Jely An Castro* para recordarte que tu póliza de *${pol.ramo}* con *${pol.aseg}* (N° ${pol.polNum || pol.id}) vence el *${fechaFmt2}*.\n${diasRestantes >= 0 ? `⚠️ Faltan solo ${diasRestantes} días para vencer.` : '⚠️ Tu póliza ya venció.'}\n\nPara renovarla y mantener tu cobertura sin interrupciones, contáctame de inmediato.\n\nAtentamente,\nJely An Castro Pérez\nJAC Seguros | Jely An Castro, corredora de seguros\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com\n📧 jelyancorredora@gmail.com\n🌐 www.jacsegurospa.com\n📍 Panamá\n\nRegulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.`,
  'poliza', pol.id);
  return;
  }
@@ -6215,7 +6218,7 @@ function exportInformePDF(){
  const totalPrima=pol.reduce((s,p)=>s+(+p.prima||0),0);
  const totalCom=pol.reduce((s,p)=>s+(+p.comision||0),0);
  w.document.write(`<!DOCTYPE html><html><head><title>Informe JAC Seguros</title><style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{color:#0F172A}table{width:100%;border-collapse:collapse}th{background:#1E3A8A;color:#fff;padding:6px}td{padding:5px;border-bottom:1px solid #ddd}.stat{display:inline-block;margin:10px;padding:15px;background:#f0f4ff;border-radius:8px;min-width:150px}</style></head><body>
-  <h1>📊 Informe JAC Seguros</h1><p>Generado: ${hoy} · Lic. #6175</p>
+  <h1>📊 Informe JAC Seguros</h1><p>Generado: ${hoy} · JAC Seguros · Panamá</p>
  <div><span class="stat"><b>${pol.length}</b><br>Total Pólizas</span><span class="stat"><b>${vigentes}</b><br>Vigentes</span><span class="stat"><b>$${fmt2(totalPrima)}</b><br>Prima Total</span><span class="stat"><b>$${fmt2(totalCom)}</b><br>Comisión Total</span></div>
  <h3>Pólizas Activas</h3><table><tr><th>Póliza</th><th>Cliente</th><th>Aseg.</th><th>Ramo</th><th>Prima</th><th>Comisión</th><th>Vence</th></tr>
  ${S.polizas.filter(p=>p.estado==='Vigente').map(p=>{const cl=S.clientes.find(c=>c.id===p.clienteId)||{nombre:'—'};return`<tr><td>${p.numero||'—'}</td><td>${cl.nombre}</td><td>${p.aseg||'—'}</td><td>${p.ramo||'—'}</td><td>$${fmt2(p.prima||0)}</td><td>$${fmt2(p.comision||0)}</td><td>${p.fechaFin||'—'}</td></tr>`;}).join('')}
@@ -6375,7 +6378,7 @@ function showBirthdayCard(clientId) {
  const cardHTML = `
  <div style="background:linear-gradient(135deg,#1A3A6B 0%,#C8102E 100%);padding:32px;border-radius:12px;text-align:center;color:white;font-family:'Outfit',sans-serif;min-width:320px;max-width:400px;margin:0 auto">
  <div style="font-size:48px;margin-bottom:8px">🎂</div>
- <div style="font-size:11px;letter-spacing:3px;opacity:.7;margin-bottom:4px">JAC SEGUROS · LIC. #6175</div>
+ <div style="font-size:11px;letter-spacing:3px;opacity:.7;margin-bottom:4px">JAC SEGUROS · PANAMÁ</div><div style="font-size:8px;letter-spacing:1px;opacity:.6;margin-top:3px">REGULADO Y SUPERVISADO POR LA SUPERINTENDENCIA DE SEGUROS Y REASEGUROS DE PANAMÁ.</div>
  <div style="font-size:28px;font-weight:900;margin:12px 0">¡Feliz Cumpleaños!</div>
  <div style="font-size:22px;font-weight:700;margin-bottom:8px">${nombre.split(' ').slice(0,3).join(' ')}</div>
  ${age ? `<div style="font-size:14px;opacity:.8;margin-bottom:16px">¡${age} años de vida!</div>` : ''}
@@ -6502,7 +6505,8 @@ function exportComPDF(){
  doc.setFontSize(16);doc.setTextColor(29,78,216);
  doc.text('JAC Seguros · Reporte de Comisiones',14,16);
  doc.setFontSize(10);doc.setTextColor(100);
-    doc.text('Jely An Castro Pérez  ·  jcastro@jacsegurospa.com  ·  Lic. #6175',14,23);
+    doc.text('Jely An Castro, corredora de seguros  ·  jcastro@jacsegurospa.com  ·  Panamá',14,23);
+  doc.setFontSize(7); doc.text('Regulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.',14,27); doc.setFontSize(10);
  doc.text('Generado: '+new Date().toLocaleDateString('es-PA'),14,29);
  const body=[];
  let totMiCom=0;
@@ -7230,7 +7234,7 @@ function exportReporteMensual(){
  const pages=doc.internal.getNumberOfPages();
  for(let i=1;i<=pages;i++){
  doc.setPage(i);doc.setFontSize(8);doc.setTextColor(150);
-      doc.text('JAC Seguros · Lic. #6175 · www.jacsegurospa.com · Generado '+now.toLocaleDateString('es-PA'),14,292);
+      doc.text('JAC Seguros | Jely An Castro, corredora de seguros · Panamá · www.jacsegurospa.com · Regulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá. · Generado '+now.toLocaleDateString('es-PA'),14,292);
  doc.text(`Pág. ${i}/${pages}`,196,292,{align:'right'});
  }
 
@@ -9334,7 +9338,7 @@ function cotpGenReport(){
  <text x="130" y="72" text-anchor="middle" font-family="Outfit,Montserrat,Arial,sans-serif" font-weight="300" font-size="12" fill="#93C5FD" letter-spacing="8">SEGUROS</text>
  </svg>
  <div>
-              <div style="font-size:11px;opacity:.75;margin-top:2px">Jely An Castro Pérez · Lic. SSRP N° 6175</div>
+              <div style="font-size:11px;opacity:.75;margin-top:2px">Jely An Castro, corredora de seguros · Panamá</div><div style="font-size:9px;opacity:.65;margin-top:3px">Regulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.</div>
  <div style="font-size:11px;opacity:.75">📞 +507 6292-6010 · jcastro@jacsegurospa.com</div>
  <div style="font-size:11px;opacity:.75">🌐 jacsegurospa.com</div>
  </div>
@@ -9407,7 +9411,7 @@ function cotpGenReport(){
  <strong>⚠️ Importante:</strong> Las primas son estimadas y de referencia. La prima final está sujeta a la evaluación de riesgo por cada aseguradora. Cotización válida por 30 días a partir de ${fecha}.
  </div>
  <div style="text-align:center;font-size:10px;color:#94A3B8;padding:14px 0;border-top:1px solid #E2E8F0">
-        JAC Seguros | Jely An Castro Pérez · Lic. SSRP N° 6175 · +507 6292-6010 · jcastro@jacsegurospa.com · jacsegurospa.com
+        JAC Seguros | Jely An Castro, corredora de seguros · Panamá · +507 6292-6010 · jcastro@jacsegurospa.com · Regulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá. · jacsegurospa.com
  </div>
  </div>
  </div>
@@ -9554,7 +9558,7 @@ function contactarMensajeroWA(){
 function contactarMensajeroEmail(){
  const nombre=S.mensajero||'Francisco Flores';
  const subj=`JAC Seguros — Mensaje para ${nombre}`;
- const body=`Hola ${nombre.split(' ')[0]} 👋\n\n[Escribe tu mensaje aquí]\n\nAtentamente,\nJely An Castro Pérez\nJely An Castro\nJAC Seguros | Lic. #6175\n📞 +507 6292-6010`;
+ const body=`Hola ${nombre.split(' ')[0]} 👋\n\n[Escribe tu mensaje aquí]\n\nAtentamente,\nJely An Castro Pérez\nJAC Seguros | Jely An Castro, corredora de seguros\n📞 +507 6292-6010\n📧 jcastro@jacsegurospa.com\n📧 jelyancorredora@gmail.com\n🌐 www.jacsegurospa.com\n📍 Panamá\n\nRegulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.`;
  openComposeEmail('',nombre,subj,body,'mensajero','');
 }
 
@@ -9590,7 +9594,7 @@ function getMensEmailSubj(enc){
 function getMensEmailBody(enc){
  const nombre=S.mensajero||'Francisco';
  const msg=getMensWAMsg(enc).replace(/\*/g,'').replace(/_/g,'');
- return `${nombre},\n\n${msg.replace(/_/g,'')}\n\nFecha asignación: ${enc.fecha||''}\n\nJely An Castro\nJAC Seguros | Lic. #6175\nJely An Castro Pérez · +507 6292-6010`;
+ return `${nombre},\n\n${msg.replace(/_/g,'')}\n\nFecha asignación: ${enc.fecha||''}\n\nJely An Castro\nJAC Seguros | Jely An Castro, corredora de seguros\nPanamá · +507 6292-6010`;
 }
 
 function OMens(id){
@@ -11115,7 +11119,37 @@ function cfgSaveGcalCid(){
  S.integraciones=S.integraciones||{};
  S.integraciones.googleClientId=v.trim();
  save();
+ if(window.toast&&v.trim())toast('Google Client ID guardado y sincronizado','ok');
 }
+/* El campo se repuebla al abrir Configuracion. Antes quedaba vacio aunque el
+   valor estuviera guardado, y parecia que se habia perdido. */
+window.jacPintarEmailJS=function(){
+ try{
+  var c=(S||{}).emailjs; if(!c)return false;
+  Object.keys(c).forEach(function(k){
+   var el=document.getElementById(k);
+   if(el&&!el.value)el.value=c[k]||'';
+  });
+  return true;
+ }catch(e){return false;}
+};
+window.jacPintarClientId=function(){
+ try{
+  var el=document.getElementById('cfg-gcal-cid');
+  if(!el)return false;
+  var v=((S||{}).integraciones||{}).googleClientId||'';
+  if(v&&!el.value)el.value=v;
+  return true;
+ }catch(e){return false;}
+};
+(function(){
+ var n=0;
+ var t=setInterval(function(){
+  n++;
+  var a=window.jacPintarClientId(), b=window.jacPintarEmailJS();
+  if((a&&b)||n>40)clearInterval(t);
+ },700);
+})();
 function gcalStatus(msg){
  var el=document.getElementById('cfg-gcal-status');
  if(el)el.textContent=msg;
@@ -11864,7 +11898,8 @@ document.addEventListener('click', function(e){
     comisiones: 'comisiones', prospectos: 'prospectos',
     ventasCruzadas: 'ventas_cruzadas'
   };
-  var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg', 'comisCfg', 'univivir'];
+  var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg', 'comisCfg',
+                  'univivir', 'integraciones', 'plantillas', 'metas', 'emailjs'];
   var COLS = window.__JAC_COLS || {};
 
   function snake(c) {
@@ -11934,7 +11969,11 @@ document.addEventListener('click', function(e){
      que dejar un SecurityError suelto en la consola. */
   var _almacen = (function () {
     try {
-      localStorage.setItem('__jac_t', '1'); localStorage.removeItem('__jac_t');
+      /* Se prueban las tres operaciones: hay entornos donde escribir funciona
+         pero leer no, y el cliente de Supabase lee la sesion al arrancar. */
+      localStorage.getItem('__jac_t');
+      localStorage.setItem('__jac_t', '1');
+      localStorage.removeItem('__jac_t');
       return 'ok';
     } catch (e) {
       /* Lleno no es lo mismo que bloqueado. Safari en iPhone limita a ~5 MB
@@ -11971,6 +12010,34 @@ document.addEventListener('click', function(e){
   var _base = {};            // {tabla: {id: hash}} última copia confirmada
   var _timer = null, _corriendo = false, _pendiente = false;
 
+  /* Pedir la sesion sin que un almacenamiento bloqueado tumbe nada.
+     El cliente de Supabase guarda la sesion en localStorage; si el navegador
+     lo deniega, getSession() lanza SecurityError. Aqui se traduce a un
+     mensaje entendible en vez de dejar el error crudo en la consola. */
+  var _avisoAlmacen = false;
+  async function sesionSegura(d) {
+    if (!d || !d.auth) return null;
+    try {
+      var s2 = await d.auth.getSession();
+      return (s2 && s2.data && s2.data.session) ? s2.data.session : null;
+    } catch (e) {
+      var esAlmacen = e && (e.name === 'SecurityError' || /Storage|getItem|denied/i.test(String(e.message || e)));
+      if (esAlmacen) {
+        if (!_avisoAlmacen) {
+          _avisoAlmacen = true;
+          log('warn', '[JAC] El navegador esta bloqueando el almacenamiento en esta ventana, '
+            + 'asi que no hay sesion ni sincronizacion. Suele pasar al abrir el archivo en una '
+            + 'vista previa o con las cookies bloqueadas. Abre https://crm.jacsegurospa.com '
+            + 'directamente en una pestana normal.');
+        }
+        return null;
+      }
+      log('warn', '[JAC] No se pudo leer la sesion: ' + (e && e.message ? e.message : e));
+      return null;
+    }
+  }
+  window.jacSesion = sesionSegura;
+
   function db() {
     var d = window.db;
     if (!d) { log('warn', '[JAC] Sin cliente Supabase.'); return null; }
@@ -11984,12 +12051,13 @@ document.addEventListener('click', function(e){
 
   async function volcar() {
     if (_sinAlmacen) return;
+    if (_avisoAlmacen) return;   /* ya sabemos que el navegador lo bloquea */
     var d = db(); if (!d || typeof S === 'undefined') return;
     if (_corriendo) { _pendiente = true; return; }
     _corriendo = true;
     try {
-      var ses = await d.auth.getSession();
-      if (!ses || !ses.data || !ses.data.session) {
+      var ses = await sesionSegura(d);
+      if (!ses) {
         if (!_avisoSesion) {
           _avisoSesion = true;
           log('warn', '[JAC] Sin sesion iniciada: los cambios se guardan solo en este '
@@ -12209,11 +12277,8 @@ document.addEventListener('click', function(e){
      el caso de nube vacia o muy incompleta. */
   window.sincronizar = async function () {
     var d = db(); if (!d) return false;
-    var s2 = await d.auth.getSession();
-    if (!s2 || !s2.data || !s2.data.session) {
-      log('warn', '[JAC] Sin sesion: no se puede sincronizar.');
-      return false;
-    }
+    var s2 = await sesionSegura(d);
+    if (!s2) { log('warn', '[JAC] Sin sesion: no se puede sincronizar.'); return false; }
     var ok = await window.cargarDesdeNube();
     await window.cargarMeta();
     try {
@@ -12260,8 +12325,8 @@ document.addEventListener('click', function(e){
       if (intentos > 40) { clearInterval(t); return; }
       var d = db();
       if (!d) return;
-      d.auth.getSession().then(function (s2) {
-        if (s2 && s2.data && s2.data.session) {
+      sesionSegura(d).then(function (s2) {
+        if (s2) {
           clearInterval(t);
           cortina(true);
           window.sincronizar().then(function () { cortina(false); })
@@ -13255,7 +13320,13 @@ document.addEventListener('click', function(e){
     try {
       var aseg = (typeof V === 'function') ? V('p-as') : '';
       var ramo = (typeof V === 'function') ? V('p-ra') : '';
-      var res = window.jacResolverPct(aseg, ramo);
+      var anio = (typeof window.jacAnioVigencia === 'function') ? window.jacAnioVigencia(null) : 1;
+      var res = window.jacResolverPct(aseg, ramo, anio);
+      var av = document.getElementById('jac-anio-vig');
+      if (av) {
+        av.textContent = 'Año ' + anio + ' de vigencia'
+          + (res.origen ? ' · % desde ' + res.origen : '');
+      }
 
       var cb = document.getElementById('p-cb');
       var it = document.getElementById('p-it');
@@ -13299,14 +13370,21 @@ document.addEventListener('click', function(e){
 
   function fila(clave, obj, etiqueta, grupo) {
     var v = obj || {};
+    var res = (typeof window.jacResumenTramos === 'function') ? window.jacResumenTramos(v) : '';
     return '<tr>'
-      + '<td style="font-size:12px;padding:4px 6px">' + esc(etiqueta) + '</td>'
+      + '<td style="font-size:12px;padding:4px 6px">' + esc(etiqueta)
+      + (res ? '<div style="font-size:10px;color:#7C3AED;margin-top:2px">' + esc(res) + '</div>' : '')
+      + '</td>'
       + '<td style="padding:4px 6px"><input type="number" step="0.01" inputmode="decimal" class="fc" '
       + 'style="width:88px" data-g="' + grupo + '" data-k="' + encodeURIComponent(clave) + '" data-c="com" '
       + 'value="' + (v.com !== undefined ? v.com : '') + '" placeholder="—"></td>'
       + '<td style="padding:4px 6px"><input type="number" step="0.01" inputmode="decimal" class="fc" '
       + 'style="width:88px" data-g="' + grupo + '" data-k="' + encodeURIComponent(clave) + '" data-c="itbms" '
       + 'value="' + (v.itbms !== undefined ? v.itbms : '') + '" placeholder="—"></td>'
+      + '<td style="padding:4px 6px"><button class="btn bgh" style="padding:2px 9px;font-size:11px" '
+          + 'title="Comisión distinta según el año de vigencia" '
+          + 'onclick="jacEditarTramos(\'' + grupo + '\',\'' + encodeURIComponent(clave) + '\')">'
+          + (res ? '⏱ tramos' : '⏱') + '</button></td>'
       + (grupo === 'combos' ? '<td style="padding:4px 6px"><button class="btn bgh" style="padding:2px 8px" '
           + 'onclick="jacBorrarCombo(\'' + encodeURIComponent(clave) + '\')">✕</button></td>' : '')
       + '</tr>';
@@ -13316,8 +13394,9 @@ document.addEventListener('click', function(e){
     return '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse">'
       + '<thead><tr style="text-align:left;font-size:11px;color:var(--mu,#64748b)">'
       + '<th style="padding:6px">Aplica a</th><th style="padding:6px">% Comisión</th>'
-      + '<th style="padding:6px">% ITBMS</th>' + (conAccion ? '<th></th>' : '')
-      + '</tr></thead><tbody>' + (filas || '<tr><td colspan="4" style="padding:10px;font-size:12px;'
+      + '<th style="padding:6px">% ITBMS</th><th style="padding:6px">Por año</th>'
+      + (conAccion ? '<th></th>' : '')
+      + '</tr></thead><tbody>' + (filas || '<tr><td colspan="5" style="padding:10px;font-size:12px;'
       + 'color:var(--mu,#64748b)">Sin registros todavía.</td></tr>') + '</tbody></table></div>';
   }
 
@@ -13428,6 +13507,7 @@ document.addEventListener('click', function(e){
       if (v === '') delete c[g][k][campo];
       else c[g][k][campo] = parseFloat(v);
       if (!Object.keys(c[g][k]).length && g !== 'combos') delete c[g][k];
+      /* los tramos viven en la misma entrada: no se tocan al guardar planos */
     });
     if (typeof save === 'function') save();
     if (silencioso) return;
@@ -13709,6 +13789,507 @@ document.addEventListener('click', function(e){
   };
 
   log('info', '[JAC] Metas por ramo y aseguradora listas, enlazadas a los KPIs');
+})();
+
+</script>
+
+<script>
+/* ============================================================
+   Comision por año de vigencia (tramos)
+   En vida y salud la comision del primer año no es la misma que
+   la de renovacion, y suele bajar otra vez pasados unos años.
+   Esto permite definir tramos: año 1 = X%, años 2-5 = Y%,
+   año 6 en adelante = Z%. Aplica a ramo, aseguradora y a la
+   combinacion de ambos.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function log(n, a) { try { var c = console; var f = c && (c[n] || c.log); if (f) f.call(c, a); } catch (e) {} }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  var SEP = '||';
+
+  function cfg() {
+    if (typeof S === 'undefined') return { ramos:{}, asegs:{}, combos:{}, cocor:{} };
+    if (!S.comisCfg || typeof S.comisCfg !== 'object') S.comisCfg = {};
+    ['ramos','asegs','combos','cocor'].forEach(function (k) {
+      if (!S.comisCfg[k] || typeof S.comisCfg[k] !== 'object') S.comisCfg[k] = {};
+    });
+    return S.comisCfg;
+  }
+
+  /* ---------- año de vigencia de la poliza ---------- */
+  window.jacAnioVigencia = function (pol) {
+    /* pol puede ser un objeto poliza o venir del formulario abierto */
+    var nr, fi, cliente, ramo, num;
+    if (pol) {
+      nr = pol.nueva; fi = pol.fechaInicio; cliente = pol.clienteId; ramo = pol.ramo; num = pol.num;
+    } else {
+      nr = (typeof V === 'function') ? V('p-nr') : '';
+      fi = (typeof V === 'function') ? V('p-fi') : '';
+      cliente = window.__polClienteId || '';
+      ramo = (typeof V === 'function') ? V('p-ra') : '';
+      num = (typeof V === 'function') ? V('p-nu') : '';
+    }
+    if (String(nr || '').toLowerCase().indexOf('nueva') === 0) return 1;
+
+    /* Renovada: contar cuantas vigencias previas hay del mismo asunto.
+       Se busca por numero de poliza y, si no, por cliente + ramo. */
+    var pols = (typeof S !== 'undefined' && S.polizas) || [];
+    var previas = pols.filter(function (p) {
+      if (!p.fechaInicio || (fi && p.fechaInicio >= fi)) return false;
+      if (num && p.num && String(p.num).trim() === String(num).trim()) return true;
+      if (cliente && p.clienteId === cliente && (p.ramo || '') === (ramo || '')) return true;
+      return false;
+    });
+    if (previas.length) return previas.length + 1;
+
+    /* Sin historial: estimar por antiguedad si hay fecha de inicio original. */
+    if (fi) {
+      var pm = pols.filter(function (p) {
+        return num && p.num && String(p.num).trim() === String(num).trim() && p.fechaInicio;
+      }).map(function (p) { return p.fechaInicio; }).sort();
+      if (pm.length) {
+        var a1 = parseInt(pm[0].slice(0, 4), 10), a2 = parseInt(String(fi).slice(0, 4), 10);
+        if (a1 && a2 && a2 >= a1) return (a2 - a1) + 1;
+      }
+    }
+    return 2; /* renovada sin mas datos: al menos segundo año */
+  };
+
+  /* ---------- resolucion con tramos ---------- */
+  function delTramo(o, anio) {
+    if (!o) return undefined;
+    if (Array.isArray(o.tramos) && o.tramos.length) {
+      for (var i = 0; i < o.tramos.length; i++) {
+        var t = o.tramos[i];
+        var d = parseInt(t.d, 10) || 1;
+        var h = (t.h === null || t.h === undefined || t.h === '') ? Infinity : parseInt(t.h, 10);
+        if (anio >= d && anio <= h && t.com !== undefined && t.com !== '') return parseFloat(t.com);
+      }
+    }
+    return (o.com !== undefined && o.com !== '') ? parseFloat(o.com) : undefined;
+  }
+
+  window.jacResolverPct = function (aseg, ramo, anio) {
+    if (anio === undefined || anio === null) anio = 1;
+    var c = cfg(), r = {};
+    var fuentes = [];
+    if (aseg && ramo) fuentes.push(c.combos[aseg + SEP + ramo]);
+    if (aseg) fuentes.push(c.asegs[aseg]);
+    if (ramo) fuentes.push(c.ramos[ramo]);
+    for (var i = 0; i < fuentes.length; i++) {
+      var o = fuentes[i]; if (!o) continue;
+      if (r.com === undefined) {
+        var v = delTramo(o, anio);
+        if (v !== undefined) { r.com = v; r.origen = i === 0 ? 'aseguradora + ramo' : (i === 1 ? 'aseguradora' : 'ramo'); }
+      }
+      if (r.itbms === undefined && o.itbms !== undefined && o.itbms !== '') r.itbms = parseFloat(o.itbms);
+    }
+    r.anio = anio;
+    return r;
+  };
+
+  /* ---------- editor de tramos ---------- */
+  var _ed = null;
+
+  window.jacEditarTramos = function (grupo, clave) {
+    _ed = { grupo: grupo, clave: decodeURIComponent(clave) };
+    var c = cfg();
+    var o = c[grupo][_ed.clave] || {};
+    var tr = Array.isArray(o.tramos) && o.tramos.length ? o.tramos.slice()
+           : [{ d:1, h:1, com:'' }, { d:2, h:'', com:'' }];
+    _ed.tramos = tr;
+    pintarEditor();
+  };
+
+  function filaTramo(t, i) {
+    return '<tr>'
+      + '<td style="padding:4px"><input type="number" min="1" step="1" class="fc" style="width:70px" '
+      + 'data-t="' + i + '" data-tc="d" value="' + (t.d !== undefined ? t.d : '') + '"></td>'
+      + '<td style="padding:4px"><input type="number" min="1" step="1" class="fc" style="width:70px" '
+      + 'data-t="' + i + '" data-tc="h" value="' + (t.h !== undefined && t.h !== null ? t.h : '') + '" '
+      + 'placeholder="∞"></td>'
+      + '<td style="padding:4px"><input type="number" step="0.01" class="fc" style="width:90px" '
+      + 'data-t="' + i + '" data-tc="com" value="' + (t.com !== undefined ? t.com : '') + '" placeholder="—"></td>'
+      + '<td style="padding:4px"><button class="btn bgh" style="padding:2px 8px" '
+      + 'onclick="jacQuitarTramo(' + i + ')">✕</button></td></tr>';
+  }
+
+  function pintarEditor() {
+    var v = document.getElementById('jac-tramos');
+    if (v) v.remove();
+    var nombre = _ed.clave.split(SEP).join(' · ');
+    var d = document.createElement('div');
+    d.id = 'jac-tramos';
+    d.style.cssText = 'position:fixed;inset:0;z-index:2147483644;background:rgba(2,6,23,.7);'
+      + 'display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto';
+    d.innerHTML = '<div style="background:var(--cd,#fff);color:var(--tx,#0f172a);max-width:560px;width:100%;'
+      + 'border-radius:12px;padding:20px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+      + '<h3 style="margin:0;font-size:16px">Comisión por año</h3>'
+      + '<button class="btn" onclick="document.getElementById(\'jac-tramos\').remove()">✕</button></div>'
+      + '<div style="font-size:12px;color:var(--mu,#64748b);margin-bottom:14px">' + esc(nombre) + '</div>'
+      + '<table style="width:100%;border-collapse:collapse">'
+      + '<thead><tr style="text-align:left;font-size:11px;color:var(--mu,#64748b)">'
+      + '<th style="padding:4px">Desde año</th><th style="padding:4px">Hasta año</th>'
+      + '<th style="padding:4px">% Comisión</th><th></th></tr></thead>'
+      + '<tbody id="jac-tramos-body">' + _ed.tramos.map(filaTramo).join('') + '</tbody></table>'
+      + '<div style="font-size:11px;color:var(--mu,#64748b);margin-top:8px">'
+      + 'Deja «Hasta año» vacío para «en adelante». Ejemplo: año 1 al 1 = 80%, '
+      + 'año 2 al 5 = 20%, año 6 en adelante = 5%.</div>'
+      + '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">'
+      + '<button class="btn" onclick="jacAgregarTramo()">+ Tramo</button>'
+      + '<button class="btn" style="background:#15803D;color:#fff;border-color:#15803D" '
+      + 'onclick="jacGuardarTramos()">Guardar</button></div>'
+      + '<div id="jac-tramos-msg" style="font-size:12px;color:#DC2626;margin-top:8px"></div>'
+      + '</div>';
+    document.body.appendChild(d);
+  }
+
+  function leerEditor() {
+    var body = document.getElementById('jac-tramos-body');
+    if (!body) return;
+    body.querySelectorAll('input[data-t]').forEach(function (inp) {
+      var i = parseInt(inp.getAttribute('data-t'), 10);
+      var c = inp.getAttribute('data-tc');
+      var v = inp.value.trim();
+      if (!_ed.tramos[i]) _ed.tramos[i] = {};
+      _ed.tramos[i][c] = v === '' ? '' : parseFloat(v);
+    });
+  }
+
+  window.jacAgregarTramo = function () {
+    leerEditor();
+    var ult = _ed.tramos[_ed.tramos.length - 1] || {};
+    var desde = (ult.h && ult.h !== '') ? parseInt(ult.h, 10) + 1 : (parseInt(ult.d, 10) || 1) + 1;
+    _ed.tramos.push({ d: desde, h: '', com: '' });
+    pintarEditor();
+  };
+
+  window.jacQuitarTramo = function (i) {
+    leerEditor();
+    _ed.tramos.splice(i, 1);
+    pintarEditor();
+  };
+
+  window.jacGuardarTramos = function () {
+    leerEditor();
+    var tr = _ed.tramos.filter(function (t) { return t.com !== '' && t.com !== undefined && t.d !== ''; })
+      .map(function (t) { return { d: parseInt(t.d, 10) || 1, h: (t.h === '' ? null : parseInt(t.h, 10)), com: parseFloat(t.com) }; })
+      .sort(function (a, b) { return a.d - b.d; });
+
+    /* avisar de solapes: dos tramos que cubren el mismo año dan resultados
+       impredecibles, mejor decirlo antes de guardar */
+    for (var i = 1; i < tr.length; i++) {
+      var ant = tr[i - 1];
+      var finAnt = ant.h === null ? Infinity : ant.h;
+      if (tr[i].d <= finAnt) {
+        var m = document.getElementById('jac-tramos-msg');
+        if (m) m.textContent = 'El tramo que empieza en el año ' + tr[i].d
+          + ' se solapa con el anterior. Corrige los rangos.';
+        return;
+      }
+    }
+
+    var c = cfg();
+    if (!c[_ed.grupo][_ed.clave]) c[_ed.grupo][_ed.clave] = {};
+    if (tr.length) c[_ed.grupo][_ed.clave].tramos = tr;
+    else delete c[_ed.grupo][_ed.clave].tramos;
+
+    if (typeof save === 'function') save();
+    if (window.toast) toast('Tramos guardados', 'ok');
+    var v = document.getElementById('jac-tramos'); if (v) v.remove();
+    if (typeof window.jacTabComis === 'function') window.jacTabComis(_ed.grupo === 'ramos' ? 'ramos'
+      : (_ed.grupo === 'asegs' ? 'asegs' : 'combos'));
+  };
+
+  /* resumen legible de los tramos, para mostrarlo en la tabla */
+  window.jacResumenTramos = function (o) {
+    if (!o || !Array.isArray(o.tramos) || !o.tramos.length) return '';
+    return o.tramos.map(function (t) {
+      var r = t.h === null || t.h === undefined ? 'año ' + t.d + '+' :
+              (t.d === t.h ? 'año ' + t.d : 'años ' + t.d + '-' + t.h);
+      return r + ': ' + t.com + '%';
+    }).join(' · ');
+  };
+
+  log('info', '[JAC] Tramos de comision por año de vigencia listos');
+})();
+
+</script>
+
+<script>
+/* ============================================================
+   Plantillas de mensajes — JAC Seguros
+   Tono cercano, informacion completa y una firma unica en todas:
+   JAC Seguros | Jely An Castro, corredora de seguros
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function log(n, a) { try { var c = console; var f = c && (c[n] || c.log); if (f) f.call(c, a); } catch (e) {} }
+
+  var TEL   = '+507 6292-6010';
+  var WEB   = 'www.jacsegurospa.com';
+  var MAIL1 = 'jcastro@jacsegurospa.com';
+  var MAIL2 = 'jelyancorredora@gmail.com';
+  var PAIS  = 'Panamá';
+
+  /* Cintillo regulatorio de la Superintendencia de Seguros y Reaseguros
+     de Panama. Debe acompañar todas las comunicaciones. */
+  window.JAC_SSRP = 'Regulado y supervisado por la Superintendencia de Seguros '
+    + 'y Reaseguros de Panamá.';
+
+  window.jacFirma = function (compacta) {
+    if (compacta) {
+      return '\n\n_*JAC Seguros* | Jely An Castro, corredora de seguros_\n'
+        + '📞 ' + TEL + ' · ' + PAIS + '\n'
+        + '_' + window.JAC_SSRP + '_';
+    }
+    return '\n\n————————————\n'
+      + '*JAC Seguros* | Jely An Castro, corredora de seguros\n'
+      + '📞 ' + TEL + '\n'
+      + '✉️ ' + MAIL1 + '\n'
+      + '✉️ ' + MAIL2 + '\n'
+      + '🌐 ' + WEB + '\n'
+      + '📍 ' + PAIS + '\n\n'
+      + '_' + window.JAC_SSRP + '_';
+  };
+
+  /* Version HTML, para correos, informes y PDFs */
+  window.jacFirmaHTML = function () {
+    return '<div style="margin-top:18px;padding-top:12px;border-top:1px solid #e2e8f0;'
+      + 'font-size:11px;color:#64748b;line-height:1.7">'
+      + '<strong style="color:#1E3A8A">JAC Seguros</strong> | Jely An Castro, corredora de seguros<br>'
+      + '📞 ' + TEL + ' · ✉️ ' + MAIL1 + ' · ✉️ ' + MAIL2 + '<br>'
+      + '🌐 ' + WEB + ' · 📍 ' + PAIS + '<br>'
+      + '<span style="display:inline-block;margin-top:7px;padding:5px 10px;background:#f1f5f9;'
+      + 'border-left:3px solid #1E3A8A;border-radius:3px;font-size:10px;color:#475569">'
+      + window.JAC_SSRP + '</span></div>';
+  };
+
+  function nom(x) { return String(x || '').trim().split(/\s+/)[0] || 'Hola'; }
+  function f(d) { try { return (typeof fmt === 'function' && d) ? fmt(d) : (d || ''); } catch (e) { return d || ''; } }
+  function m(v) {
+    try {
+      if (typeof window.jacMoneda === 'function') return 'B/. ' + window.jacMoneda(v);
+      if (typeof fmtM === 'function') return fmtM(v);
+    } catch (e) {}
+    return 'B/. ' + (parseFloat(v) || 0).toFixed(2);
+  }
+  function dias(hasta) {
+    try {
+      var h = new Date(hasta), hoy = new Date();
+      return Math.ceil((h - hoy) / 86400000);
+    } catch (e) { return null; }
+  }
+
+  /* ---------- renovacion ---------- */
+  window.waRenMsg = function (p, cl) {
+    p = p || {}; cl = cl || {};
+    var d = dias(p.fechaFin);
+    var urgencia = (d !== null && d >= 0)
+      ? (d === 0 ? '*vence hoy*' : (d === 1 ? '*vence mañana*' : 'vence en *' + d + ' días*'))
+      : 'está por vencer';
+    return 'Hola ' + nom(cl.nombre || p.nombreCliente) + ' 👋🏼\n\n'
+      + 'Te escribo para recordarte que tu póliza ' + urgencia + ' y quiero ayudarte a renovarla '
+      + 'a tiempo para que no quedes ni un día sin cobertura.\n\n'
+      + '📋 *Detalle de tu póliza*\n'
+      + '• Ramo: ' + (p.ramo || '—') + '\n'
+      + '• Aseguradora: ' + (p.aseg || '—') + '\n'
+      + '• N° de póliza: ' + (p.num || '—') + '\n'
+      + '• Vence: *' + f(p.fechaFin) + '*\n'
+      + (p.prima ? '• Prima actual: ' + m(p.prima) + '\n' : '')
+      + '\nSi quieres, reviso tu cobertura y te comparto opciones antes de renovar, '
+      + 'por si algo cambió este año.\n\n'
+      + '¿Te queda bien que lo veamos esta semana?'
+      + window.jacFirma();
+  };
+
+  /* ---------- cobro ---------- */
+  window.waCobMsg = function (p, cl) {
+    p = p || {}; cl = cl || {};
+    return 'Hola ' + nom(cl.nombre || p.nombreCliente) + ' 👋🏼\n\n'
+      + 'Te escribo con un recordatorio amable sobre el pago de tu póliza, '
+      + 'para que tu cobertura se mantenga activa sin contratiempos.\n\n'
+      + '📋 *Detalle*\n'
+      + '• Ramo: ' + (p.ramo || '—') + '\n'
+      + '• Aseguradora: ' + (p.aseg || '—') + '\n'
+      + '• N° de póliza: ' + (p.num || '—') + '\n'
+      + '• Monto: *' + m(p.prima) + '*\n'
+      + (p.formaPago ? '• Forma de pago: ' + p.formaPago + '\n' : '')
+      + '\nSi ya lo realizaste, por favor ignora este mensaje y compárteme el comprobante '
+      + 'para registrarlo.\n\n'
+      + 'Cualquier duda con el pago, con gusto te ayudo.'
+      + window.jacFirma();
+  };
+
+  /* ---------- bienvenida a cliente nuevo ---------- */
+  window.jacMsgBienvenida = function (cl, p) {
+    cl = cl || {}; p = p || {};
+    return 'Hola ' + nom(cl.nombre) + ' 👋🏼\n\n'
+      + '¡Bienvenido(a)! Me alegra mucho acompañarte con tu seguro.\n\n'
+      + (p.num ? '📋 *Tu póliza*\n'
+          + '• Ramo: ' + (p.ramo || '—') + '\n'
+          + '• Aseguradora: ' + (p.aseg || '—') + '\n'
+          + '• N° de póliza: ' + p.num + '\n'
+          + (p.fechaInicio ? '• Vigencia: ' + f(p.fechaInicio) + ' al ' + f(p.fechaFin) + '\n' : '')
+          + '\n' : '')
+      + 'Guarda este número. Para cualquier cosa que necesites — un siniestro, una duda de '
+      + 'cobertura, un cambio o simplemente una consulta — escríbeme directamente. '
+      + 'Estoy para acompañarte, no solo para venderte la póliza.\n\n'
+      + 'Un gusto trabajar contigo 🤝'
+      + window.jacFirma();
+  };
+
+  /* ---------- siniestro ---------- */
+  window.jacMsgSiniestro = function (cl, s) {
+    cl = cl || {}; s = s || {};
+    return 'Hola ' + nom(cl.nombre || s.cliente) + ' 👋🏼\n\n'
+      + 'Lamento lo ocurrido. Ya estoy dando seguimiento a tu caso y te voy a mantener '
+      + 'informado(a) en cada paso.\n\n'
+      + '📋 *Tu reclamo*\n'
+      + (s.numSin ? '• N° de caso: ' + s.numSin + '\n' : '')
+      + (s.poliza ? '• Póliza: ' + s.poliza + '\n' : '')
+      + (s.aseg ? '• Aseguradora: ' + s.aseg + '\n' : '')
+      + (s.fechaSin ? '• Fecha del evento: ' + f(s.fechaSin) + '\n' : '')
+      + (s.estado ? '• Estado: *' + s.estado + '*\n' : '')
+      + '\nSi la aseguradora te solicita algún documento, mándamelo y yo me encargo '
+      + 'de gestionarlo.\n\n'
+      + 'Cualquier cosa, aquí estoy.'
+      + window.jacFirma();
+  };
+
+  /* ---------- cumpleaños ---------- */
+  window.jacMsgCumple = function (cl) {
+    cl = cl || {};
+    return '¡Feliz cumpleaños, ' + nom(cl.nombre) + '! 🎉🎂\n\n'
+      + 'Te deseo un año lleno de salud, tranquilidad y cosas buenas.\n\n'
+      + 'Gracias por la confianza de tenerme como tu corredora. '
+      + 'Que lo disfrutes muchísimo 🥳'
+      + window.jacFirma(true);
+  };
+
+  /* ---------- seguimiento a prospecto ---------- */
+  window.jacMsgProspecto = function (pr) {
+    pr = pr || {};
+    var interes = Array.isArray(pr.interes) ? pr.interes.join(', ') : (pr.interes || '');
+    return 'Hola ' + nom(pr.nombre) + ' 👋🏼\n\n'
+      + 'Soy Jely An Castro, corredora de seguros. Te escribo para retomar '
+      + (interes ? 'tu interés en *' + interes + '*' : 'nuestra conversación') + '.\n\n'
+      + 'Como corredora trabajo con las 18 aseguradoras del país, así que puedo comparar '
+      + 'coberturas y precios y recomendarte lo que de verdad te convenga — sin costo '
+      + 'adicional para ti.\n\n'
+      + '¿Te parece si te preparo una cotización? Solo necesito unos datos básicos '
+      + 'y te la comparto en poco tiempo.'
+      + window.jacFirma();
+  };
+
+  /* ---------- cotizacion ---------- */
+  window.jacMsgCotizacion = function (nombre, datos) {
+    datos = datos || {};
+    return 'Hola ' + nom(nombre) + ' 👋🏼\n\n'
+      + 'Te comparto la cotización que preparé para ti:\n\n'
+      + '📋 *Propuesta*\n'
+      + (datos.ramo ? '• Ramo: ' + datos.ramo + '\n' : '')
+      + (datos.aseg ? '• Aseguradora: ' + datos.aseg + '\n' : '')
+      + (datos.plan ? '• Plan: ' + datos.plan + '\n' : '')
+      + (datos.prima ? '• Prima: *' + m(datos.prima) + '*\n' : '')
+      + (datos.vigencia ? '• Vigencia: ' + datos.vigencia + '\n' : '')
+      + '\nRevísala con calma. Si quieres que te explique qué cubre exactamente, '
+      + 'o que compare con otra aseguradora, con gusto lo hacemos.\n\n'
+      + 'Quedo atenta a tus comentarios 😊'
+      + window.jacFirma();
+  };
+
+  /* ---------- mensaje masivo ---------- */
+  var _wamBuild = window.wamBuildMsg;
+  window.wamBuildMsg = function (tipo, cl, pol) {
+    try {
+      if (tipo === 'ren') return window.waRenMsg(pol || {}, cl || {});
+      if (tipo === 'cob' || tipo === 'pag') return window.waCobMsg(pol || {}, cl || {});
+      if (tipo === 'cum') return window.jacMsgCumple(cl || {});
+      if (tipo === 'bien') return window.jacMsgBienvenida(cl || {}, pol || {});
+    } catch (e) { log('warn', '[JAC plantillas] ' + e); }
+    if (typeof _wamBuild === 'function') return _wamBuild(tipo, cl, pol);
+    return '';
+  };
+
+  /* ---------- plantillas guardadas: sembrar las nuevas una sola vez ---------- */
+  window.jacSembrarPlantillas = function (forzar) {
+    if (typeof S === 'undefined') return;
+    if (!Array.isArray(S.plantillas)) S.plantillas = [];
+    if (S.__plantillasV2 && !forzar) return;
+    var base = [
+      { nombre: 'Renovación',            tipo: 'ambos', texto: window.waRenMsg({ramo:'{{ramo}}',aseg:'{{aseguradora}}',num:'{{poliza}}',fechaFin:'{{vence}}',prima:0}, {nombre:'{{nombre}}'}) },
+      { nombre: 'Recordatorio de pago',   tipo: 'ambos', texto: window.waCobMsg({ramo:'{{ramo}}',aseg:'{{aseguradora}}',num:'{{poliza}}',prima:0}, {nombre:'{{nombre}}'}) },
+      { nombre: 'Bienvenida',             tipo: 'ambos', texto: window.jacMsgBienvenida({nombre:'{{nombre}}'}, {ramo:'{{ramo}}',aseg:'{{aseguradora}}',num:'{{poliza}}'}) },
+      { nombre: 'Seguimiento a siniestro',tipo: 'ambos', texto: window.jacMsgSiniestro({nombre:'{{nombre}}'}, {numSin:'{{caso}}',aseg:'{{aseguradora}}'}) },
+      { nombre: 'Cumpleaños',             tipo: 'ambos', texto: window.jacMsgCumple({nombre:'{{nombre}}'}) },
+      { nombre: 'Prospecto — primer contacto', tipo:'ambos', texto: window.jacMsgProspecto({nombre:'{{nombre}}',interes:'{{interes}}'}) },
+      { nombre: 'Envío de cotización',    tipo: 'ambos', texto: window.jacMsgCotizacion('{{nombre}}', {ramo:'{{ramo}}',aseg:'{{aseguradora}}'}) }
+    ];
+    base.forEach(function (t) {
+      var ya = S.plantillas.some(function (p) { return p.nombre === t.nombre; });
+      if (!ya) S.plantillas.push({ id: 'TPL' + Math.random().toString(36).slice(2, 9), nombre: t.nombre, tipo: t.tipo, texto: t.texto });
+    });
+    S.__plantillasV2 = true;
+    try { if (typeof save === 'function') save(); } catch (e) {}
+    log('info', '[JAC] Plantillas base disponibles: ' + S.plantillas.length);
+  };
+
+  /* sembrar cuando el CRM ya tenga datos cargados */
+  var intentos = 0;
+  var t = setInterval(function () {
+    intentos++;
+    if (intentos > 40) { clearInterval(t); return; }
+    if (typeof S !== 'undefined' && S.clientes) {
+      clearInterval(t);
+      try { window.jacSembrarPlantillas(); } catch (e) { log('warn', e); }
+    }
+  }, 700);
+
+  /* Cintillo visible en la interfaz: pie de la aplicacion y pantalla de login. */
+  function pintarCintillo() {
+    if (document.getElementById('jac-ssrp-pie')) return true;
+    var host = document.getElementById('app') || document.body;
+    if (!host) return false;
+    var d = document.createElement('div');
+    d.id = 'jac-ssrp-pie';
+    d.style.cssText = 'text-align:center;font-size:10px;color:var(--mu,#94a3b8);'
+      + 'padding:14px 12px 78px;line-height:1.6;border-top:1px solid var(--bd,#e2e8f0);margin-top:22px';
+    d.innerHTML = '<strong>JAC Seguros</strong> | Jely An Castro, corredora de seguros · Panamá<br>'
+      + window.JAC_SSRP;
+    host.appendChild(d);
+    return true;
+  }
+  var ci = 0;
+  var ct = setInterval(function () {
+    ci++;
+    if (pintarCintillo() || ci > 40) clearInterval(ct);
+  }, 700);
+
+  /* y en la pantalla de acceso */
+  (function () {
+    var li = 0;
+    var lt = setInterval(function () {
+      li++;
+      if (li > 40) { clearInterval(lt); return; }
+      var lo = document.getElementById('login') || document.querySelector('.login-box, #loginBox');
+      if (!lo || document.getElementById('jac-ssrp-login')) { if (lo) clearInterval(lt); return; }
+      var d = document.createElement('div');
+      d.id = 'jac-ssrp-login';
+      d.style.cssText = 'text-align:center;font-size:9.5px;color:#94a3b8;margin-top:14px;'
+        + 'line-height:1.5;padding:0 10px';
+      d.textContent = window.JAC_SSRP;
+      lo.appendChild(d);
+      clearInterval(lt);
+    }, 700);
+  })();
+
+  log('info', '[JAC] Plantillas mejoradas con firma unificada');
 })();
 
 </script>
