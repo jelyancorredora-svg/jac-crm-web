@@ -14058,6 +14058,21 @@ document.addEventListener('click', function(e){
       + '_' + window.JAC_SSRP + '_';
   };
 
+  /* Logo oficial de la SSRP. Se sirve desde el sitio de la Superintendencia;
+     si no carga, el cintillo de texto se muestra igual. */
+  window.JAC_SSRP_LOGO = 'https://superseguros.gob.pa/wp-content/uploads/2019/09/logo-1.png';
+
+  window.jacCintilloHTML = function (compacto) {
+    var alto = compacto ? 26 : 34;
+    return '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;'
+      + 'padding:7px 11px;background:#f1f5f9;border-left:3px solid #1E3A8A;border-radius:4px">'
+      + '<img src="' + window.JAC_SSRP_LOGO + '" alt="SSRP" height="' + alto + '" '
+      + 'style="height:' + alto + 'px;width:auto;flex:0 0 auto" '
+      + 'onerror="this.style.display=\'none\'">'
+      + '<span style="font-size:10px;color:#475569;line-height:1.4">'
+      + window.JAC_SSRP + '</span></div>';
+  };
+
   /* Version HTML, para correos, informes y PDFs */
   window.jacFirmaHTML = function () {
     return '<div style="margin-top:18px;padding-top:12px;border-top:1px solid #e2e8f0;'
@@ -14065,9 +14080,7 @@ document.addEventListener('click', function(e){
       + '<strong style="color:#1E3A8A">JAC Seguros</strong> | Jely An Castro, corredora de seguros<br>'
       + '📞 ' + TEL + ' · ✉️ ' + MAIL1 + ' · ✉️ ' + MAIL2 + '<br>'
       + '🌐 ' + WEB + ' · 📍 ' + PAIS + '<br>'
-      + '<span style="display:inline-block;margin-top:7px;padding:5px 10px;background:#f1f5f9;'
-      + 'border-left:3px solid #1E3A8A;border-radius:3px;font-size:10px;color:#475569">'
-      + window.JAC_SSRP + '</span></div>';
+      + window.jacCintilloHTML() + '</div>';
   };
 
   function nom(x) { return String(x || '').trim().split(/\s+/)[0] || 'Hola'; }
@@ -14260,8 +14273,11 @@ document.addEventListener('click', function(e){
     d.id = 'jac-ssrp-pie';
     d.style.cssText = 'text-align:center;font-size:10px;color:var(--mu,#94a3b8);'
       + 'padding:14px 12px 78px;line-height:1.6;border-top:1px solid var(--bd,#e2e8f0);margin-top:22px';
-    d.innerHTML = '<strong>JAC Seguros</strong> | Jely An Castro, corredora de seguros · Panamá<br>'
-      + window.JAC_SSRP;
+    d.innerHTML = '<strong>JAC Seguros</strong> | Jely An Castro, corredora de seguros · Panamá'
+      + '<div style="display:flex;align-items:center;justify-content:center;gap:9px;margin-top:7px">'
+      + '<img src="' + window.JAC_SSRP_LOGO + '" alt="SSRP" height="30" '
+      + 'style="height:30px;width:auto" onerror="this.style.display=\'none\'">'
+      + '<span style="max-width:420px;text-align:left">' + window.JAC_SSRP + '</span></div>';
     host.appendChild(d);
     return true;
   }
@@ -14283,7 +14299,9 @@ document.addEventListener('click', function(e){
       d.id = 'jac-ssrp-login';
       d.style.cssText = 'text-align:center;font-size:9.5px;color:#94a3b8;margin-top:14px;'
         + 'line-height:1.5;padding:0 10px';
-      d.textContent = window.JAC_SSRP;
+      d.innerHTML = '<img src="' + window.JAC_SSRP_LOGO + '" alt="SSRP" height="26" '
+        + 'style="height:26px;width:auto;display:block;margin:0 auto 5px" '
+        + 'onerror="this.style.display=\'none\'">' + window.JAC_SSRP;
       lo.appendChild(d);
       clearInterval(lt);
     }, 700);
