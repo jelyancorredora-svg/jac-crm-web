@@ -9942,13 +9942,13 @@ function isRenderCartera() {
   var vigentes = 0;
   var totalPrima = 0;
   for (var i = 0; i < pols.length; i++) {
-    if (pols[i].et === 'Vigente') vigentes++;
+    if (pols[i].es === 'Vigente') vigentes++;
     totalPrima += pols[i].pr || 0;
   }
   var rows = '';
   for (var j = 0; j < pols.length; j++) {
     var p = pols[j];
-    var v = p.et === 'Vigente';
+    var v = p.es === 'Vigente';
     var ico = p.r && p.r.indexOf('SALUD') >= 0 ? 'S' : p.r && p.r.indexOf('AUTO') >= 0 ? 'A' : p.r && p.r.indexOf('VIDA') >= 0 ? 'V' : 'P';
     rows += '<tr class="' + (v ? 'vig' : '') + '">'
       + '<td>' + p.n + '</td>'
