@@ -2629,7 +2629,141 @@ let waComposePid=null,waComposeCid=null,cemEntityType=null,cemEntityId=null;
 
 function save(){try{var _s=JSON.stringify(S);localStorage.setItem('jacv10',_s);syncToCloudDebounced();}catch(e){toast('Almacenamiento lleno — exporta datos','err');}try{if(typeof renderKPIs==='function')renderKPIs();}catch(e){}try{if(typeof gcalAutoSync==='function')gcalAutoSync();}catch(e){}}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5).toUpperCase();}
+function jacSyncEcosistema(){
+  try{
+  function normName(s){ return (s||'').toString().toUpperCase().replace(/[^A-Z ]/g,'').replace(/\s+/g,' ').trim(); }
+  function ddmmyyyy(s){ const m=(s||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m? (m[3]+'-'+m[2]+'-'+m[1]) : (s||''); }
+  function findCli(nm){ const n=normName(nm); return S.clientes.find(c=>normName(c.nombre)===n); }
+  function findPol(num){ return S.polizas.find(p=>String(p.numeroPol||'')===String(num)); }
+  const log={uvCliAdd:[],uvPolAdd:[],uvComAdd:0,uvComDel:0,bcCliAdd:[],bcPolAdd:[],bcPending:[]};
 
+  const uvMissing=[
+  {n:'13096',nombre:'CORINA BEATRIZ FLORES FUENTE',cedula:'8-832-2261',prima:118.10,com:12,fi:'01/05/2019',ff:'01/05/2027'},
+  {n:'13869',nombre:'MONICA HERNANDEZ PRECIADO',cedula:'A0591190',prima:99.83,com:12,fi:'01/11/2019',ff:'01/11/2026'},
+  {n:'19545',nombre:'MARUSKA MELISSA CANTORAL MONTENEGRO',cedula:'7-705-53',prima:64.11,com:12,fi:'01/12/2023',ff:'01/12/2026'}
+  ];
+  uvMissing.forEach(u=>{
+  let cli=findCli(u.nombre);
+  if(!cli){ cli={id:'C'+uid(),nombre:u.nombre,cedula:u.cedula,tipo:'Persona',estadoCli:'Activo',etiquetas:[],fNac:'',fechaCreacion:new Date().toISOString().slice(0,10),historialComms:[],historialWA:[],archivos:[]}; S.clientes.push(cli); log.uvCliAdd.push(u.nombre); }
+  const numeroPol='1-9-'+u.n;
+  let pol=findPol(numeroPol);
+  if(!pol){
+  const comision=Math.round(u.prima*u.com)/100;
+  pol={id:uid(),clienteId:cli.id,nombreCliente:u.nombre,cedCliente:u.cedula,celCliente:'',emailCliente:'',aseg:'Vivir Compania De Seguros, S.A',aseguradora:'Vivir Compania De Seguros, S.A',ramo:'SALUD/MEDICOS',subramo:'SALUD/MEDICOS',categorias:'SEGUROS VIVIR ,POLIZA DE SALUD',prima:u.prima,primaMensual:u.prima,comPct:u.com,comisionPct:u.com/100,comision:comision,formaPago:'Fraccionado',periodicidad:'Mensual',participacion:1,fechaInicio:ddmmyyyy(u.fi),fechaFin:ddmmyyyy(u.ff),fechaCreacion:new Date().toISOString().slice(0,10),estado:'Vigente',estadoCartera:'Comisionada',etapa:'Vigente',nueva:'Renovada',numeroPol:numeroPol,beneficiario:u.nombre,cedBenef:u.cedula,tomador:u.nombre,docTomador:u.cedula,total:comision,notas:'Importado de sync UniVivir (poliza portal #'+u.n+').'};
+  S.polizas.push(pol); log.uvPolAdd.push(numeroPol);
+  }
+  });
+
+  if(S.univivir && S.univivir.polizasVigentes){
+  const uvRawNums=S.univivir.polizasVigentes.map(p=>String(p.n));
+  function polForRaw(raw){ return S.polizas.find(p=>{ const np=String(p.numeroPol||''); return np===raw||np.endsWith('-'+raw); }); }
+  S.comisiones=S.comisiones.filter(c=>{
+  const np=String(c.numeroPol||'');
+  const isTarget=uvRawNums.some(raw=>np===raw||np.endsWith('-'+raw));
+  if(isTarget){ log.uvComDel++; return false; }
+  return true;
+  });
+  function pushReal(rawNum,monto,fechaDMY,numPago){
+  const pol=polForRaw(String(rawNum));
+  if(!pol) return;
+  const mes=ddmmyyyy(fechaDMY).slice(0,7);
+  S.comisiones.push({id:uid(),aseg:pol.aseg,cedCliente:pol.cedCliente,clienteId:pol.clienteId,estado:'cobrada',fechaFin:'',mes:mes,monto:monto,nombreCliente:pol.nombreCliente,numPago:String(numPago||''),numeroPol:pol.numeroPol,polizaId:pol.id,ramo:'Salud',fuente:'UniVivir-real',fechaPago:ddmmyyyy(fechaDMY)});
+  log.uvComAdd++;
+  }
+  (S.univivir.liqComisiones||[]).forEach(e=>pushReal(e.poliza,e.comision,e.fecha_pago,e.nro_cuota));
+  (S.univivir.comisiones||[]).forEach(e=>pushReal(e.poliza,e.comision,e.fechaPago,e.cuota));
+  }
+
+  const bcVerified=[
+  ['16-1-33845','Carlos Ivan Luna Cortez','Carlos Ivan Luna Cortez',173.88,10,17.39],
+  ['16-1-39266','Karen Yadira Ramirez Anacona','Karen Yadira Ramirez Anacona',160.97,10,16.10],
+  ['16-1-39266','Karen Yadira Ramirez Anacona','Maximiliano Reluz Ramirez',160.97,10,16.10],
+  ['16-1-53058','Maria del Carmen Castro Barria','Maria del Carmen Castro Barria',97.65,10,9.77],
+  ['16-1-55304','Franklin Delano Martinez Barria','Mila Mariana Martinez Villar',49.67,10,4.97],
+  ['16-1-55305','Franklin Delano Martinez Barria','Luana Mariana Martinez Villar',49.67,10,4.97],
+  ['16-1-57417','Larry Javier Nieto Delgado','Liam David Nieto Padilla',49.67,0,0],
+  ['16-1-58406','Blanca Magaly Molina Quintero','Blanca Magaly Molina Quintero',120.12,10,12.01],
+  ['16-1-59254','Francy Oralix Principal Villabona','Grace Marie Piza Principal',49.67,10,4.97],
+  ['16-1-60953','Alex Alvarez Martinez','Alex Alvarez Martinez',112.56,10,11.26],
+  ['16-1-61930','Maruska Melissa Cantoral Montenegro','Suria Luanne Maestre Cantoral',49.67,10,4.97],
+  ['16-1-61931','Maruska Melissa Cantoral Montenegro','Helena del Mar Ferro Cantoral',49.67,10,4.97],
+  ['16-1-63677','Oldemar Ulises Lescure Gilkes','Ulises Abraham Lescure Espinosa',49.67,10,4.97],
+  ['16-1-64323','Estefani Yahir Ruiz Adrian','Bianca Estefania Herrera Ruiz',49.67,10,4.97],
+  ['16-1-64359','Estefani Yahir Ruiz Adrian','Tomas Bolivar Herrera Ruiz',49.67,10,4.97],
+  ['16-1-67522','Carlos Julio Guerra Castillo','Daniel Alejandro Guerra Conte',49.67,10,4.97],
+  ['16-1-67523','Carlos Julio Guerra Castillo','Alejandra Lucia Guerra Conte',49.67,10,4.97],
+  ['16-2-899','Helen Melissa Della Sera Guerra','Helen Melissa Della Sera Guerra',97.65,10,9.77],
+  ['16-8-180','Larry Javier Nieto Delgado','Larry Javier Nieto Delgado',78.44,10,7.84],
+  ['16-12-2826','Oldemar Ulises Lescure Gilkes','Andrea Michelle Lescure Espinosa',49.67,10,4.97],
+  ['16-12-3422','Alex Alvarez Martinez','Abraham Alvarez Guerra',49.67,12,5.96],
+  ['16-12-3487','Carlos Julian Luna Dominguez','Carlos Julian Luna Dominguez',85.47,12,10.26]
+  ];
+  const bcVigencia={
+  '16-1-33845':['01/11/2025','01/11/2026'],'16-1-39266':['01/10/2025','01/10/2026'],'16-1-53058':['01/07/2026','01/07/2027'],
+  '16-1-55304':['15/02/2026','15/02/2027'],'16-1-55305':['15/02/2026','15/02/2027'],'16-1-57417':['15/09/2025','15/09/2026'],
+  '16-1-58406':['01/01/2026','01/01/2027'],'16-1-59254':['15/03/2026','15/03/2027'],'16-1-60953':['01/09/2025','01/09/2026'],
+  '16-1-61930':['15/12/2025','15/12/2026'],'16-1-61931':['15/12/2025','15/12/2026'],'16-1-63677':['01/06/2026','01/06/2027'],
+  '16-1-64323':['01/08/2025','01/08/2026'],'16-1-64359':['01/08/2025','01/08/2026'],'16-1-67522':['15/06/2026','15/06/2027'],
+  '16-1-67523':['15/06/2026','15/06/2027'],'16-2-899':['01/09/2025','01/09/2026'],'16-8-180':['01/07/2026','01/07/2027'],
+  '16-12-2826':['15/04/2026','15/04/2027'],'16-12-3422':['15/09/2025','15/09/2026'],'16-12-3487':['15/11/2025','15/11/2026']
+  };
+  const bcDoc={
+  'CARLOS IVAN LUNA CORTEZ':'7-122-404','KAREN YADIRA RAMIREZ ANACONA':'E-8-134628','MAXIMILIANO RELUZ RAMIREZ':'GNP-901',
+  'MARIA DEL CARMEN CASTRO BARRIA':'7-709-2359','MILA MARIANA MARTINEZ VILLAR':'8-1174-1377','LUANA MARIANA MARTINEZ VILLAR':'8-1210-1570',
+  'LIAM DAVID NIETO PADILLA':'8-1215-1370','BLANCA MAGALY MOLINA QUINTERO':'E-8-191684','GRACE MARIE PIZA PRINCIPAL':'13-11-1960',
+  'ALEX ALVAREZ MARTINEZ':'E-8-206756','SURIA LUANNE MAESTRE CANTORAL':'8-1109-1540','HELENA DEL MAR FERRO CANTORAL':'8-1244-1161',
+  'ULISES ABRAHAM LESCURE ESPINOSA':'4-736-1918','BIANCA ESTEFANIA HERRERA RUIZ':'8-1218-2398','TOMAS BOLIVAR HERRERA RUIZ':'8-1250-1928',
+  'DANIEL ALEJANDRO GUERRA CONTE':'8-1163-20','ALEJANDRA LUCIA GUERRA CONTE':'8-1112-271','HELEN MELISSA DELLA SERA GUERRA':'4-770-2072',
+  'LARRY JAVIER NIETO DELGADO':'8-798-178','ANDREA MICHELLE LESCURE ESPINOSA':'8-1085-1447','ABRAHAM ALVAREZ GUERRA':'M988509',
+  'CARLOS JULIAN LUNA DOMINGUEZ':'7-710-1705'
+  };
+  bcVerified.forEach(row=>{
+  const poliza=row[0], contratante=row[1], asegurado=row[2], prima=row[3], comPct=row[4], comision=row[5];
+  let pol=findPol(poliza);
+  if(!pol){
+  const vig=bcVigencia[poliza]||['',''];
+  let cliTitular=findCli(contratante);
+  if(!cliTitular){ cliTitular={id:'C'+uid(),nombre:contratante,cedula:bcDoc[normName(contratante)]||'',tipo:'Persona',estadoCli:'Activo',etiquetas:[],fNac:'',fechaCreacion:new Date().toISOString().slice(0,10),historialComms:[],historialWA:[],archivos:[]}; S.clientes.push(cliTitular); log.bcCliAdd.push(contratante); }
+  pol={id:uid(),clienteId:cliTitular.id,nombreCliente:contratante,cedCliente:cliTitular.cedula,celCliente:'',emailCliente:'',aseg:'Cia Internacional De Seguros, S.A.',aseguradora:'Cia Internacional De Seguros, S.A.',ramo:'SALUD/MEDICOS',subramo:'SALUD/MEDICOS',categorias:'BLUECROSS & BLUESHIELD ,POLIZA DE SALUD',prima:prima,primaMensual:prima,comPct:comPct,comisionPct:comPct/100,comision:comision,formaPago:'Fraccionado',periodicidad:'Mensual',participacion:1,fechaInicio:ddmmyyyy(vig[0]),fechaFin:ddmmyyyy(vig[1]),fechaCreacion:new Date().toISOString().slice(0,10),estado:comPct===0?'Vigente (pago rechazado)':'Vigente',estadoCartera:comPct===0?'Rechazado':'Comisionada',etapa:'Vigente',nueva:'Renovada',numeroPol:poliza,beneficiario:asegurado,cedBenef:bcDoc[normName(asegurado)]||'',tomador:contratante,docTomador:cliTitular.cedula,total:comision,asegurados:[asegurado],notas:'Importado de sync iSeguros/BlueCross (verificado manualmente).'};
+  S.polizas.push(pol); log.bcPolAdd.push(poliza);
+  if(comPct>0){
+  S.comisiones.push({id:uid(),aseg:pol.aseg,cedCliente:pol.cedCliente,clienteId:pol.clienteId,estado:'cobrada',fechaFin:'',mes:new Date().toISOString().slice(0,7),monto:comision,nombreCliente:pol.nombreCliente,numPago:'',numeroPol:poliza,polizaId:pol.id,ramo:'Salud',fuente:'iSeguros-BlueCross-verificado'});
+  }
+  } else {
+  if(pol.asegurados && pol.asegurados.indexOf(asegurado)===-1) pol.asegurados.push(asegurado);
+  }
+  if(normName(asegurado)!==normName(contratante)){
+  let cliDep=findCli(asegurado);
+  if(!cliDep){
+  cliDep={id:'C'+uid(),nombre:asegurado,cedula:bcDoc[normName(asegurado)]||'',tipo:'Persona',estadoCli:'Activo',etiquetas:[],fNac:'',fechaCreacion:new Date().toISOString().slice(0,10),historialComms:[],historialWA:[],archivos:[],notas:'Dependiente en poliza BlueCross '+poliza+' (titular: '+contratante+').'};
+  S.clientes.push(cliDep); log.bcCliAdd.push(asegurado);
+  }
+  }
+  });
+  const bcPendientes=[
+  {poliza:'16-1-28467',nombre:'WALTER SALOMON DIAMOND FERNANDEZ',doc:'8-746-1980',vig:['01/12/2025','01/12/2026']},
+  {poliza:'16-1-57983',nombre:'SCARLETT SOLANGE KILZI ROJAS',doc:'8-1067-2316',contratante:'CARLOS ALFREDO GONZALEZ SANCHEZ',vig:['15/11/2025','15/11/2026']},
+  {poliza:'16-12-3540',nombre:'ASTON ANDREE LEMUS SALINAS',doc:'4-890-2288',contratante:'JEYMI NOHELLYS SALINAS TELLO',vig:['15/01/2026','15/01/2027']}
+  ];
+  bcPendientes.forEach(u=>{
+  let pol=findPol(u.poliza);
+  if(!pol){
+  const titularNombre=u.contratante||u.nombre;
+  let cli=findCli(titularNombre);
+  if(!cli){ cli={id:'C'+uid(),nombre:titularNombre,cedula:'',tipo:'Persona',estadoCli:'Activo',etiquetas:[],fNac:'',fechaCreacion:new Date().toISOString().slice(0,10),historialComms:[],historialWA:[],archivos:[]}; S.clientes.push(cli); log.bcCliAdd.push(titularNombre); }
+  pol={id:uid(),clienteId:cli.id,nombreCliente:titularNombre,cedCliente:cli.cedula,aseg:'Cia Internacional De Seguros, S.A.',aseguradora:'Cia Internacional De Seguros, S.A.',ramo:'SALUD/MEDICOS',subramo:'SALUD/MEDICOS',prima:0,comPct:0,comision:0,fechaInicio:ddmmyyyy(u.vig[0]),fechaFin:ddmmyyyy(u.vig[1]),estado:'Vigente',estadoCartera:'Pendiente verificar',numeroPol:u.poliza,beneficiario:u.nombre,tomador:titularNombre,notas:'PENDIENTE: prima y comision real no verificados aun en portal iSeguros/BlueCross.'};
+  S.polizas.push(pol); log.bcPolAdd.push(u.poliza); log.bcPending.push(u.poliza);
+  if(u.contratante && normName(u.contratante)!==normName(u.nombre)){
+  let cliDep=findCli(u.nombre);
+  if(!cliDep){ S.clientes.push({id:'C'+uid(),nombre:u.nombre,cedula:u.doc||'',tipo:'Persona',estadoCli:'Activo',etiquetas:[],fNac:'',fechaCreacion:new Date().toISOString().slice(0,10),historialComms:[],historialWA:[],archivos:[],notas:'Dependiente en poliza BlueCross '+u.poliza+' (titular: '+u.contratante+'). Pendiente verificar prima/comision.'}); log.bcCliAdd.push(u.nombre); }
+  }
+  }
+  });
+
+  save();
+  return log;
+  }catch(e){ console.error('jacSyncEcosistema error', e); return {error:String(e)}; }
+  }
 // ── UTILS ──
 function fmt(d){if(!d||d==='NaT'||d==='None'||d===''||String(d).length<8)return(d&&String(d).length===4?String(d):'—');try{const x=new Date(d.length>10?d:d+'T00:00:00');if(isNaN(x))return d;return`${x.getDate()} ${MON[x.getMonth()]} ${x.getFullYear()}`;}catch{return d||'—';}}
 function fmtM(n){return'$'+(parseFloat(n)||0).toLocaleString('es-PA',{minimumFractionDigits:2,maximumFractionDigits:2});}
