@@ -14343,7 +14343,7 @@ document.addEventListener('click', function(e){
       ['16-1-53058','Maria del Carmen Castro Barria','Maria del Carmen Castro Barria','97.65','10.00','9.77'],
       ['16-1-55304','Franklin Delano Martinez Barria','Mila Mariana Martinez Villar','49.67','10.00','4.97'],
       ['16-1-55305','Franklin Delano Martinez Barria','Luana Mariana Martinez Villar','49.67','10.00','4.97'],
-      ['16-1-57417','Larry Javier Nieto Delgado','Liam David Nieto Padilla','49.67','N/D','N/D'],
+            ['16-1-57417','Larry Javier Nieto Delgado','Liam David Nieto Padilla','49.67','RECH','RECH'],
       ['16-1-58406','Blanca Magaly Molina Quintero','Blanca Magaly Molina Quintero','120.12','10.00','12.01'],
       ['16-1-59254','Francy Oralix Principal Villabona','Grace Marie Piza Principal','49.67','10.00','4.97'],
       ['16-1-60953','Alex Alvarez Martinez','Alex Alvarez Martinez','112.56','10.00','11.26'],
@@ -14367,10 +14367,10 @@ document.addEventListener('click', function(e){
       + '</div>'
       + '<table class="is-tbl"><tr><th>Poliza</th><th>Contratante</th><th>Asegurado</th><th>Prima/mes</th><th>% Com.</th><th>Comisión</th></tr>';
     rows.forEach(function(r){
-      html += '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>$'+r[3]+'</td><td>'+(r[4]==='N/D'?'N/D':r[4]+'%')+'</td><td>'+(r[5]==='N/D'?'N/D':'$'+r[5])+'</td></tr>';
+      html += '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>$'+r[3]+'</td><td>'+(r[4]==='N/D'?'N/D':(r[4]==='RECH'?'Rechazado':r[4]+'%'))+'</td><td>'+(r[5]==='N/D'?'N/D':(r[5]==='RECH'?'$0.00':'$'+r[5]))+'</td></tr>';
     });
     html += '</table>'
-      + '<div class="is-note">Salud (MEDIRED PPO) no muestra desglose de impuesto: prima con y sin impuesto son iguales. Prima verificada en Consulta de Cobros (BlueCross). % Comisión y Comisión verificados en Estado de Cuenta de Comisión (iSeguros) julio 2026. La póliza 16-1-57417 no aparece en los reportes de julio ni agosto, se deja como N/D.</div>';
+            + '<div class="is-note">Salud (MEDIRED PPO) no muestra desglose de impuesto: prima con y sin impuesto son iguales. Prima verificada en Consulta de Cobros (BlueCross). % Comisión y Comisión verificados en Estado de Cuenta de Comisión (iSeguros) julio 2026. La póliza 16-1-57417 (Liam David Nieto Padilla) marca "Rechazado": el pago de julio 2026 fue devuelto 3 veces por el banco (fondos insuficientes / transacción no permitida, verificado en Detalles de la Póliza) y la cuenta está morosa 1-30 días a la fecha; al no cobrarse la prima, la comisión de ese periodo es $0.00.</div>';
     return html;
   }
   window.isRenderPrimaCom = function(sub){
