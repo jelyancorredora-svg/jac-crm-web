@@ -14311,6 +14311,105 @@ document.addEventListener('click', function(e){
 })();
 
 </script>
+
+<script>
+(function(){
+  function pcVida(){
+    return ''
+      + '<div class="is-stats-row">'
+      + '<div class="is-mini-card"><span>9</span>Pol. Vida</div>'
+      + '<div class="is-mini-card"><span>4</span>Vigentes</div>'
+      + '<div class="is-mini-card"><span>$30.22</span>Comisión/mes</div>'
+      + '</div>'
+      + '<table class="is-tbl"><tr><th>Poliza</th><th>Ramo</th><th>Cliente</th>'
+      + '<th>Prima s/imp</th><th>Prima c/imp</th><th>% Com.</th><th>Comisión</th><th>Periodo</th><th>Estado</th></tr>'
+      + '<tr class="vig"><td>1-12-598</td><td>Vida Trad.</td><td>Xiomara Phillips</td><td>$78.35</td><td>$82.27</td><td>15.00%</td><td>$11.75</td><td>Una cuota mensual</td><td><span class="is-badge ok">Vigente</span></td></tr>'
+      + '<tr class="vig"><td>1-12-658</td><td>Vida Trad.</td><td>Jhon Jairo Valverde Osorio</td><td>$37.47</td><td>$39.34</td><td>45.00%</td><td>$16.86</td><td>Una cuota mensual</td><td><span class="is-badge ok">Vigente</span></td></tr>'
+      + '<tr class="vig"><td>2-12-54</td><td>Vida Universal</td><td>Shirley Perez Villalobos</td><td>$51.69</td><td>$51.69</td><td>1.50%</td><td>$0.77</td><td>Una cuota mensual</td><td><span class="is-badge ok">Vigente</span></td></tr>'
+      + '<tr class="vig"><td>2-1-18060</td><td>Vida Universal</td><td>Jose Antonio Jimenez Moya</td><td>$56.62</td><td>$56.62</td><td>1.50%</td><td>$0.84</td><td>Una cuota mensual</td><td><span class="is-badge ok">Vigente</span></td></tr>'
+      + '<tr><td>15245</td><td>Vida Trad.</td><td>Nikaira Ixehel Delgado Heinz</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td><span class="is-badge ven">Cancelada</span></td></tr>'
+      + '<tr><td>17810</td><td>Vida Universal</td><td>Roger Jose Perez Perez</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td><span class="is-badge ven">Cancelada</span></td></tr>'
+      + '<tr><td>18436</td><td>Vida Universal</td><td>Jose de la Paz Rodriguez Arcia</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td><span class="is-badge ven">Cancelada</span></td></tr>'
+      + '<tr><td>19414</td><td>Vida Universal</td><td>Evelyn Michelle Soto Carmona</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td><span class="is-badge ven">Cancelada</span></td></tr>'
+      + '<tr><td>19415</td><td>Vida Universal</td><td>Jose Angel Juarez Delgado</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td><span class="is-badge ven">Cancelada</span></td></tr>'
+      + '</table>'
+      + '<div class="is-note">Prima sin imp. = Prima Planeada. Prima con imp. = monto real cobrado (Vida Universal no lleva impuesto). % Comisión y Comisión verificados en Estado de Cuenta de Comisión julio 2026. Los 5 cancelados no tienen fuente en vivo.</div>';
+  }
+  function pcSalud(){
+    var rows = [
+      ['16-1-33845','Carlos Ivan Luna Cortez','Carlos Ivan Luna Cortez','173.88','10.00','17.39'],
+      ['16-1-39266','Karen Yadira Ramirez Anacona','Karen Yadira Ramirez Anacona','160.97','10.00','16.10'],
+      ['16-1-39266','Karen Yadira Ramirez Anacona','Maximiliano Reluz Ramirez (dep.)','160.97','10.00','16.10'],
+      ['16-1-53058','Maria del Carmen Castro Barria','Maria del Carmen Castro Barria','97.65','10.00','9.77'],
+      ['16-1-55304','Franklin Delano Martinez Barria','Mila Mariana Martinez Villar','49.67','10.00','4.97'],
+      ['16-1-55305','Franklin Delano Martinez Barria','Luana Mariana Martinez Villar','49.67','10.00','4.97'],
+      ['16-1-57417','Larry Javier Nieto Delgado','Liam David Nieto Padilla','49.67','N/D','N/D'],
+      ['16-1-58406','Blanca Magaly Molina Quintero','Blanca Magaly Molina Quintero','120.12','10.00','12.01'],
+      ['16-1-59254','Francy Oralix Principal Villabona','Grace Marie Piza Principal','49.67','10.00','4.97'],
+      ['16-1-60953','Alex Alvarez Martinez','Alex Alvarez Martinez','112.56','10.00','11.26'],
+      ['16-1-61930','Maruska Melissa Cantoral Montenegro','Suria Luanne Maestre Cantoral','49.67','10.00','4.97'],
+      ['16-1-61931','Maruska Melissa Cantoral Montenegro','Helena del Mar Ferro Cantoral','49.67','10.00','4.97'],
+      ['16-1-63677','Oldemar Ulises Lescure Gilkes','Ulises Abraham Lescure Espinosa','49.67','10.00','4.97'],
+      ['16-1-64323','Estefani Yahir Ruiz Adrian','Bianca Estefania Herrera Ruiz','49.67','10.00','4.97'],
+      ['16-1-64359','Estefani Yahir Ruiz Adrian','Tomas Bolivar Herrera Ruiz','49.67','10.00','4.97'],
+      ['16-1-67522','Carlos Julio Guerra Castillo','Daniel Alejandro Guerra Conte','49.67','10.00','4.97'],
+      ['16-1-67523','Carlos Julio Guerra Castillo','Alejandra Lucia Guerra Conte','49.67','10.00','4.97'],
+      ['16-2-899','Helen Melissa Della Sera Guerra','Helen Melissa Della Sera Guerra','97.65','10.00','9.77'],
+      ['16-8-180','Larry Javier Nieto Delgado','Larry Javier Nieto Delgado','78.44','10.00','7.84'],
+      ['16-12-2826','Oldemar Ulises Lescure Gilkes','Andrea Michelle Lescure Espinosa','49.67','10.00','4.97'],
+      ['16-12-3422','Alex Alvarez Martinez','Abraham Alvarez Guerra','49.67','12.00','5.96'],
+      ['16-12-3487','Carlos Julian Luna Dominguez','Carlos Julian Luna Dominguez','85.47','12.00','10.26']
+    ];
+    var html = '<div class="is-stats-row">'
+      + '<div class="is-mini-card"><span>21</span>Pol. Salud</div>'
+      + '<div class="is-mini-card"><span>22</span>Asegurados</div>'
+      + '<div class="is-mini-card"><span>$155.03</span>Comisión/mes</div>'
+      + '</div>'
+      + '<table class="is-tbl"><tr><th>Poliza</th><th>Contratante</th><th>Asegurado</th><th>Prima/mes</th><th>% Com.</th><th>Comisión</th></tr>';
+    rows.forEach(function(r){
+      html += '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>$'+r[3]+'</td><td>'+(r[4]==='N/D'?'N/D':r[4]+'%')+'</td><td>'+(r[5]==='N/D'?'N/D':'$'+r[5])+'</td></tr>';
+    });
+    html += '</table>'
+      + '<div class="is-note">Salud (MEDIRED PPO) no muestra desglose de impuesto: prima con y sin impuesto son iguales. Prima verificada en Consulta de Cobros (BlueCross). % Comisión y Comisión verificados en Estado de Cuenta de Comisión (iSeguros) julio 2026. La póliza 16-1-57417 no aparece en los reportes de julio ni agosto, se deja como N/D.</div>';
+    return html;
+  }
+  window.isRenderPrimaCom = function(sub){
+    sub = sub || 'vida';
+    var cont = document.querySelector('.is-tab-content');
+    if(!cont) return;
+    var tabsHtml = '<div class="is-tabs" style="margin-bottom:10px;">'
+      + '<button class="is-tab' + (sub==='vida' ? ' active' : '') + '" onclick="isRenderPrimaCom(\'vida\')">Vida</button>'
+      + '<button class="is-tab' + (sub==='salud' ? ' active' : '') + '" onclick="isRenderPrimaCom(\'salud\')">Salud (BlueCross)</button>'
+      + '</div>';
+    cont.innerHTML = tabsHtml + (sub === 'salud' ? pcSalud() : pcVida());
+    document.querySelectorAll('.is-tabs > .is-tab').forEach(function(b){
+      if(b.textContent.trim() !== 'Vida' && b.textContent.trim() !== 'Salud (BlueCross)') b.classList.remove('active');
+    });
+    var mainBtn = document.querySelector('.is-tab.pc-main');
+    if(mainBtn) mainBtn.classList.add('active');
+  };
+  function pcAddTab(){
+    var bar = document.querySelectorAll('.is-tabs')[0];
+    if(!bar || bar.querySelector('.pc-main')) return;
+    var btn = document.createElement('button');
+    btn.className = 'is-tab pc-main';
+    btn.textContent = 'Prima/Comisión';
+    btn.onclick = function(){ isRenderPrimaCom('vida'); };
+    bar.appendChild(btn);
+  }
+  pcAddTab();
+  setTimeout(pcAddTab, 1200);
+  if(typeof window.isRender === 'function' && !window.__pcPatched){
+    var _origIsRender = window.isRender;
+    window.isRender = function(v){
+      var r = _origIsRender.apply(this, arguments);
+      pcAddTab();
+      return r;
+    };
+    window.__pcPatched = true;
+  }
+})();
+</script>
 </body>
 </html>
 <!-- deploy-test -->
