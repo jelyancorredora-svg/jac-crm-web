@@ -264,6 +264,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
 <body>
   <button id="jacSyncEcoBtn" onclick="var r=jacSyncEcosistema(); alert('Sincronizacion completada.\nClientes UniVivir agregados: '+r.uvCliAdd.length+'\nPolizas UniVivir agregadas: '+r.uvPolAdd.length+'\nComisiones UniVivir reemplazadas por datos reales: '+r.uvComAdd+' (estimados eliminados: '+r.uvComDel+')\nClientes BlueCross agregados: '+r.bcCliAdd.length+'\nPolizas BlueCross agregadas: '+r.bcPolAdd.length+'\nPolizas BlueCross pendientes de verificar: '+r.bcPending.length); location.reload();" style="position:fixed;bottom:16px;left:16px;z-index:9999;background:#1D4ED8;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)">Sincronizar Ecosistema JAC</button>
   <button id="jacFixUvBtn" onclick="var r=jacFixUnivivirVigencias(); alert('Vigencias UniVivir actualizadas.\nPolizas actualizadas con datos reales: '+r.actualizadas.length+' ('+r.actualizadas.join(', ')+')\nNo encontradas en CRM: '+r.noEncontradas.length+(r.noEncontradas.length?' ('+r.noEncontradas.join(', ')+')':'')); location.reload();" style="position:fixed;bottom:16px;left:230px;z-index:9999;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)">Corregir Vigencias UniVivir</button>
+  <button id="jacMergeBtn" onclick="var r=jacMergeDuplicadosYAseguradoras(); alert('Fusion completada.\nAseguradoras unificadas: '+r.aseguradorasUnificadas+'\nClientes fusionados: '+r.clientesFusionados.length+'\nPolizas reasignadas: '+r.polizasReasignadas); location.reload();" style="position:fixed;bottom:16px;left:410px;z-index:9999;padding:10px 16px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer">Unificar Duplicados</button>
 <div id="tst"></div>
 <div id="cof"><div id="cob"><h3>⚠️ Confirmar</h3><p id="cmsg">¿Eliminar?</p><div style="display:flex;gap:9px;justify-content:center"><button class="btn" onclick="cc()">Cancelar</button><button class="btn brd2" id="cokb">Confirmar</button></div></div></div>
 
@@ -2785,6 +2786,32 @@ function autoUpdatePolizasStatus(){
  });
  if(changed>0){save();console.log('[JAC CRM] Auto-updated '+changed+' policy statuses');}
 }
+function jacMergeDuplicadosYAseguradoras(){
+try{
+var log = {aseguradorasUnificadas:0, clientesFusionados:[], polizasReasignadas:0};
+var asegMap = {
+'CÍA INTERNACIONAL DE SEGUROS':'Cía Internacional De Seguros, S.A.',
+'Internacional':'Cía Internacional De Seguros, S.A.',
+'IS':'Cía Internacional De Seguros, S.A.',
+'Vivir Compañia De Seguros, S.A':'UNIVIVIR',
+'UniVivir':'UNIVIVIR',
+'Sura':'SURA',
+'Suramericana':'SURA',
+'La Regional De Seguros, S.A.':'La Regional De Seguros | Vumi',
+'VUMI-LA REGIONAL DE SEGUROS':'La Regional De Seguros | Vumi',
+'La Regional':'La Regional De Seguros | Vumi',
+'LA REGIONAL DE SEGUROS | ':'La Regional De Seguros | Vumi',
+'Aseguradora Ancon, S.A':'Ancón'
+};
+S.polizas.forEach(function(p){
+var cur = p.aseg || p.aseguradora;
+if(cur && asegMap[cur]){
+if(p.aseg) p.aseg = asegMap[cur];
+if(p.aseguradora) p.aseguradora = asegMap[cur];
+log.aseguradorasUnificadas++;
+}
+});
+function normCed(s){ return (s||'').toString().trim().toUpperCase().split(' ').join('').split('-').join('').split('.').join(''); }var byCed = {};S.clientes.forEach(function(c){var k = normCed(c.cedula||c.cedCliente||c.documento);if(!k) return;byCed[k] = byCed[k] || [];byCed[k].push(c);});Object.keys(byCed).forEach(function(k){var group = byCed[k];if(group.length<2) return;group.sort(function(a,b){var an = Object.keys(a).filter(function(kk){return a[kk]!==''&&a[kk]!=null&&!(Array.isArray(a[kk])&&a[kk].length===0);}).length;var bn = Object.keys(b).filter(function(kk){return b[kk]!==''&&b[kk]!=null&&!(Array.isArray(b[kk])&&b[kk].length===0);}).length;return bn-an;});var canonical = group[0];var dupes = group.slice(1);dupes.forEach(function(d){S.polizas.forEach(function(p){if(p.clienteId===d.id){ p.clienteId=canonical.id; log.polizasReasignadas++; }});var idx = S.clientes.indexOf(d);if(idx>=0) S.clientes.splice(idx,1);});log.clientesFusionados.push({nombre:canonical.nombre, canonicalId:canonical.id, dupesRemoved:dupes.map(function(d){return d.id;})});});if(typeof autoUpdatePolizasStatus==='function') autoUpdatePolizasStatus();save();return log;}catch(e){ console.error('jacMergeDuplicadosYAseguradoras error', e); return {error:String(e)}; }}
 function jacFixUnivivirVigencias(){
 try{
 function ddmmyyyy2(s){ const m=(s||'').toString().match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m? (m[3]+'-'+m[2]+'-'+m[1]) : (s||''); }
@@ -10312,7 +10339,7 @@ window.uvSetTab=function(t,el){
   uvRenderTable();
 };
 window.uvEditPV=function(){
-  var m=document.getElementById('uv-modal');
+var m=document.getElementById('uv-modal');
   var cur=JSON.stringify(((gd()||{}).polizasVigentes)||[],null,2);
   m.innerHTML='<div style="background:#fff;border-radius:8px;padding:24px;width:92%;max-width:720px;max-height:82vh;overflow:auto">'+
     '<h3 style="margin:0 0 8px">📋 Editar Pólizas Vigentes UniVivir</h3>'+
