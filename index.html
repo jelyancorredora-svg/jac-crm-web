@@ -264,7 +264,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
 <body>
   <button id="jacSyncEcoBtn" onclick="var r=jacSyncEcosistema(); alert('Sincronizacion completada.\nClientes UniVivir agregados: '+r.uvCliAdd.length+'\nPolizas UniVivir agregadas: '+r.uvPolAdd.length+'\nComisiones UniVivir reemplazadas por datos reales: '+r.uvComAdd+' (estimados eliminados: '+r.uvComDel+')\nClientes BlueCross agregados: '+r.bcCliAdd.length+'\nPolizas BlueCross agregadas: '+r.bcPolAdd.length+'\nPolizas BlueCross pendientes de verificar: '+r.bcPending.length); location.reload();" style="position:fixed;bottom:16px;left:16px;z-index:9999;background:#1D4ED8;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)">Sincronizar Ecosistema JAC</button>
   <button id="jacFixUvBtn" onclick="var r=jacFixUnivivirVigencias(); alert('Vigencias UniVivir actualizadas.\nPolizas actualizadas con datos reales: '+r.actualizadas.length+' ('+r.actualizadas.join(', ')+')\nNo encontradas en CRM: '+r.noEncontradas.length+(r.noEncontradas.length?' ('+r.noEncontradas.join(', ')+')':'')); location.reload();" style="position:fixed;bottom:16px;left:230px;z-index:9999;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)">Corregir Vigencias UniVivir</button>
-  <button id="jacMergeBtn" onclick="var r=jacMergeDuplicadosYAseguradoras(); alert('Fusion completada.\nAseguradoras unificadas: '+r.aseguradorasUnificadas+'\nClientes fusionados: '+r.clientesFusionados.length+'\nPolizas reasignadas: '+r.polizasReasignadas); location.reload();" style="position:fixed;bottom:16px;left:410px;z-index:9999;padding:10px 16px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer">Unificar Duplicados</button><button id="jacSyncAssaBtn" onclick="jacSyncAssaVidaSalud()">Sync ASSA</button>
+  <button id="jacMergeBtn" onclick="var r=jacMergeDuplicadosYAseguradoras(); alert('Fusion completada.\nAseguradoras unificadas: '+r.aseguradorasUnificadas+'\nClientes fusionados: '+r.clientesFusionados.length+'\nPolizas reasignadas: '+r.polizasReasignadas); location.reload();" style="position:fixed;bottom:16px;left:410px;z-index:9999;padding:10px 16px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer">Unificar Duplicados</button><button id="jacSyncAssaBtn" onclick="jacSyncAssaVidaSalud()">Sync ASSA</button><button id="jacSepararRegionalBtn" onclick="jacSepararRegionalVumi()">Separar Regional/Vumi</button>
 <div id="tst"></div>
 <div id="cof"><div id="cob"><h3>⚠️ Confirmar</h3><p id="cmsg">¿Eliminar?</p><div style="display:flex;gap:9px;justify-content:center"><button class="btn" onclick="cc()">Cancelar</button><button class="btn brd2" id="cokb">Confirmar</button></div></div></div>
 
@@ -326,7 +326,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <a onclick="SH('com');renderCom()">💰 Comisiones</a><a class="nav-item" onclick="SH('rep');renderRep()" title="Reportes">📊 <span>Reportes</span></a>
  
  <a onclick="SH('emp')">🏢 Empresas</a>
- <a onclick="SH('aseg')">🏛 Aseg.</a>
+ 
  <a onclick="SH('wam')">📣 WA Masivo</a>
  
  <a onclick="SH('men')">📦 Mensajero</a>
@@ -897,7 +897,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  </div>
  <p style="font-size:11px;color:var(--mu);margin-top:8px">Exporta periódicamente como respaldo de seguridad.</p>
  </div>
-<div class="card" style="margin-top:16px;padding:14px"><h3 style="font-size:13px;margin-bottom:8px">🔗 Integraciones · Google Calendar</h3><p style="font-size:11px;color:#78716C;margin-bottom:10px">Sincroniza tus tareas y acciones de la Agenda con tu Google Calendar. Pega aquí tu "Client ID" de Google Cloud Console.</p><label style="font-size:11px;font-weight:600;color:#475569;display:block;margin-bottom:4px">Google Client ID</label><input id="cfg-gcal-cid" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com" class="fc" style="width:100%;max-width:420px;margin-bottom:10px;box-sizing:border-box" oninput="cfgSaveGcalCid()"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn bp" onclick="gcalConectar()">🔌 Conectar Google Calendar</button><button class="btn" onclick="gcalSyncAll()">🔄 Sincronizar ahora</button><button class="btn" onclick="gcalDesconectar()">Desconectar</button></div><div id="cfg-gcal-status" style="font-size:11px;color:#78716C;margin-top:8px"></div></div></div>
+<div class="card" style="margin-top:16px;padding:14px"><h3 style="font-size:13px;margin-bottom:8px">🔗 Integraciones · Google Calendar</h3><p style="font-size:11px;color:#78716C;margin-bottom:10px">Sincroniza tus tareas y acciones de la Agenda con tu Google Calendar. Pega aquí tu "Client ID" de Google Cloud Console.</p><label style="font-size:11px;font-weight:600;color:#475569;display:block;margin-bottom:4px">Google Client ID</label><input id="cfg-gcal-cid" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com" class="fc" style="width:100%;max-width:420px;margin-bottom:10px;box-sizing:border-box" oninput="cfgSaveGcalCid()"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn bp" onclick="gcalConectar()">🔌 Conectar Google Calendar</button><button class="btn" onclick="gcalSyncAll()">🔄 Sincronizar ahora</button><button class="btn" onclick="gcalDesconectar()">Desconectar</button></div><div id="cfg-gcal-status" style="font-size:11px;color:#78716C;margin-top:8px"></div></div><div class="card"><div class="ch"><h3>🏛 Aseguradoras</h3></div><div style="padding:12px 16px;"><p style="color:#6b7280;font-size:13px;margin:0 0 12px;">Gestiona las companias aseguradoras registradas en el sistema.</p><button onclick="SH(&apos;aseg&apos;)" style="padding:8px 16px;border-radius:8px;border:none;background:#1E3A8A;color:#fff;cursor:pointer;font-size:13px;">Abrir Aseguradoras</button></div></div></div>
 
 <!-- MENSAJERO -->
 <div class="pg" id="pg-men">
@@ -965,7 +965,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <a onclick="SH('men');closeBnMore()"><span style="font-size:16px">📦</span>Mensajero</a>
  <a onclick="SH('cal');renderCal();calTab('tareas');closeBnMore()"><span style="font-size:16px">✅</span>Tareas</a>
  <a onclick="SH('emp');closeBnMore()"><span style="font-size:16px">🏢</span>Empresas</a>
- <a onclick="SH('aseg');closeBnMore()"><span style="font-size:16px">🏛</span>Aseg.</a>
+ 
  <a onclick="SH('cfg');closeBnMore()"><span style="font-size:16px">⚙️</span>Config.</a>
  <a onclick="doLogout()"><span style="font-size:16px">🚪</span>Salir</a>
 </div>
@@ -2872,6 +2872,105 @@ function jacSyncAssaVidaSalud(){
     location.reload();
   } catch(e) { alert('ERROR en sync ASSA: ' + e.message); }
 }
+function jacSepararRegionalVumi(){
+  try {
+    var rows = S.polizas.filter(function(p){ return /REGIONAL/i.test(p.aseguradora||'') && /VUMI/i.test(p.aseguradora||''); });
+    var nAuto=0, nSalud=0, nOther=0;
+    rows.forEach(function(p){
+      var ramo = (p.ramo||'').toUpperCase();
+      var nombre;
+      if (ramo.indexOf('AUTO')!==-1) { nombre='La Regional de Seguros'; nAuto++; }
+      else if (ramo.indexOf('SALUD')!==-1) { nombre='La Regional de Seguros Vumi'; nSalud++; }
+      else { nombre='La Regional de Seguros Vumi'; nOther++; }
+      p.aseguradora = nombre; p.aseg = nombre;
+    });
+    if (typeof save === 'function') save();
+    alert('Separacion completada.\nLa Regional de Seguros (Auto): ' + nAuto + '\nLa Regional de Seguros Vumi (Salud): ' + nSalud + '\nOtros: ' + nOther);
+    location.reload();
+  } catch(e) { alert('ERROR: ' + e.message); }
+}
+
+function jacEnhanceComisiones(){
+  try {
+    var tbl = document.querySelector('#pg-com table');
+    if (!tbl) return;
+    var thead = tbl.querySelector('thead tr');
+    if (thead && thead.children.length===7 && !thead.querySelector('.jac-acc-th')) {
+      var th = document.createElement('th'); th.className='jac-acc-th'; th.textContent='Acciones'; thead.appendChild(th);
+    }
+    var rows = tbl.querySelectorAll('tbody tr');
+    rows.forEach(function(tr){
+      var tds = tr.children;
+      if (tds.length !== 7) return;
+      if (tr.querySelector('.jac-acc-td')) return;
+      var cliente = (tds[0].textContent||'').trim();
+      var primaTxt = (tds[3].textContent||'').replace(/[^0-9.\-]/g,'');
+      var prima = parseFloat(primaTxt);
+      var match = S.polizas.filter(function(p){ return (p.nombreCliente||'').trim()===cliente && Math.abs((p.prima||0)-prima) < 0.02; })[0];
+      var td = document.createElement('td'); td.className='jac-acc-td';
+      if (match) {
+        var aplicada = !!match.comisionAplicada;
+        var btnEdit = document.createElement('button');
+        btnEdit.textContent = 'Editar';
+        btnEdit.style.cssText = 'padding:2px 8px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;';
+        btnEdit.onclick = function(){ jacEditComision(match.id, tr); };
+        var btnAplicada = document.createElement('button');
+        btnAplicada.textContent = aplicada?'Aplicada \u2713':'No aplicada';
+        btnAplicada.style.cssText = 'padding:2px 8px;border-radius:6px;border:none;cursor:pointer;font-size:12px;margin-left:4px;background:'+(aplicada?'#16a34a':'#e5e7eb')+';color:'+(aplicada?'#fff':'#374151')+';';
+        btnAplicada.onclick = function(){ jacToggleAplicada(match.id, btnAplicada); };
+        td.appendChild(btnEdit); td.appendChild(btnAplicada);
+      }
+      tr.appendChild(td);
+    });
+  } catch(e) {}
+}
+function jacEditComision(id, tr){
+  var p = S.polizas.filter(function(x){return x.id===id;})[0];
+  if (!p) { alert('Poliza no encontrada'); return; }
+  var nuevoPct = prompt('Nuevo % de comision para ' + p.nombreCliente + ' (actual: ' + (p.comisionPct||0) + '%):', p.comisionPct||0);
+  if (nuevoPct === null) return;
+  nuevoPct = parseFloat(nuevoPct);
+  if (isNaN(nuevoPct)) { alert('Valor invalido'); return; }
+  p.comisionPct = nuevoPct;
+  p.comision = +((p.prima||0) * nuevoPct/100).toFixed(2);
+  if (typeof save === 'function') save();
+  if (tr) {
+    var tds = tr.children;
+    if (tds[4]) tds[4].textContent = nuevoPct + '%';
+    if (tds[5]) tds[5].textContent = '$' + p.comision.toFixed(2);
+    if (tds[6]) tds[6].textContent = '$' + (p.comision/12).toFixed(2);
+  }
+}
+function jacToggleAplicada(id, btn){
+  var p = S.polizas.filter(function(x){return x.id===id;})[0];
+  if (!p) return;
+  p.comisionAplicada = !p.comisionAplicada;
+  if (typeof save === 'function') save();
+  if (btn) {
+    var aplicada = !!p.comisionAplicada;
+    btn.style.background = aplicada?'#16a34a':'#e5e7eb';
+    btn.style.color = aplicada?'#fff':'#374151';
+    btn.textContent = aplicada?'Aplicada \u2713':'No aplicada';
+  }
+}
+(function(){
+  function hookCom(){
+    var pgCom = document.getElementById('pg-com');
+    if (pgCom && !window.__jacComObserved) {
+      var obs = new MutationObserver(function(){ jacEnhanceComisiones(); });
+      obs.observe(pgCom, {childList:true, subtree:true});
+      window.__jacComObserved = true;
+    }
+    if (typeof window.SH === 'function' && !window.__jacShWrapped) {
+      var origSH = window.SH;
+      window.SH = function(k){ origSH.apply(this, arguments); if (k==='com') setTimeout(jacEnhanceComisiones, 60); };
+      window.__jacShWrapped = true;
+    }
+  }
+  if (document.readyState==='complete' || document.readyState==='interactive') { setTimeout(hookCom, 300); }
+  else { document.addEventListener('DOMContentLoaded', function(){ setTimeout(hookCom, 300); }); }
+})();
+
 
 function jacFixUnivivirVigencias(){
 try{
