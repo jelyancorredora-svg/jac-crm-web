@@ -894,7 +894,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  </div>
  <p style="font-size:11px;color:var(--mu);margin-top:8px">Exporta periódicamente como respaldo de seguridad.</p>
  </div>
-<div class="card" style="margin-top:16px;padding:14px"><h3 style="font-size:13px;margin-bottom:8px">🔗 Integraciones · Google Calendar</h3><p style="font-size:11px;color:#78716C;margin-bottom:10px">Sincroniza tus tareas y acciones de la Agenda con tu Google Calendar. Pega aquí tu "Client ID" de Google Cloud Console.</p><label style="font-size:11px;font-weight:600;color:#475569;display:block;margin-bottom:4px">Google Client ID</label><input id="cfg-gcal-cid" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com" class="fc" style="width:100%;max-width:420px;margin-bottom:10px;box-sizing:border-box" oninput="cfgSaveGcalCid()"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn bp" onclick="gcalConectar()">🔌 Conectar Google Calendar</button><button class="btn" onclick="gcalSyncAll()">🔄 Sincronizar ahora</button><button class="btn" onclick="gcalDesconectar()">Desconectar</button></div><div id="cfg-gcal-status" style="font-size:11px;color:#78716C;margin-top:8px"></div></div><div class="card"><div class="ch"><h3>🏛 Aseguradoras</h3></div><div style="padding:12px 16px;"><p style="color:#6b7280;font-size:13px;margin:0 0 12px;">Gestiona las companias aseguradoras registradas en el sistema.</p><button onclick="SH(&apos;aseg&apos;)" style="padding:8px 16px;border-radius:8px;border:none;background:#1E3A8A;color:#fff;cursor:pointer;font-size:13px;">Abrir Aseguradoras</button></div></div>
+<div class="card" style="margin-top:16px;padding:14px"><h3 style="font-size:13px;margin-bottom:8px">🔗 Integraciones · Google Calendar</h3><p style="font-size:11px;color:#78716C;margin-bottom:10px">Sincroniza tus tareas y acciones de la Agenda con tu Google Calendar. Pega aquí tu "Client ID" de Google Cloud Console.</p><label style="font-size:11px;font-weight:600;color:#475569;display:block;margin-bottom:4px">Google Client ID</label><input id="cfg-gcal-cid" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com" class="fc" style="width:100%;max-width:420px;margin-bottom:10px;box-sizing:border-box" oninput="cfgSaveGcalCid()"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn bp" onclick="gcalConectar()">🔌 Conectar Google Calendar</button><button class="btn" onclick="gcalSyncAll()">🔄 Sincronizar ahora</button><button class="btn" onclick="gcalDesconectar()">Desconectar</button></div><div id="cfg-gcal-status" style="font-size:11px;color:#78716C;margin-top:8px"></div></div><div class="card"><div class="ch"><h3>🏛 Aseguradoras</h3></div><div style="padding:12px 16px;"><p style="color:#6b7280;font-size:13px;margin:0 0 12px;">Gestiona las companias aseguradoras registradas en el sistema.</p><button onclick="SH(&apos;aseg&apos;)" style="padding:8px 16px;border-radius:8px;border:none;background:#1E3A8A;color:#fff;cursor:pointer;font-size:13px;">Abrir Aseguradoras</button></div></div><div class="card"><div class="ch"><h3>🔐 Seguridad de la sesión</h3></div><div style="padding:12px 16px;"><p style="color:#6b7280;font-size:13px;margin:0 0 12px;">Tu sesión se cierra automáticamente después de 24 horas de inactividad. Si usas una computadora compartida, cierra sesión manualmente al terminar.</p><button onclick="window.doLogout&&window.doLogout()" style="padding:8px 16px;border-radius:8px;border:none;background:#DC2626;color:#fff;cursor:pointer;font-size:13px;">🔓 Cerrar sesión</button></div></div>
 <div class="card" style="padding:16px;margin-top:12px;max-width:820px">
  <div style="font-size:13px;font-weight:700;color:var(--bl);margin-bottom:4px;padding-bottom:6px;border-bottom:1px solid var(--bd)">🛠️ Utilidades / Sincronización</div>
  <div style="font-size:11px;color:var(--mu);margin-bottom:12px;line-height:1.6">Herramientas de sincronización y mantenimiento de datos entre iSeguros, UniVivir y ASSA. Usar solo cuando sea necesario.</div>
@@ -1703,7 +1703,7 @@ const D={"clientes":[],"polizas":[],"aseguradoras":[{"id":"18264","nombre":"SEGU
 // ── AUTH (FIXED - login confiable) ──
 function getAuth(){try{const a=localStorage.getItem('jac_auth');if(a)return JSON.parse(a);}catch(e){__crmErr(e);}return{user:'',pwd:'',pin:''};}
 function saveAuth(a){try{localStorage.setItem('jac_auth',JSON.stringify(a));}catch(e){__crmErr(e);}}
-function isLoggedIn(){return sessionStorage.getItem('jac_s')==='ok';}
+function isLoggedIn(){if(sessionStorage.getItem('jac_s')!=='ok')return false;var __ts=parseInt(localStorage.getItem('jac_s_ts')||'0',10);if(!__ts||(Date.now()-__ts)>(24*60*60*1000)){try{sessionStorage.removeItem('jac_s');localStorage.removeItem('jac_s_ts');}catch(e){}return false;}return true;}
 function switchLT(t,el){
  document.querySelectorAll('.ltabs button').forEach(b=>b.classList.remove('on'));
  el.classList.add('on');
@@ -1738,6 +1738,7 @@ function showErr(msg){
 }
 function startSession(){
  sessionStorage.setItem('jac_s','ok');
+ try{localStorage.setItem('jac_s_ts',String(Date.now()));}catch(__tse){}
  try{
  var __sbU='about:blank#proyecto-viejo-desactivado/rest/v1/jac_crm_data?select=data&user_id=eq.df11ca77-c38d-41a4-b2fe-380ea4d9bea6';
  var __sbK='';
@@ -12836,6 +12837,11 @@ document.addEventListener('click', function(e){
   /* El PIN no puede autenticar contra Supabase: queda deshabilitado. */
   window.doLoginPin = function () {
     err('El acceso por PIN fue retirado. Entra con tu correo y contraseña.');
+  };
+  window.doLogout = async function () {
+    try { sessionStorage.removeItem('jac_s'); localStorage.removeItem('jac_s_ts'); } catch (e) {}
+    try { if (window.db && window.db.auth && typeof window.db.auth.signOut === 'function') await window.db.auth.signOut(); } catch (e) {}
+    location.reload();
   };
 })();
 
