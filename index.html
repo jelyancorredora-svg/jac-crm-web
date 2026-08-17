@@ -1477,7 +1477,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <div class="fl"><label>Cuota Trimestral c/ITBMS ($)</label><input class="fc ro" id="p-ctri" type="number" readonly style="color:#15803D"></div>
  <div class="fl"><label>Cuota Semestral c/ITBMS ($)</label><input class="fc ro" id="p-csem" type="number" readonly style="color:#15803D"></div>
  <div class="fl"><label>Cuota Anual c/ITBMS ($)</label><input class="fc ro" id="p-canu" type="number" readonly style="color:#1D4ED8;font-weight:700"></div>
- <div class="fl"><label>% Comisión Aseg. <button onclick="syncPolComPct()" style="font-size:9px;padding:1px 6px;margin-left:4px;cursor:pointer;background:#e0f2fe;border:1px solid #38bdf8;border-radius:3px" title="Sync del portal">&#x1F504;</button></label><input class="fc" id="p-cb" type="number" step="0.1" oninput="CT()" inputmode="decimal" placeholder="ej. 12"></div>
+ <div class="fl"><label>% Comisión Aseg. <button onclick="syncPolComPct()" style="font-size:9px;padding:1px 6px;margin-left:4px;cursor:pointer;background:#e0f2fe;border:1px solid #38bdf8;border-radius:3px" title="Sync del portal">&#x1F504;</button><span id="jac-anio-vig" style="display:block;font-size:10px;color:#7C3AED;font-weight:600"></span></label><input class="fc" id="p-cb" type="number" step="0.1" oninput="CT()" inputmode="decimal" placeholder="ej. 12"></div>
  <div class="fl"><label>Participación JAC (%)</label><input class="fc" id="p-pa" type="number" step="0.1" value="100" oninput="CT()" inputmode="decimal"></div>
  <div class="fl"><label>Comisión JAC ($) <span style="font-size:9px;color:#64748b;font-weight:400">editable</span></label><input class="fc" id="p-co" type="text" inputmode="decimal" step="0.01" inputmode="decimal" style="font-weight:700;color:#15803D" title="Auto-calculada. Puedes editarla manualmente."></div>
  <span class="sl" style="cursor:pointer" onclick="document.getElementById('p-hc').click()">🤝 CO-CORRETAJE</span>
@@ -4447,7 +4447,21 @@ function exportPolCSV(){
  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='polizas-jac-'+new Date().toISOString().split('T')[0]+'.csv';a.click();toast('📥 CSV descargado ('+fil.length+' pólizas)');
 }
 function setPV(v,el){PV=v;document.querySelectorAll('.vtog button').forEach(b=>b.classList.remove('on'));el.classList.add('on');RP();}
-function exportPolCSV(){var pol=S.polizas||[];var h=['No.Poliza','Cliente','Ramo','Aseg','Estado','Prima','Vencimiento','Pagos'];var rows=[h];pol.forEach(function(p){var cl=GC(p.clienteId)||{};rows.push([p.num,cl.nombre||'',p.ramo,p.aseg,p.estado,p.total||p.prima||0,p.fechaFin||'',p.numPagos||0]);});var csv=rows.map(function(r){return r.join(',');}).join('\n');var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='polizas.csv';a.click();}
+function exportPolCSV(){
+ /* Exporta lo filtrado en pantalla, no toda la cartera, con columnas completas. */
+ var pol;
+ try{ pol=(typeof filtPol==='function')?filtPol():(S.polizas||[]); }catch(e){ pol=S.polizas||[]; }
+ var h=['No.Poliza','Cliente','Ramo','Aseguradora','Estado','Prima','Comision','Inicio','Vencimiento','Forma Pago','Pagos'];
+ var rows=[h];
+ pol.forEach(function(p){var cl=GC(p.clienteId)||{};
+  rows.push([p.num||'',cl.nombre||p.nombreCliente||'',p.ramo||'',p.aseg||'',p.estado||'',
+   p.total||p.prima||0,p.comision||0,p.fechaInicio||'',p.fechaFin||'',p.formaPago||'',p.numPagos||0]);});
+ var csv=rows.map(function(r){return r.map(function(c){
+  var v=String(c==null?'':c); return /[,"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(',');}).join('\n');
+ var a=document.createElement('a');
+ a.href='data:text/csv;charset=utf-8,\ufeff'+encodeURIComponent(csv);
+ a.download='polizas_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
 function RP(){
  const fil=filtPol();
  // Suma de prima TOTAL (con ITBMS) — no prima neta
@@ -9803,7 +9817,7 @@ function cotpSaveProspe(){
  saveArea.style.display='block';
  saveArea.innerHTML=`<div style="background:#DCFCE7;border:1px solid #16A34A;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
  <span style="color:#15803D;font-weight:700;font-size:12px">✅ ${savedNom} guardado en Prospectos</span>
- <button onclick="showPg('pg-pros');CM('mcotp')" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:700">Ver en Prospectos →</button>
+ <button onclick="SH('pros');CM('mcotp')" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:700">Ver en Prospectos →</button>
  </div>`;
  }
 }
@@ -11676,7 +11690,19 @@ h+='</tr>';});
 h+='</tbody></table></div>';
 GI('com-body').innerHTML=h;
 }}
-function OHist(tipo,id){window._histBack=window._lastTab||'pol';renderHist(tipo,id);}
+function OHist(a,b){
+ /* Convive con las dos formas de llamada: con un solo argumento abre el modal
+    de gestion del prospecto; con dos, el visor de historial. */
+ if(b===undefined){
+  histProsId=a;
+  SVal('hist-f',TODAY.toISOString().split('T')[0]);
+  SVal('hist-a','');SVal('hist-r','');SVal('hist-s','');
+  OM('mhist');
+  return;
+ }
+ window._histBack=window._lastTab||'pol';
+ renderHist(a,b);
+}
 function renderHist(tipo,id){
   SH('hist');
   var title=GI('hist-title'),body=GI('hist-body'),items=[];
@@ -14598,7 +14624,8 @@ document.addEventListener('click', function(e){
     var lt = setInterval(function () {
       li++;
       if (li > 40) { clearInterval(lt); return; }
-      var lo = document.getElementById('login') || document.querySelector('.login-box, #loginBox');
+      var lo = document.querySelector('#ls .lbox') || document.getElementById('ls')
+            || document.querySelector('.login-box, #loginBox');
       if (!lo || document.getElementById('jac-ssrp-login')) { if (lo) clearInterval(lt); return; }
       var d = document.createElement('div');
       d.id = 'jac-ssrp-login';
