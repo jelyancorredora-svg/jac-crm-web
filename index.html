@@ -438,7 +438,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <div class="tb">
  <input class="si" id="spo" placeholder="Buscar..." style="width:140px" oninput="RP()">
  <select class="fc si" style="width:120px" id="fpa" onchange="RP()"><option value="">Todas aseg.</option></select>
- <select class="fc si" style="width:90px" id="fpe" onchange="RP()"><option value="">Estado</option><option>Vigente</option><option>Vencida</option><option>Cancelada</option></select>
+ <select class="fc si" style="width:90px" id="fpe" onchange="RP()"><option value="">Estado</option><option>Vigente</option><option>Vencida</option><option>Renovada</option><option>Cancelada</option></select>
  <select class="fc si" style="width:130px" id="fpr" onchange="RP()"><option value="">Ramo</option><option value="AUTOS/VEHÍCULOS">Autos / Vehículos</option><option value="SALUD/MÉDICOS">Salud / Médicos</option><option value="VIDA">Vida</option><option value="INCENDIO Y LÍNEAS ALIADAS">Incendio / Hogar</option><option value="ACCIDENTES PERSONALES">Accidentes Personales</option><option value="SOAT">SOAT</option><option value="RESPONSABILIDAD CIVIL">Responsabilidad Civil</option><option value="ROBO/HURTO">Robo / Hurto</option><option value="TRANSPORTE">Transporte</option><option value="FIANZAS">Fianzas</option></select>
  <div class="vtog">
  <button class="on" onclick="setPV('table',this)">☰</button>
@@ -1469,7 +1469,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <div class="fl"><label>Ramo Principal <span>*</span></label><select class="fc" id="p-ra" onchange="onRC()"></select></div>
  <div class="fl"><label>Sub-ramo</label><input class="fc" id="p-sr"></div>
  <div class="fl"><label>Nueva / Renovada</label><select class="fc" id="p-nr"><option>Nueva</option><option>Renovada</option></select></div>
- <div class="fl"><label>Estado</label><select class="fc" id="p-es"><option>Vigente</option><option>Vencida</option><option>Cancelada</option><option>Pendiente</option></select></div>
+ <div class="fl"><label>Estado</label><select class="fc" id="p-es"><option>Vigente</option><option>Vencida</option><option>Renovada</option><option>Cancelada</option><option>Pendiente</option></select></div>
  <div class="fl"><label>Etapa gestión</label><select class="fc" id="p-et"><option>Nueva</option><option>En Proceso</option><option>Vigente</option><option>Por Renovar</option><option>Renovada</option><option>Cancelada</option></select></div>
  <div class="fl ff"><label>Descripción del Riesgo</label><input class="fc" id="p-ri"></div>
  <div class="fl"><label>Valor Riesgo ($)</label><input class="fc" id="p-vr" type="number" step="0.01" inputmode="decimal"></div>
@@ -3580,6 +3580,9 @@ function RAgenda(){
 function jacEstadoPol(p){
  var e=String((p&&p.estado)||'').trim().toLowerCase();
  if(e==='cancelada')return 'Cancelada';
+ /* "Renovada" = vigencia vieja que ya tiene su renovacion cargada.
+    No es vencida: no hay nada que cobrar ni que perseguir. Queda de historia. */
+ if(e==='renovada'||e==='renovado')return 'Renovada';
  if(e==='vigente')return 'Vigente';
  if(e==='vencida')return 'Vencida';
  var f=p&&p.fechaFin;
@@ -3590,7 +3593,8 @@ function jacEstadoPol(p){
 function jacVigentes(){return (S.polizas||[]).filter(function(p){return jacEstadoPol(p)==='Vigente';});}
 function jacVencidas(){return (S.polizas||[]).filter(function(p){return jacEstadoPol(p)==='Vencida';});}
 function jacCanceladas(){return (S.polizas||[]).filter(function(p){return jacEstadoPol(p)==='Cancelada';});}
-window.jacEstadoPol=jacEstadoPol;window.jacVigentes=jacVigentes;window.jacVencidas=jacVencidas;
+function jacRenovadas(){return (S.polizas||[]).filter(function(p){return jacEstadoPol(p)==='Renovada';});}
+window.jacEstadoPol=jacEstadoPol;window.jacVigentes=jacVigentes;window.jacVencidas=jacVencidas;window.jacRenovadas=jacRenovadas;
 
 function calcKPIs(){
  var hoy=new Date(); hoy.setHours(0,0,0,0);
@@ -3612,6 +3616,7 @@ function calcKPIs(){
  var _vig=jacVigentes();
  var _venc=jacVencidas();
  var _canc=jacCanceladas();
+ var _renov=jacRenovadas();
  var comisionCartera=_vig.reduce(function(a,p){return a+(Number(p.comision)||0);},0);
  var saldoPorCobrar=_vig.reduce(function(a,p){return a+(Number(p.saldo)||0);},0);
  var primaCartera=_vig.reduce(function(a,p){return a+(Number(p.prima)||0);},0);
@@ -3665,7 +3670,7 @@ function calcKPIs(){
   tasaCartera:tasaCartera,comisionAnio:comisionAnio,
   comCobradaAnio:comCobradaAnio,comPorCobrar:comPorCobrar,comPorCobrarN:comPorCobrarN,
   mesCorte:mesCorte,comMesCorte:comMesCorte,
-  nVigentes:_vig.length,nVencidas:_venc.length,nCanceladas:_canc.length,
+  nVigentes:_vig.length,nVencidas:_venc.length,nCanceladas:_canc.length,nRenovadas:_renov.length,
   sinVencimiento:sinVencimiento,vigVencidaFecha:vigVencidaFecha,sinComision:sinComision,
   completadas:completadas,pendientes:pendientes,vencidas:vencidas,
   avanceTareas:avanceTareas,atrasoMax:atrasoMax,tiempoResp:tiempoResp,
@@ -6751,6 +6756,7 @@ function renderDashStatusCards() {
  const vigentes = jacVigentes();
  const vencidas = jacVencidas();
  const canceladas = jacCanceladas();
+ const renovadas = jacRenovadas();
  const perdidos = (S.clientes||[]).filter(c => c.estadoComercial === 'perdido');
  const vPrima = vigentes.reduce((s, p) => s + (p.prima || 0), 0);
  const vvPrima = vencidas.reduce((s, p) => s + (p.prima || 0), 0);
@@ -6766,7 +6772,7 @@ function renderDashStatusCards() {
  <div style="font-size:10px;font-weight:700;color:#B91C1C;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">🔴 Pólizas Vencidas</div>
  <div style="font-size:26px;font-weight:800;color:#B91C1C">${vencidas.length}</div>
  <div style="font-size:10px;color:var(--mu);margin-top:2px">Prima: ${fmtM2(vvPrima)}</div>
- <div style="font-size:10px;color:var(--mu)">${canceladas.length} canceladas</div>
+ <div style="font-size:10px;color:var(--mu)">${canceladas.length} canceladas · ${renovadas.length} renovadas</div>
  </div>
  <div class="card" style="padding:14px;border-left:4px solid #64748B;cursor:pointer" onclick="switchCliTab('perdido',document.querySelector('#cli-tabs a:nth-child(5)'));SH('cli')">
  <div style="font-size:10px;font-weight:700;color:#64748B;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">❌ Clientes Perdidos</div>
@@ -15081,7 +15087,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-19-F';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-19-G';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
