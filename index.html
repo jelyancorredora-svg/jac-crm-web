@@ -3586,6 +3586,15 @@ function calcKPIs(){
  var comisionesMes=(S.comisiones||[]).filter(function(c){return c.mes===mesActual;});
  var comisionMesTotal=comisionesMes.reduce(function(a,c){return a+(Number(c.monto)||0);},0);
  var comisionMesPend=comisionesMes.filter(function(c){return c.estado==='pendiente';}).reduce(function(a,c){return a+(Number(c.monto)||0);},0);
+ /* --- Metricas de cartera: siempre tienen valor, no dependen de que haya
+    comisiones registradas justo en el mes en curso --- */
+ var _vig=(S.polizas||[]).filter(function(p){return p.estado==='Vigente';});
+ var comisionCartera=_vig.reduce(function(a,p){return a+(Number(p.comision)||0);},0);
+ var saldoPorCobrar=_vig.reduce(function(a,p){return a+(Number(p.saldo)||0);},0);
+ var primaCartera=_vig.reduce(function(a,p){return a+(Number(p.total)||0);},0);
+ var _12m=new Date(hoy.getTime()-365*86400000).toISOString().slice(0,7);
+ var comisionAnio=(S.comisiones||[]).filter(function(c){return (c.mes||'')>=_12m;})
+   .reduce(function(a,c){return a+(Number(c.monto)||0);},0);
  var tareasReales=(S.tareas||[]).filter(function(t){return t._autoTipo!=='comision';});
  var completadas=tareasReales.filter(function(t){return t.etapaTarea==='Hecho';}).length;
  var pendientes=tareasReales.filter(function(t){return t.etapaTarea!=='Hecho'&&t.etapaTarea!=='Cancelada'&&t.etapaTarea!=='Eliminada';}).length;
@@ -3607,7 +3616,7 @@ function calcKPIs(){
  var reunRealizadas=(S.calReuniones||[]).filter(function(r){return r.fecha && r.fecha>=hace7 && r.fecha<=hoyStr;}).length;
  var llamadas=(S.tareas||[]).filter(function(t){return t.tipoAgenda==='llamada' && ((t.fechaLimite||t.fechaCreacion||'')>=hace7);}).length;
  var visitas=(S.tareas||[]).filter(function(t){return t.tipoAgenda==='visita' && ((t.fechaLimite||t.fechaCreacion||'')>=hace7);}).length;
- return {conversion:conversion,polizasMes:polizasMes,comisionMesTotal:comisionMesTotal,comisionMesPend:comisionMesPend,completadas:completadas,pendientes:pendientes,vencidas:vencidas,tiempoResp:tiempoResp,renovacionesProx:renovacionesProx,porVencer60:porVencer60,clientesActivos:clientesActivos,reunRealizadas:reunRealizadas,llamadas:llamadas,visitas:visitas};
+ return {conversion:conversion,polizasMes:polizasMes,comisionMesTotal:comisionMesTotal,comisionMesPend:comisionMesPend,comisionCartera:comisionCartera,saldoPorCobrar:saldoPorCobrar,primaCartera:primaCartera,comisionAnio:comisionAnio,completadas:completadas,pendientes:pendientes,vencidas:vencidas,tiempoResp:tiempoResp,renovacionesProx:renovacionesProx,porVencer60:porVencer60,clientesActivos:clientesActivos,reunRealizadas:reunRealizadas,llamadas:llamadas,visitas:visitas};
 }
 function fmtMoneyKPI(n){
  try{return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});}catch(e){return '$'+Math.round(n);}
@@ -3629,7 +3638,8 @@ function renderKPIs(){
   return h;
  }
  var h='';
- h+=grp('💰 Ventas y conversion',[['Conversion prospecto→cliente',k.conversion+'%'],['Polizas vendidas (mes)',k.polizasMes],['Comisiones (mes)',fmtMoneyKPI(k.comisionMesTotal)],['Por cobrar (mes)',fmtMoneyKPI(k.comisionMesPend)]]);
+ h+=grp('💰 Ventas y conversion',[['Conversion prospecto→cliente',k.conversion+'%'],['Polizas vendidas (mes)',k.polizasMes],['Comisiones (mes)',fmtMoneyKPI(k.comisionMesTotal)],['Comisiones (12 meses)',fmtMoneyKPI(k.comisionAnio)]]);
+ h+=grp('💼 Cartera vigente',[['Prima cartera vigente',fmtMoneyKPI(k.primaCartera)],['Comision de la cartera',fmtMoneyKPI(k.comisionCartera)],['Saldo por cobrar',fmtMoneyKPI(k.saldoPorCobrar)]]);
  h+=grp('✅ Productividad y tareas',[['Completadas',k.completadas],['Pendientes',k.pendientes],['Vencidas',k.vencidas],['Tiempo prom. (dias)',k.tiempoResp===null?'N/D':k.tiempoResp]]);
  h+=grp('📁 Cartera de clientes',[['Renovaciones (30d)',k.renovacionesProx],['Polizas por vencer (60d)',k.porVencer60],['Clientes activos',k.clientesActivos]]);
  h+=grp('📅 Actividad agenda (7 dias)',[['Reuniones',k.reunRealizadas],['Llamadas',k.llamadas],['Visitas',k.visitas]]);
@@ -14989,7 +14999,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-19-D';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-19-E';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
