@@ -14980,6 +14980,88 @@ document.addEventListener('click', function(e){
 })();
 </script>
 
+<script>
+/* ============================================================
+   JAC CRM - Version al dia + KPIs en vivo
+   1. Si GitHub publica una version nueva, el CRM se recarga solo.
+      Se acabo el "sigo viendo lo viejo" por culpa de la cache.
+   2. Los KPIs y la vista abierta se repintan despues de cada
+      sincronizacion, sin tener que cambiar de pantalla.
+   ============================================================ */
+(function(){
+  var MARCA = 'JAC-BUILD-2026-08-19-D';   /* cambia en cada publicacion */
+  window.JAC_BUILD = MARCA;
+
+  /* --- 1. Vigilante de version --- */
+  async function revisarVersion(){
+    try{
+      var t = await fetch('/index.html?_=' + Date.now(), {cache:'no-store'}).then(function(r){return r.text();});
+      var m = t.match(/JAC-BUILD-[0-9A-Za-z-]+/);
+      if(!m) return;
+      if(m[0] !== MARCA){
+        if(window.__jacRecargando) return;
+        window.__jacRecargando = true;
+        try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
+        var url = location.pathname + '?v=' + Date.now();
+        location.replace(url);
+      }
+    }catch(e){}
+  }
+  setTimeout(revisarVersion, 15000);
+  setInterval(revisarVersion, 600000);          /* cada 10 minutos */
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='visible') setTimeout(revisarVersion, 2000);
+  });
+
+  /* --- 2. Repintar KPIs y la vista abierta tras cada sincronizacion --- */
+  function repintar(){
+    try{
+      if(typeof renderKPIs==='function') renderKPIs();
+      if(typeof jacKPIs==='function') jacKPIs();
+      if(typeof RD==='function') RD();
+      if(typeof calcKPIs==='function') calcKPIs();
+    }catch(e){}
+    /* la vista que este abierta */
+    try{
+      var abierta=null, pgs=document.querySelectorAll('.pg');
+      for(var i=0;i<pgs.length;i++){ if(pgs[i].classList.contains('on')){ abierta=pgs[i].id; break; } }
+      var mapa={'pg-pol':'RP','pg-cli':'RC','pg-pros':'RPros','pg-ren':'RRen','pg-pag':'RPag',
+                'pg-com':'RCom','pg-sin':'RSin','pg-veh':'RV','pg-emp':'REmp','pg-vc':'RVC',
+                'pg-pipe':'RPipe','pg-port':'RPort','pg-tar':'RTar'};
+      if(abierta && mapa[abierta] && typeof window[mapa[abierta]]==='function') window[mapa[abierta]]();
+      if(abierta==='pg-cal' && typeof renderCal==='function') renderCal();
+    }catch(e){}
+    try{ if(typeof window.jacAlertasBadge==='function') window.jacAlertasBadge(); }catch(e){}
+    try{
+      var pane=document.getElementById('cal-pane-alertas');
+      if(pane && pane.style.display!=='none' && typeof window.jacAlertasRender==='function') window.jacAlertasRender();
+    }catch(e){}
+  }
+  window.jacRepintar = repintar;
+
+  function envolverSincronizar(){
+    if(typeof window.sincronizar!=='function' || window.__jacSincEnvuelto) return;
+    window.__jacSincEnvuelto = true;
+    var _s = window.sincronizar;
+    window.sincronizar = async function(){
+      var r = await _s.apply(this, arguments);
+      setTimeout(repintar, 250);
+      return r;
+    };
+  }
+  setTimeout(envolverSincronizar, 2000);
+  setTimeout(envolverSincronizar, 8000);
+
+  /* Repintado periodico suave, solo si no hay un formulario abierto */
+  setInterval(function(){
+    if(document.visibilityState!=='visible') return;
+    var m=document.querySelectorAll('.mo');
+    for(var i=0;i<m.length;i++){ if(m[i].offsetParent!==null && m[i].offsetHeight>80) return; }
+    repintar();
+  }, 120000);
+})();
+</script>
+
 </body>
 </html>
 <!-- deploy-test -->
