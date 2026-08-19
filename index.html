@@ -14650,7 +14650,9 @@ document.addEventListener('click', function(e){
 
   /* Reúne todo lo que requiere atención. No inventa nada: solo lee el estado del CRM. */
   window.jacAlertas=function(){
-    var S=window.S||{}, out={renovaciones:[],pagos:[],tareas:[],notas:[],cumples:[]};
+    /* El estado del CRM es la global `S`; window.S no existe. Referenciarla directo. */
+    if(typeof S==='undefined'||!S) return {renovaciones:[],pagos:[],tareas:[],notas:[],cumples:[],total:0};
+    var out={renovaciones:[],pagos:[],tareas:[],notas:[],cumples:[]};
     (S.polizas||[]).forEach(function(p){
       var est=String(p.estado||'').toLowerCase();
       if(est==='cancelada')return;
@@ -14773,10 +14775,11 @@ document.addEventListener('click', function(e){
     window.gcalSyncAll=async function(){
       await _syncOriginal.apply(this,arguments);
       if(!window.__gcalToken) return;
-      if(!window.S.gcalRefs) window.S.gcalRefs={};
+      if(typeof S==='undefined'||!S) return;
+      if(!S.gcalRefs) S.gcalRefs={};
       var ev=window.jacGcalEventosDelCRM(), n=0;
       for(var i=0;i<ev.length;i++){
-        var e=ev[i], id=window.S.gcalRefs[e._k];
+        var e=ev[i], id=S.gcalRefs[e._k];
         var body={summary:e.titulo, description:e.desc, start:{date:e.fecha}, end:{date:e.fecha}};
         try{
           var url='https://www.googleapis.com/calendar/v3/calendars/primary/events'+(id?'/'+id:'');
@@ -14784,7 +14787,7 @@ document.addEventListener('click', function(e){
             headers:{Authorization:'Bearer '+window.__gcalToken,'Content-Type':'application/json'},
             body:JSON.stringify(body)});
           var j=await r.json();
-          if(j&&j.id){ window.S.gcalRefs[e._k]=j.id; n++; }
+          if(j&&j.id){ S.gcalRefs[e._k]=j.id; n++; }
         }catch(err){}
       }
       try{save();}catch(err){}
