@@ -8296,24 +8296,24 @@ const COTP_RATES = {
  autos:{
  // TODO RIESGO: tasa % del valor del vehículo/año (2.5%-3.8% mercado panameño)
  cobertura_completa:{
- ASSA: {tasa:0.0320,itbms:0.06,com:0.15,deducible:'1% mín. B/.150',cobertura:'Todo riesgo (daños propios, colisión, volcadura), robo total, RC hasta B/.60,000, asistencia vial 24h'},
- SURA: {tasa:0.0295,itbms:0.06,com:0.15,deducible:'1% mín. B/.175',cobertura:'Todo riesgo, robo total y parcial, cristales, asistencia vial 24h, revisado gratis'},
- MAPFRE: {tasa:0.047, itbms:0.06,com:0.15,deducible:'2% mín. B/.200 (50% desc. conductoras >25 años)',cobertura:'AutoMax Básico (4.7%) · AutoMax Plus (+AP B/.5K, accesorios) · AutoMax Premium (+AP B/.10K, sin depreciación, auto sustituto). Carro alquiler incluido. RC hasta B/.75,000. ✅ Dr. en minutos GRATIS'},
- IS: {tasa:0.0305,itbms:0.06,com:0.15,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, robo total/parcial, RC hasta B/.50,000, asistencia en carretera'},
- FEDPA: {tasa:0.0255,itbms:0.06,com:0.12,deducible:'2% mín. B/.200',cobertura:'Todo riesgo básico, robo total, RC hasta B/.40,000'},
- ACERTA: {tasa:0.0262,itbms:0.06,com:0.14,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, robo total, RC hasta B/.50,000, asistencia vial'},
- ANCON: {tasa:0.0272,itbms:0.06,com:0.14,deducible:'1% mín. B/.150',cobertura:'Todo riesgo, robo total, RC hasta B/.50,000'},
- GENERALI: {tasa:0.0300,itbms:0.06,com:0.15,deducible:'1% mín. B/.150',cobertura:'Todo riesgo premium, RC hasta B/.75,000, asistencia, daños por agua'},
- CHUBB: {tasa:0.0360,itbms:0.06,com:0.15,deducible:'1% mín. B/.250',cobertura:'Todo riesgo superior (Full Omnibus), RC hasta B/.100,000, GAP, asistencia premium'},
- ALIADOS: {tasa:0.046, itbms:0.06,com:0.14,deducible:'2% mín. B/.200',cobertura:'Todo riesgo 4.6% + Endoso AUTO ALIADO exclusivo + Dr. ALIADO 24h. ✅ Beneficio único: atención Hospital Nacional SIN desembolso previo. RC hasta B/.50,000'},
- LAREGIONAL:{tasa:0.0248,itbms:0.06,com:0.12,deducible:'2% mín. B/.200',cobertura:'Todo riesgo básico, RC hasta B/.30,000'},
- GENERAL: {tasa:0.0252,itbms:0.06,com:0.13,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, RC hasta B/.45,000'},
- VUMI: {tasa:0.0288,itbms:0.06,com:0.15,deducible:'1% mín. B/.150',cobertura:'Todo riesgo, RC hasta B/.60,000, asistencia'},
- BG: {tasa:0.0298,itbms:0.06,com:0.15,deducible:'1% mín. B/.175',cobertura:'Todo riesgo, RC hasta B/.75,000, asistencia 24h'},
- PALIG: {tasa:0.0275,itbms:0.06,com:0.14,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, RC hasta B/.50,000, grúa incluida — PALIG'},
- WWMED: {tasa:0.0265,itbms:0.06,com:0.13,deducible:'2% mín. B/.200',cobertura:'Todo riesgo, RC hasta B/.40,000 — WW Medical'},
- UNIVIVIR: {tasa:0.0258,itbms:0.06,com:0.12,deducible:'2% mín. B/.200',cobertura:'Todo riesgo básico, RC hasta B/.30,000 — Univivir'},
- ASSITCARD: {tasa:0.0280,itbms:0.06,com:0.13,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, RC hasta B/.50,000, asistencia 24h — ASSIT CARD'},
+ ASSA: {base:385.63,tasa:0.02205,minimo:383.02,muestra:12,itbms:0.06,com:0.20,deducible:'1% mín. B/.150',cobertura:'Todo riesgo (daños propios, colisión, volcadura), robo total, RC hasta B/.60,000, asistencia vial 24h · [Calibrado con tu cartera — 12 pólizas reales, R²=0.89]'},
+ SURA: {base:193.63,tasa:0.03392,minimo:361.31,muestra:10,itbms:0.06,com:0.20,deducible:'1% mín. B/.175',cobertura:'Todo riesgo, robo total y parcial, cristales, asistencia vial 24h, revisado gratis · [Calibrado con tu cartera — 10 pólizas reales, R²=0.86]'},
+ MAPFRE: {base:0,tasa:0.0379,minimo:617.6,muestra:2,itbms:0.06,com:0.20,deducible:'2% mín. B/.200 (50% desc. conductoras >25 años)',cobertura:'AutoMax Básico (4.7%) · AutoMax Plus (+AP B/.5K, accesorios) · AutoMax Premium (+AP B/.10K, sin depreciación, auto sustituto). Carro alquiler incluido. RC hasta B/.75,000. ✅ Dr. en minutos GRATIS · [Calibrado con tu cartera — 2 pólizas reales, tasa mediana]'},
+ IS: {base:0,tasa:0.03101,minimo:458.35,muestra:3,itbms:0.06,com:0.20,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, robo total/parcial, RC hasta B/.50,000, asistencia en carretera · [Calibrado con tu cartera — 3 pólizas reales, tasa mediana]'},
+ FEDPA: {base:0,tasa:0.05638,minimo:350.7,muestra:3,itbms:0.06,com:0.20,deducible:'2% mín. B/.200',cobertura:'Todo riesgo básico, robo total, RC hasta B/.40,000 · [Calibrado con tu cartera — 3 pólizas reales, tasa mediana]'},
+ ACERTA: {base:101.37,tasa:0.03511,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, robo total, RC hasta B/.50,000, asistencia vial · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ ANCON: {base:0,tasa:0.06615,minimo:982.82,muestra:3,itbms:0.06,com:0.20,deducible:'1% mín. B/.150',cobertura:'Todo riesgo, robo total, RC hasta B/.50,000 · [Calibrado con tu cartera — 3 pólizas reales, tasa mediana]'},
+ GENERALI: {base:101.37,tasa:0.0402,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'1% mín. B/.150',cobertura:'Todo riesgo premium, RC hasta B/.75,000, asistencia, daños por agua · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ CHUBB: {base:101.37,tasa:0.04824,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'1% mín. B/.250',cobertura:'Todo riesgo superior (Full Omnibus), RC hasta B/.100,000, GAP, asistencia premium · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ ALIADOS: {base:101.37,tasa:0.06164,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'2% mín. B/.200',cobertura:'Todo riesgo 4.6% + Endoso AUTO ALIADO exclusivo + Dr. ALIADO 24h. ✅ Beneficio único: atención Hospital Nacional SIN desembolso previo. RC hasta B/.50,000 · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ LAREGIONAL: {base:0,tasa:0.04042,minimo:440.09,muestra:1,itbms:0.06,com:0.20,deducible:'2% mín. B/.200',cobertura:'Todo riesgo básico, RC hasta B/.30,000 · [Calibrado con tu cartera — 1 póliza reales, tasa mediana]'},
+ GENERAL: {base:101.37,tasa:0.03377,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, RC hasta B/.45,000 · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ VUMI: {base:101.37,tasa:0.03859,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'1% mín. B/.150',cobertura:'Todo riesgo, RC hasta B/.60,000, asistencia · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ BG: {base:101.37,tasa:0.03993,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'1% mín. B/.175',cobertura:'Todo riesgo, RC hasta B/.75,000, asistencia 24h · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ PALIG: {base:101.37,tasa:0.03685,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, RC hasta B/.50,000, grúa incluida — PALIG · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ WWMED: {base:101.37,tasa:0.03551,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'2% mín. B/.200',cobertura:'Todo riesgo, RC hasta B/.40,000 — WW Medical · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ UNIVIVIR: {base:101.37,tasa:0.03457,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'2% mín. B/.200',cobertura:'Todo riesgo básico, RC hasta B/.30,000 — Univivir · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
+ ASSITCARD: {base:101.37,tasa:0.03752,minimo:350.0,muestra:0,itbms:0.06,com:0.20,deducible:'1.5% mín. B/.150',cobertura:'Todo riesgo, RC hasta B/.50,000, asistencia 24h — ASSIT CARD · [Referencia de mercado — sin pólizas propias con esta aseguradora]'},
  },
  // TERCEROS/RC: precio fijo anual (NO % valor). Tarifa 2026
  danos_terceros:{
@@ -8321,9 +8321,9 @@ const COTP_RATES = {
  ASSA: {fijo:132.0, itbms:0.06,com:0.15,deducible:'N/A',cobertura:'RC daños materiales B/.60,000, lesiones B/.15,000, ambulancia. Tarifa 2026'},
  IS: {fijo:145.0, itbms:0.06,com:0.15,deducible:'N/A',cobertura:'RC daños B/.50,000, grúa, asistencia vial, ambulancia. Tarifa 2026'},
  SURA: {fijo:149.0, itbms:0.06,com:0.15,deducible:'N/A',cobertura:'RC daños B/.60,000, revisado gratis incluido, asistencia vial. Tarifa 2026'},
- FEDPA: {fijo:108.0, itbms:0.06,com:0.12,deducible:'N/A',cobertura:'RC daños materiales B/.40,000 — Tarifa 2026'},
+ FEDPA: {fijo:122.65, itbms:0.06,com:0.12,deducible:'N/A',cobertura:'RC daños materiales B/.40,000 — Tarifa 2026'},
  ANCON: {fijo:94.50, itbms:0.06,com:0.14,deducible:'N/A',cobertura:'RC daños materiales B/.50,000'},
- ACERTA: {fijo:98.00, itbms:0.06,com:0.14,deducible:'N/A',cobertura:'RC daños B/.50,000, asistencia en carretera'},
+ ACERTA: {fijo:169.82, itbms:0.06,com:0.14,deducible:'N/A',cobertura:'RC daños B/.50,000, asistencia en carretera'},
  MAPFRE: {fijo:145.0, itbms:0.06,com:0.15,deducible:'N/A',cobertura:'3 Planes: Básico B/.145 · Plus B/.168 · Premium B/.190 — RC hasta B/.75,000, gastos médicos terceros B/.2,000. ✅ Dr. en minutos GRATIS en todos los planes (consulta médica virtual 24h)'},
  GENERALI: {fijo:105.0, itbms:0.06,com:0.15,deducible:'N/A',cobertura:'RC daños B/.60,000, asistencia vial'},
  CHUBB: {fijo:118.0, itbms:0.06,com:0.15,deducible:'N/A',cobertura:'RC daños B/.100,000, defensa legal incluida'},
@@ -8346,7 +8346,7 @@ const COTP_RATES = {
  IS: {base:85, edad_factor:0.046,itbms:0.05,com:0.10,deducible:'B/.300/año',cobertura:'Suma B/.50,000 — hospitalización, quirúrgico, consultas especialistas'},
  PALIG: {base:120,edad_factor:0.065,itbms:0.05,com:0.10,deducible:'B/.500/año',cobertura:'Suma B/.1,000,000 — hospitalización, cirugías, cobertura internacional PALIG'},
  WWMED: {base:105,edad_factor:0.058,itbms:0.05,com:0.10,deducible:'B/.200/año',cobertura:'Suma B/.100,000 — hospitalización, quirúrgico, laboratorio, especialistas'},
- ASSITCARD:{base:68, edad_factor:0.040,itbms:0.05,com:0.15,deducible:'B/.200/año',cobertura:'Plan de asistencia médica + emergencias internacionales ASSIT CARD'},
+ ASSITCARD:{base:68, edad_factor:0.040,itbms:0.05,com:0.12,deducible:'B/.200/año',cobertura:'Plan de asistencia médica + emergencias internacionales ASSIT CARD'},
  ANCON: {base:78, edad_factor:0.045,itbms:0.05,com:0.10,deducible:'B/.250/año',cobertura:'Hospitalización, cirugía, laboratorio, medicamentos en red Ancón'},
  ALIADOS: {base:65, edad_factor:0.038,itbms:0.05,com:0.10,deducible:'B/.300/año',cobertura:'Hospitalización básica, cirugía, emergencias — plan económico'},
  GENERAL: {base:70, edad_factor:0.042,itbms:0.05,com:0.10,deducible:'B/.200/año',cobertura:'Hospitalización, cirugía, consultas, laboratorio, medicamentos'},
@@ -8365,7 +8365,7 @@ const COTP_RATES = {
  IS: {base:72, edad_factor:0.042,itbms:0.05,com:0.10,deducible:'B/.500/año',cobertura:'Plan familiar B/.50,000 — hospitalización, quirúrgico, urgencias, pediatría'},
  PALIG: {base:98, edad_factor:0.060,itbms:0.05,com:0.10,deducible:'B/.700/año',cobertura:'Plan familiar B/.1,000,000 — cobertura internacional, pediatría, especialistas PALIG'},
  WWMED: {base:88, edad_factor:0.052,itbms:0.05,com:0.10,deducible:'B/.400/año',cobertura:'Plan familiar B/.100,000 — hospitalización, pediatría, laboratorio, especialistas'},
- ASSITCARD: {base:58, edad_factor:0.038,itbms:0.05,com:0.15,deducible:'B/.300/año',cobertura:'Plan asistencia familiar + emergencias internacionales ASSIT CARD'},
+ ASSITCARD: {base:58, edad_factor:0.038,itbms:0.05,com:0.12,deducible:'B/.300/año',cobertura:'Plan asistencia familiar + emergencias internacionales ASSIT CARD'},
  ANCON: {base:65, edad_factor:0.040,itbms:0.05,com:0.10,deducible:'B/.400/año',cobertura:'Plan familiar: hospitalización, cirugía, laboratorio, pediatría, red Ancón'},
  ALIADOS: {base:55, edad_factor:0.035,itbms:0.05,com:0.10,deducible:'B/.400/año',cobertura:'Plan familiar básico: hospitalización, cirugía, emergencias'},
  GENERAL: {base:62, edad_factor:0.040,itbms:0.05,com:0.10,deducible:'B/.400/año',cobertura:'Plan familiar: hospitalización, cirugía, consultas, laboratorio, pediatría'},
@@ -8444,24 +8444,24 @@ const COTP_RATES = {
  },
  // ── HOGAR/INCENDIO ── tasa % valor asegurado/año
  hogar:{
- ASSA: {tasa:0.00220,itbms:0.06,com:0.15,deducible:'B/.300',cobertura:'Incendio, rayo, explosión, robo, daños por agua, RC vecinos — valor comercial'},
- SURA: {tasa:0.00235,itbms:0.06,com:0.15,deducible:'B/.300',cobertura:'Incendio, rayo, robo, daños por agua, responsabilidad civil edificio'},
- MAPFRE: {tasa:0.00195,itbms:0.06,com:0.15,deducible:'B/.300',cobertura:'Incendio, rayo, explosión, robo con violencia'},
- IS: {tasa:0.00210,itbms:0.06,com:0.15,deducible:'B/.250',cobertura:'Incendio, rayo, explosión, RC vecinos, daños por agua'},
- PALIG: {tasa:0.00245,itbms:0.06,com:0.15,deducible:'B/.500',cobertura:'Incendio, robo, daños, RC, pérdida de alquileres, terremoto opt.'},
- FEDPA: {tasa:0.00175,itbms:0.06,com:0.12,deducible:'B/.300',cobertura:'Incendio básico, rayo, robo con violencia'},
- ACERTA: {tasa:0.00182,itbms:0.06,com:0.14,deducible:'B/.250',cobertura:'Incendio, rayo, explosión, daños por agua'},
- ANCON: {tasa:0.00198,itbms:0.06,com:0.14,deducible:'B/.300',cobertura:'Incendio, rayo, explosión, RC vecinos'},
- GENERALI:{tasa:0.00228,itbms:0.06,com:0.15,deducible:'B/.300',cobertura:'Incendio, robo, daños por agua, RC, contenido hogar, todo riesgo'},
- CHUBB: {tasa:0.00295,itbms:0.06,com:0.15,deducible:'B/.500',cobertura:'Todo riesgo hogar premium, RC amplia, objetos de valor, arte'},
- VUMI: {tasa:0.00215,itbms:0.06,com:0.15,deducible:'B/.300',cobertura:'Incendio, robo, daños, RC vecinos'},
- BG: {tasa:0.00225,itbms:0.06,com:0.15,deducible:'B/.300',cobertura:'Incendio, rayo, explosión, robo, daños por agua, RC'},
- UNIVIVIR:{tasa:0.00200,itbms:0.06,com:0.12,deducible:'B/.300',cobertura:'Incendio, rayo, robo, daños básico — Univivir'},
- WWMED: {tasa:0.00210,itbms:0.06,com:0.13,deducible:'B/.300',cobertura:'Incendio, rayo, robo, daños por agua — WW Medical'},
- ALIADOS: {tasa:0.00205,itbms:0.06,com:0.12,deducible:'B/.300',cobertura:'Incendio, robo, RC básico — Seguros Aliados'},
- LAREGIONAL:{tasa:0.00215,itbms:0.06,com:0.12,deducible:'B/.300',cobertura:'Incendio, robo, daños por agua — La Regional'},
- GENERAL: {tasa:0.00220,itbms:0.06,com:0.13,deducible:'B/.300',cobertura:'Incendio, rayo, robo, daños — General de Seguros'},
- ASSITCARD:{tasa:0.00240,itbms:0.06,com:0.12,deducible:'B/.350',cobertura:'Incendio, rayo, robo, asistencia hogar 24h — ASSIT CARD'},
+ ASSA: {tasa:0.001,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, rayo, explosión, robo, daños por agua, RC vecinos — valor comercial'},
+ SURA: {tasa:0.0009,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, rayo, robo, daños por agua, responsabilidad civil edificio'},
+ MAPFRE: {tasa:0.000945,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, rayo, explosión, robo con violencia'},
+ IS: {tasa:0.00175,itbms:0.06,com:0.20,deducible:'B/.250',cobertura:'Incendio, rayo, explosión, RC vecinos, daños por agua'},
+ PALIG: {tasa:0.00245,itbms:0.06,com:0.20,deducible:'B/.500',cobertura:'Incendio, robo, daños, RC, pérdida de alquileres, terremoto opt.'},
+ FEDPA: {tasa:0.00175,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio básico, rayo, robo con violencia'},
+ ACERTA: {tasa:0.00182,itbms:0.06,com:0.20,deducible:'B/.250',cobertura:'Incendio, rayo, explosión, daños por agua'},
+ ANCON: {tasa:0.00198,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, rayo, explosión, RC vecinos'},
+ GENERALI:{tasa:0.00228,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, robo, daños por agua, RC, contenido hogar, todo riesgo'},
+ CHUBB: {tasa:0.00295,itbms:0.06,com:0.20,deducible:'B/.500',cobertura:'Todo riesgo hogar premium, RC amplia, objetos de valor, arte'},
+ VUMI: {tasa:0.00215,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, robo, daños, RC vecinos'},
+ BG: {tasa:0.00225,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, rayo, explosión, robo, daños por agua, RC'},
+ UNIVIVIR:{tasa:0.00200,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, rayo, robo, daños básico — Univivir'},
+ WWMED: {tasa:0.00210,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, rayo, robo, daños por agua — WW Medical'},
+ ALIADOS: {tasa:0.00205,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, robo, RC básico — Seguros Aliados'},
+ LAREGIONAL:{tasa:0.00215,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, robo, daños por agua — La Regional'},
+ GENERAL: {tasa:0.00220,itbms:0.06,com:0.20,deducible:'B/.300',cobertura:'Incendio, rayo, robo, daños — General de Seguros'},
+ ASSITCARD:{tasa:0.00240,itbms:0.06,com:0.20,deducible:'B/.350',cobertura:'Incendio, rayo, robo, asistencia hogar 24h — ASSIT CARD'},
  },
  // ── ACCIDENTES PERSONALES ── tasa base; multiplicador de ocupación aplicado en cálculo
  ap:{
@@ -8810,12 +8810,12 @@ function cotpGeneratePDF(filterAsegId){
  }).join('');
  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><title>Cotizacion '+ramoLabel+' - JAC Seguros<\/title>'
  +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:\'Segoe UI\',Helvetica,Arial,sans-serif;color:#1E293B;font-size:13px;background:#fff}.hdr{background:linear-gradient(135deg,#0F172A 0%,#1E3A5F 100%);color:#fff;padding:24px 32px;display:flex;justify-content:space-between;align-items:center}.hdr-logo{font-size:24px;font-weight:900;letter-spacing:2px;color:#FCD34D;font-family:Georgia,serif}.hdr-sub{font-size:11px;color:#93C5FD;margin-top:3px;letter-spacing:1px;text-transform:uppercase}.hdr-contact{text-align:right;font-size:11px;color:#CBD5E1;line-height:2}.body{padding:28px 32px}.qtitle{font-size:22px;font-weight:900;color:#0F172A;margin-bottom:4px}.qsub{font-size:12px;color:#64748B;margin-bottom:20px}.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;background:#F1F5F9;border-radius:10px;padding:16px 20px;margin-bottom:22px}.info-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#64748B;font-weight:700}.info-val{font-size:15px;font-weight:800;color:#0F172A;margin-top:4px}table{width:100%;border-collapse:collapse;margin-bottom:20px;border-radius:8px;overflow:hidden}thead tr{background:linear-gradient(90deg,#1E3A5F,#1E40AF);color:#fff}thead th{padding:11px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:700}.nota{background:#EFF6FF;border-left:4px solid #3B82F6;border-radius:0 8px 8px 0;padding:12px 16px;font-size:11px;color:#1E40AF;line-height:1.7;margin-bottom:20px}.ftr{border-top:2px solid #E2E8F0;padding:14px 32px;font-size:10px;color:#94A3B8;display:flex;justify-content:space-between;background:#F8FAFC}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{margin:10mm;size:A4}}<\/style><\/head><body>'
- +'<div class="hdr"><div><div class="hdr-logo">JAC SEGUROS<\/div><div class="hdr-sub">Jely An Castro Perez &middot; Agente Autorizado de Seguros<\/div><\/div><div class="hdr-contact">+507 6292-6010<br>jcastro@jacsegurospa.com<br>jacsegurospa.com<\/div><\/div>'
+ +'<div class="hdr"><div><div class="hdr-logo">JAC SEGUROS<\/div><div class="hdr-sub">Jely An Castro &middot; Corredora de Seguros<\/div><\/div><div class="hdr-contact">+507 6292-6010<br>jcastro@jacsegurospa.com<br>jacsegurospa.com<\/div><\/div>'
  +'<div class="body"><div class="qtitle">Cotizacion Comparativa &mdash; '+ramoLabel+'<\/div><div class="qsub">Generado el '+fecha+' &middot; '+res.length+' aseguradora'+( res.length!==1?'s':'')+' analizadas &middot; Tarifas mercado panameno 2026<\/div>'
  +'<div class="info-grid"><div><div class="info-lbl">Cliente<\/div><div class="info-val">'+nombre+'<\/div><\/div><div><div class="info-lbl">Ramo asegurado<\/div><div class="info-val">'+ramoLabel+'<\/div><\/div><div><div class="info-lbl">Suma asegurada<\/div><div class="info-val">'+sumaFmt+'<\/div><\/div><\/div>'
  +'<table><thead><tr><th>Aseguradora<\/th><th>Rating<\/th><th style="text-align:right">Prima Total \/ ano<\/th><th style="text-align:right">Prima Neta<\/th><th>Cobertura incluida<\/th><th style="text-align:center">Deducible<\/th><\/tr><\/thead><tbody>'+rows+'<\/tbody><\/table>'
  +'<div class="nota"><strong>Nota importante:<\/strong> Las primas son estimadas con base en tarifas de referencia del mercado panameno 2026. La prima final puede variar segun evaluacion de cada aseguradora. Esta cotizacion es orientativa y no constituye un contrato de seguro. Para formalizar tu poliza contactame directamente.<\/div><\/div>'
- +'<div class="ftr"><div>JAC Seguros &middot; Jely An Castro Perez &middot; Agente Autorizado &middot; Republica de Panama<\/div><div>+507 6292-6010 &middot; jcastro@jacsegurospa.com &middot; jacsegurospa.com<\/div><\/div>'
+ +'<div class="ftr"><div>JAC Seguros &middot; Jely An Castro, corredora de seguros &middot; Panama<br>Regulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panama.<\/div><div>+507 6292-6010 &middot; jcastro@jacsegurospa.com &middot; jacsegurospa.com<\/div><\/div>'
  +'<script>window.onload=function(){setTimeout(function(){window.print();},400);}<\/script><\/body><\/html>';
  var w = window.open('','_blank','width=960,height=720');
  if(w){w.document.write(html);w.document.close();}
@@ -9309,6 +9309,9 @@ function cotpCalcAll(){
  primaNeta=safeVal*rates.tasa;
  }
  }
+ // ── Calibración JAC: prima fija de emisión + prima mínima de la aseguradora ──
+ if(rates.base) primaNeta += rates.base;
+ if(rates.minimo && primaNeta < rates.minimo) primaNeta = rates.minimo;
  const itbmsAmt=primaNeta*rates.itbms;
  const primaTotal=primaNeta+itbmsAmt;
  const com=primaNeta*rates.com;
@@ -9328,7 +9331,7 @@ function cotpCalcAll(){
  const title=document.getElementById('cotp-res-title');
  if(title)title.textContent=`${R?R.icon+' ':''} Comparativo ${R?R.label:ramo}`;
  const sub2=document.getElementById('cotp-res-sub');
- if(sub2)sub2.textContent=`${nombre?nombre+' · ':''}${cotpResults.length} opciones • Ordenado por precio`;
+ if(sub2)sub2.textContent=`${nombre?nombre+' · ':''}${cotpResults.length} opciones • Ordenado por precio`+' • Estimado calibrado con tu cartera real (34 pólizas de auto, error mediano 12%) — no es una cotización en firme';
  // -- JAC Seguros -- barra de acciones --
  var _actBar=document.getElementById('cotp-actions-bar');
  if(_actBar){
@@ -9336,6 +9339,12 @@ function cotpCalcAll(){
  _actBar.style.display='flex';
  _actBar.querySelector('.cotp-actions-ramo').textContent=_rNA?_rNA.label:ramo;
  _actBar.querySelector('.cotp-actions-count').textContent=cotpResults.length+' opci'+(cotpResults.length!==1?'ones':'on');
+ try{var _cc=document.getElementById('cotp-cocor-note');
+ if(!_cc){_cc=document.createElement('div');_cc.id='cotp-cocor-note';
+ _cc.style.cssText='flex-basis:100%;font-size:11px;color:#64748b;margin-top:6px;line-height:1.5';
+ _actBar.appendChild(_cc);}
+ _cc.innerHTML='💡 La comisión mostrada es <b>bruta</b>. En co-corretaje recibes: <b>Capital Care &amp; Co 65%</b> · <b>FF Seguros 50%</b>.';
+ }catch(e){}
  }
  const saveNom=document.getElementById('cotp-save-nom');if(saveNom&&nombre)saveNom.value=nombre;
  const saveAseg=document.getElementById('cotp-save-aseg');
