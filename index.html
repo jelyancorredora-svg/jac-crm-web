@@ -2,6 +2,15 @@
 <html lang="es">
 <head>
 <script>window.JAC_SSRP_TXT="Regulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.";</script>
+<style id="jac-fix-layout">
+/* Cintillo de la SSRP: solo en el Dashboard y el login, nunca encima de un modulo */
+#app:has(.pg.on) #jac-ssrp-pie{display:none!important}
+body:has(.pg.on) #jac-ssrp-pie{display:none!important}
+/* Agenda a pantalla completa, sin scroll de pagina */
+#pg-cal.on{padding:0!important}
+#pg-cal.on>div{height:calc(100vh - 58px)!important;border-radius:0!important;border-left:0!important;border-right:0!important;box-shadow:none!important}
+body:has(#pg-cal.on){overflow:hidden}
+</style>
 <script>
 /* Relleno de consola. Algunos entornos (vistas previas, iframes con sandbox,
    webviews) no traen console.info, console.debug o console.table. El codigo
