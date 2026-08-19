@@ -12118,7 +12118,7 @@ document.addEventListener('click', function(e){
     ventasCruzadas: 'ventas_cruzadas'
   };
   var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg', 'comisCfg',
-                  'univivir', 'integraciones', 'plantillas', 'metas', 'emailjs'];
+                  'univivir', 'integraciones', 'plantillas', 'metas', 'emailjs', 'gcalRefs'];
   var COLS = window.__JAC_COLS || {};
 
   function snake(c) {
@@ -12570,6 +12570,7 @@ document.addEventListener('click', function(e){
   window.pullFromCloud = function () {};
   window.loadFromCloud = function () {};
 
+  window.jacVolcar = volcar;   /* empujar a la base bajo demanda */
   window.addEventListener('pagehide', function () { try { volcar(); } catch (e) {} });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') { try { volcar(); } catch (e) {} }
@@ -14797,6 +14798,185 @@ document.addEventListener('click', function(e){
   }
   setTimeout(ampliarSync,3000);
   setTimeout(ampliarSync,9000);
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Sincronización en vivo entre dispositivos
+   Antes: los cambios solo subían al cerrar u ocultar la pestaña,
+   y los de otros equipos solo llegaban al abrir o tras 2 minutos fuera.
+   ============================================================ */
+(function(){
+  var TABLAS=['polizas','clientes','tareas','pagos','comisiones'];
+  var _marca=null, _subiendo=null, _ultimoChequeo=0, _activo=true;
+
+  function hayModalAbierto(){
+    var m=document.querySelectorAll('.mo');
+    for(var i=0;i<m.length;i++){
+      var e=m[i]; if(e.offsetParent!==null && e.offsetHeight>80) return true;
+    }
+    return false;
+  }
+  function db(){ return window.db||null; }
+
+  /* ── Subida: al guardar, con 3 segundos de margen para no golpear la base ── */
+  function programarSubida(){
+    if(_subiendo) clearTimeout(_subiendo);
+    _subiendo=setTimeout(function(){
+      try{ if(typeof window.jacVolcar==='function') window.jacVolcar().then?window.jacVolcar():window.jacVolcar(); }catch(e){}
+      setTimeout(refrescarMarca,2500);   /* no repescar nuestro propio cambio */
+    },3000);
+  }
+  if(typeof window.save==='function' && !window.__jacSaveEnvuelto){
+    window.__jacSaveEnvuelto=true;
+    var _save=window.save;
+    window.save=function(){ var r=_save.apply(this,arguments); try{programarSubida();}catch(e){} return r; };
+  }
+
+  /* ── Bajada: vigilar si otro dispositivo escribió algo ── */
+  async function ultimaEscritura(){
+    var d=db(); if(!d) return null;
+    var max=null;
+    for(var i=0;i<TABLAS.length;i++){
+      try{
+        var r=await d.from(TABLAS[i]).select('updated_at').order('updated_at',{ascending:false}).limit(1);
+        var v=r.data&&r.data[0]&&r.data[0].updated_at;
+        if(v&&(!max||v>max)) max=v;
+      }catch(e){}
+    }
+    return max;
+  }
+  async function refrescarMarca(){ var m=await ultimaEscritura(); if(m) _marca=m; }
+
+  async function revisar(){
+    if(!_activo || document.visibilityState!=='visible') return;
+    if(Date.now()-_ultimoChequeo<15000) return;
+    _ultimoChequeo=Date.now();
+    var m=await ultimaEscritura();
+    if(!m) return;
+    if(_marca===null){ _marca=m; return; }
+    if(m<=_marca) return;
+    if(hayModalAbierto()) return;          /* no interrumpir mientras edita */
+    _marca=m;
+    try{
+      if(typeof window.sincronizar==='function'){
+        await window.sincronizar();
+        if(typeof window.jacAlertasBadge==='function') window.jacAlertasBadge();
+        if(typeof toast==='function') toast('🔄 Actualizado desde otro dispositivo');
+      }
+    }catch(e){}
+  }
+
+  setTimeout(refrescarMarca,6000);
+  setInterval(revisar,40000);
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible'){ _ultimoChequeo=0; setTimeout(revisar,600); }
+  });
+  window.addEventListener('focus',function(){ _ultimoChequeo=0; setTimeout(revisar,600); });
+
+  /* Antes de cerrar, empujar lo que quede pendiente */
+  window.addEventListener('beforeunload',function(){ try{ if(typeof window.jacVolcar==='function') window.jacVolcar(); }catch(e){} });
+
+  /* Para revisar el estado a mano desde la consola */
+  window.jacEstadoSync=function(){
+    return {ultimaEscrituraVista:_marca, pestanaVisible:document.visibilityState==='visible',
+            modalAbierto:hayModalAbierto(), subidaPendiente:!!_subiendo};
+  };
+  window.jacForzarSync=async function(){ try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
+    _ultimoChequeo=0; _marca=null; await revisar(); return 'listo'; };
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Realtime + subida garantizada
+   Realtime: en cuanto la base avisa de un cambio, el CRM lo trae.
+   Si Realtime no esta habilitado en Supabase, el vigilante de 40 s
+   sigue cubriendo, asi que esto nunca deja el CRM peor que antes.
+   ============================================================ */
+(function(){
+  var TABLAS=['clientes','polizas','vehiculos','siniestros','pagos','tareas','comisiones','prospectos','crm_meta'];
+  var _canal=null, _pendiente=null, _ultima=0;
+
+  function hayModalAbierto(){
+    var m=document.querySelectorAll('.mo');
+    for(var i=0;i<m.length;i++){ if(m[i].offsetParent!==null && m[i].offsetHeight>80) return true; }
+    return false;
+  }
+
+  function traer(){
+    if(_pendiente) clearTimeout(_pendiente);
+    _pendiente=setTimeout(async function(){
+      if(Date.now()-_ultima<4000) return;
+      if(hayModalAbierto()){ _pendiente=setTimeout(traer,10000); return; }
+      if(window.__jacSubiendo) return;
+      _ultima=Date.now();
+      try{
+        if(typeof window.sincronizar==='function'){
+          await window.sincronizar();
+          if(typeof window.jacAlertasBadge==='function') window.jacAlertasBadge();
+        }
+      }catch(e){}
+    },1500);
+  }
+
+  function conectar(){
+    if(_canal||!window.db||!window.db.channel) return;
+    try{
+      _canal=window.db.channel('jac_crm_vivo');
+      TABLAS.forEach(function(t){
+        _canal.on('postgres_changes',{event:'*',schema:'public',table:t},traer);
+      });
+      _canal.subscribe(function(estado){
+        window.__jacRealtime=estado;
+        if(estado==='CHANNEL_ERROR'||estado==='TIMED_OUT'){
+          try{window.db.removeChannel(_canal);}catch(e){}
+          _canal=null; setTimeout(conectar,30000);
+        }
+      });
+    }catch(e){ _canal=null; }
+  }
+  setTimeout(conectar,7000);
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible') setTimeout(conectar,500);
+  });
+
+  /* Subida garantizada: nada se queda solo en este dispositivo */
+  async function subir(motivo){
+    if(typeof window.jacVolcar!=='function') return;
+    window.__jacSubiendo=true;
+    try{ await window.jacVolcar(); }catch(e){}
+    setTimeout(function(){ window.__jacSubiendo=false; },3000);
+    window.__jacUltimaSubida={cuando:new Date().toISOString(), motivo:motivo};
+  }
+  setInterval(function(){ subir('periodica'); }, 60000);
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='hidden') subir('oculta');
+  });
+  window.addEventListener('pagehide',function(){ subir('cierre'); });
+  window.addEventListener('online',function(){ subir('vuelve la conexion'); });
+
+  /* Aviso claro si se pierde la conexion */
+  function aviso(txt){
+    var el=document.getElementById('jac-aviso-sync');
+    if(!txt){ if(el) el.remove(); return; }
+    if(!el){
+      el=document.createElement('div'); el.id='jac-aviso-sync';
+      el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:2147483000;'
+        +'background:#7F1D1D;color:#fff;padding:9px 16px;border-radius:9px;font-size:12px;'
+        +'box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:92vw;text-align:center';
+      document.body.appendChild(el);
+    }
+    el.textContent=txt;
+  }
+  window.addEventListener('offline',function(){ aviso('Sin internet - tus cambios se guardan aqui y suben al reconectar'); });
+  window.addEventListener('online',function(){ aviso(''); });
+
+  window.jacEstadoNube=function(){
+    return {realtime:window.__jacRealtime||'sin conectar', enLinea:navigator.onLine,
+            ultimaSubida:window.__jacUltimaSubida||null, modalAbierto:hayModalAbierto()};
+  };
 })();
 </script>
 
