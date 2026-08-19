@@ -10421,135 +10421,9 @@ function isSelectCorte(fec) {
 }
 
 
-(function(){
-var _t='pv',UV='uvSync';
-function gd(){
-  return S.univivir||null;
-}
-function sd(d){S.univivir=d;save();}
-function $i(id){return document.getElementById(id)}
-function mn(n){return '$'+(+n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
-function nm(n){return (+(n||0)).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
-function stCard(v,l,c){return '<div class="uv-sc"><div class="uv-sv"'+(c?' style="color:'+c+'"':'')+'>'+v+'</div><div class="uv-sl">'+l+'</div></div>'}
-function uvRenderStats(){
-  var el=$i('uv-stats'); if(!el)return;
-  var d=gd();
-  if(!d){el.innerHTML='<div class="uv-sc" style="grid-column:1/-1;text-align:center;padding:32px"><p style="color:var(--text2,#64748b)">Sin datos. Usa Sincronizar o Importar JSON.</p></div>';return}
-  var c=d.comisiones||[],p=d.pagos||[],det=d.detalle||[];
-  var totC=c.reduce(function(s,r){return s+parseFloat(r.comision||0)},0);
-  var totP=p.filter(function(r){return r.estatus==='Pagada'}).reduce(function(s,r){return s+(r.prima||0)},0);
-  var pp=p.filter(function(r){return r.estatus==='Por Pagar'}).length;
-  var pols={};p.forEach(function(r){pols[r.nroPol]=1});
-  var facs=det.filter(function(r){return (r.tipoMovimiento||'').indexOf('FACTURACION')>=0}).length;
-  el.innerHTML=stCard(Object.keys(pols).length,'Pólizas Activas')+stCard(mn(totC),'Comisiones Totales')+stCard(mn(totP),'Primas Recaudadas')+stCard(pp,'Por Cobrar','#f59e0b')+stCard(c.length,'Registros Comisión')+stCard(facs,'Facturaciones')+stCard((d.estadosCuenta||[]).length,'Asegurados')+stCard((d.morosidad||[]).length,'Morosidad','#dc2626');
-  var ts=$i('uv-ts'); if(ts)ts.textContent='Última sync: '+(d.lastSync?new Date(d.lastSync).toLocaleString('es-PA'):'desconocida');
-}
-function uvRenderTable(){
-  var el=$i('uv-tbl'); if(!el)return;
-  var d=gd(); if(!d){el.innerHTML='<p style="padding:18px;color:var(--text2,#64748b)">Sin datos.</p>';return}
-  var h='';
-  if(_t==='com'){var c=d.comisiones||[];var totC=c.reduce(function(s,r){return s+(parseFloat(r.comision)||0);},0);h='<div style="padding:4px 0 8px;font-size:12px;color:#666">Registros: '+c.length+' &nbsp;|&nbsp; Total Comisiones: <strong style="color:#10b981">$'+nm(totC)+'</strong></div>';h+='<table class="uv-t"><thead><tr><th>Corte</th><th>Póliza</th><th>Recibo</th><th>Endoso</th><th>Asegurado</th><th>Comisión</th></tr></thead><tbody>';c.forEach(function(r){h+='<tr><td>'+r.fec_corte+'</td><td>'+r.poliza+'</td><td>'+r.recibo+'</td><td>'+r.endoso+'</td><td>'+r.asegurado+'</td><td style="font-weight:600;color:#10b981">'+nm(r.comision)+'</td></tr>';});h+='</tbody></table>';}else if(_t==='ec'){var ec=d.estadosCuenta||[];h='<table class="uv-t"><thead><tr><th>Cédula</th><th>Nombre</th><th>Póliza</th></tr></thead><tbody>';ec.forEach(function(r){h+='<tr><td>'+r.cedula+'</td><td>'+r.nombre+'</td><td>'+r.poliza+'</td></tr>'});h+='</tbody></table>';}
-  else if(_t==='mor'){var mor=d.morosidad||[];h='<table class="uv-t"><thead><tr><th>Ramo</th><th>Póliza</th><th>Contratante</th><th>Conducto</th><th>0-30d</th><th>31-60d</th><th>61-90d</th><th>&gt;90d</th><th>Total</th></tr></thead><tbody>';mor.forEach(function(r){var clr=r.dias90plus>0?'color:#dc2626':r.dias31_60>0?'color:#d97706':'';h+='<tr><td>'+r.ramo+'</td><td>'+r.poliza+'</td><td>'+r.contratante+'</td><td>'+r.conducto+'</td><td>'+nm(r.dias0_30)+'</td><td>'+nm(r.dias31_60)+'</td><td>'+nm(r.dias61_90)+'</td><td>'+nm(r.dias90plus)+'</td><td style="font-weight:600;'+clr+'">'+nm(r.total)+'</td></tr>';});h+='</tbody></table>';}else if(_t==='pag'){
-    var p=d.pagos||[];
-    h='<table class="uv-t"><thead><tr><th>Póliza</th><th>Asegurado</th><th>F.Cobro</th><th>Recibo</th><th>Prima</th><th>Comisión</th><th>Estatus</th></tr></thead><tbody>';
-    p.forEach(function(r){var b=r.estatus==='Pagada'?'<span class="uv-bok">✔</span>':'<span class="uv-bpend">⏳</span>';h+='<tr><td>'+r.nroPol+'</td><td>'+(r.asegurado||'').slice(0,24)+'</td><td>'+r.fecCobranza+'</td><td>'+r.nroRecibo+'</td><td>'+nm(r.prima)+'</td><td style="color:#059669">'+nm(r.comision)+'</td><td>'+b+' '+(r.estatus||'')+'</td></tr>'});
-    h+='</tbody></table>';
-  }else if(_t==='liq'){var liq=d.liqComisiones||[];var corte=d.liqCorte||'';var totC=liq.reduce(function(s,r){return s+r.comision;},0);h='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 8px"><span style="font-size:12px;color:#666">Corte: '+corte+' &nbsp;|&nbsp; Neto: <strong style="color:#10b981">$'+nm(totC)+'</strong></span><button onclick="uvEditLiq()" style="font-size:11px;padding:2px 8px;border:1px solid #059669;color:#059669;background:#fff;border-radius:4px;cursor:pointer">✏️ Editar</button></div>';h+='<table class="uv-t"><thead><tr><th>Asegurado</th><th>Póliza</th><th>Recibo</th><th>Cuota</th><th>Saldo</th><th>Comisión</th><th>Primas</th><th>Fecha</th></tr></thead><tbody>';liq.forEach(function(r){var clr=r.comision<0?'color:#dc2626':'';h+='<tr style="'+clr+'"><td>'+r.asegurado+'</td><td>'+r.poliza+'</td><td>'+r.recibo+'</td><td>'+r.nro_cuota+'</td><td>'+nm(r.saldo)+'</td><td>'+nm(r.comision)+'</td><td>'+nm(r.primas)+'</td><td>'+r.fecha_pago+'</td></tr>';});h+='</tbody></table>';
-  }else{
-    var det=d.detalle||[];
-    h='<table class="uv-t"><thead><tr><th>Póliza</th><th>Endoso</th><th>Asegurado</th><th>Desde</th><th>Hasta</th><th>Prima</th><th>Comisión</th><th>Tipo</th></tr></thead><tbody>';
-    det.forEach(function(r){h+='<tr><td>'+r.nroPol+'</td><td>'+r.endoso+'</td><td>'+(r.asegurado||'').slice(0,21)+'</td><td>'+r.fecDesde+'</td><td>'+r.fecHasta+'</td><td>'+nm(r.primaNeta)+'</td><td style="color:#059669">'+nm(r.comision)+'</td><td style="font-size:10px">'+r.tipoMovimiento+'</td></tr>'});
-    h+='</tbody></table>';
-  }
-  if(_t==='pv'){
-    var pv=((gd()||{}).polizasVigentes)||[];
-    var pvP=pv.reduce(function(s,r){return +(s+r.prima).toFixed(2);},0);
-    var pvV=pv.reduce(function(s,r){return s+r.vidas;},0);
-    h='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 8px">'
-      +'<span style="font-size:12px;color:#666">'+pv.length+' pólizas &middot; '+pvV+' vidas &middot; Prima total: <strong>B/.'+nm(pvP)+'</strong></span>'
-      +'<div><button onclick="uvSyncPV()" style="font-size:11px;padding:2px 8px;margin-right:6px;border:1px solid #2563eb;color:#2563eb;background:#fff;border-radius:4px;cursor:pointer">🔄 Sync</button>'
-      +'<button onclick="uvEditPV()" style="font-size:11px;padding:2px 8px;border:1px solid #059669;color:#059669;background:#fff;border-radius:4px;cursor:pointer">✏️ Editar</button></div></div>'
-      +'<table class="uv-t"><thead><tr><th>Póliza</th><th>Contratante</th><th>Inicio</th><th>Desde</th><th>Hasta</th><th>Prima B/.</th><th>Com%</th><th>Vidas</th></tr></thead><tbody>';
-    pv.forEach(function(r){h+='<tr><td><strong>'+r.n+'</strong></td><td>'+r.c+'</td><td>'+r.fi+'</td><td>'+r.fd+'</td><td>'+r.ff+'</td><td>'+nm(r.prima)+'</td><td>'+r.com+'%</td><td>'+r.vidas+'</td></tr>';});
-    h+='</tbody></table>';
-  }
-  el.innerHTML=h;
-}
-window.uvSetTab=function(t,el){
-  _t=t;
-  document.querySelectorAll('.uv-tab').forEach(function(e){e.classList.remove('on')});
-  if(el)el.classList.add('on');
-  uvRenderTable();
-};
-window.uvEditPV=function(){
-var m=document.getElementById('uv-modal');
-  var cur=JSON.stringify(((gd()||{}).polizasVigentes)||[],null,2);
-  m.innerHTML='<div style="background:#fff;border-radius:8px;padding:24px;width:92%;max-width:720px;max-height:82vh;overflow:auto">'+
-    '<h3 style="margin:0 0 8px">📋 Editar Pólizas Vigentes UniVivir</h3>'+
-    '<p style="font-size:11px;color:#666;margin:0 0 8px">Campos: n=nro póliza, c=contratante, fi=inicio, fd=desde, ff=hasta, fp=frecuencia, prima, com=%, vidas, ramo</p>'+
-    '<textarea id="pv-json" style="width:100%;height:320px;font-size:10.5px;font-family:monospace;border:1px solid #ccc;border-radius:4px;padding:8px;box-sizing:border-box">'+cur+'</textarea>'+
-    '<div style="display:flex;gap:8px;margin-top:10px">'+
-    '<button onclick="uvSavePV()" style="padding:7px 16px;background:#059669;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">💾 Guardar</button>'+
-    '<button onclick="document.getElementById(\'uv-modal\').style.display=\'none\'" style="padding:7px 14px;background:#6b7280;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Cancelar</button>'+
-    '</div></div>';
-  m.style.cssText="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999";
-};
-window.uvSavePV=function(){
-  try{
-    var d=JSON.parse(document.getElementById('pv-json').value);
-    var _svNow=gd()||{};_svNow.polizasVigentes=d;sd(_svNow);
-    document.getElementById('uv-modal').style.display='none';
-    uvRenderTable();
-    alert('✅ Pólizas guardadas: '+d.length+' registros');
-  }catch(e){alert('❌ JSON inválido: '+e.message);}
-};
-window.uvSyncPV=function(){
-  alert('🔄 Para sincronizar desde UniVivir:\n1. Entra a univivir.com.pa\n2. Ve a Consultas → Reporte 8 (Pólizas Vigentes)\n3. Copia los datos como JSON\n4. Usa ✏️ Editar para pegar y guardar');
-};
-window.uvEditLiq=function(){
-  var m=document.getElementById('uv-modal');
-  var cur=JSON.stringify(((gd()||{}).liqComisiones)||[],null,2);
-  m.innerHTML='<div style="background:#fff;border-radius:8px;padding:24px;width:92%;max-width:720px;max-height:82vh;overflow:auto">'+
-    '<h3 style="margin:0 0 8px">📜 Editar Liq. Comisiones UniVivir</h3>'+
-    '<p style="font-size:11px;color:#666;margin:0 0 8px">Campos: asegurado, poliza, recibo, endoso, saldo, comision, nro_cuota, primas, fecha_pago</p>'+
-    '<textarea id="liq-json" style="width:100%;height:320px;font-size:10.5px;font-family:monospace;border:1px solid #ccc;border-radius:4px;padding:8px;box-sizing:border-box">'+cur+'</textarea>'+
-    '<div style="display:flex;gap:8px;margin-top:10px">'+
-    '<button onclick="uvSaveLiq()" style="padding:7px 16px;background:#059669;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">💾 Guardar</button>'+
-    '<button onclick="document.getElementById(\'uv-modal\').style.display=\'none\'" style="padding:7px 14px;background:#6b7280;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Cancelar</button>'+
-    '</div></div>';
-  m.style.cssText="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999";
-};
-window.uvSaveLiq=function(){
-  try{
-    var d=JSON.parse(document.getElementById('liq-json').value);
-    var _svNow2=gd()||{};_svNow2.liqComisiones=d;sd(_svNow2);
-    document.getElementById('uv-modal').style.display='none';
-    uvRenderTable();
-    alert('✅ Comisiones guardadas: '+d.length+' registros');
-  }catch(e){alert('❌ JSON inválido: '+e.message);}
-};
-window.uvSyncNow=function(){
-  $i('uv-modal').style.display='flex';
-  $i('uv-mt').textContent='🔄 Sincronizar con UniVivir';
-  $i('uv-mb').innerHTML='<p style="margin:0 0 12px;color:var(--text2,#64748b);font-size:14px">Para obtener datos en vivo:</p><ol style="font-size:13px;line-height:1.9;padding-left:18px;color:var(--text2,#64748b)"><li>Abre el portal UniVivir en una nueva pestaña</li><li>Navega a Report/index/5 (Comisiones)</li><li>Abre consola F12 y ejecuta el script de extracción</li><li>Copia el JSON y usa el botón Importar JSON</li></ol><div style="margin-top:14px"><a href="https://www.univivir.com.pa/ConsultasOnline/Report/index/5" target="_blank" class="uv-btn">Abrir UniVivir ↗</a></div>';
-};
-window.uvImport=function(){
-  $i('uv-modal').style.display='flex';
-  $i('uv-mt').textContent='📥 Importar datos JSON';
-  $i('uv-mb').innerHTML='<p style="margin:0 0 8px;font-size:13px;color:var(--text2,#64748b)">Pega el JSON de sincronización generado desde UniVivir:</p><textarea id="uv-jin" style="width:100%;height:110px;border:1.5px solid var(--border,#e2e8f0);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;resize:vertical;box-sizing:border-box" placeholder="Pega aqui el JSON de sincronizacion" ></textarea><div style="margin-top:10px"><button class="uv-btn uv-btn-g" onclick="uvDoImport()">✅ Importar</button></div>';
-};
-window.uvDoImport=function(){
-  var t=$i('uv-jin'); if(!t)return;
-  try{var d=JSON.parse(t.value);if(!d.lastSync)d.lastSync=new Date().toISOString();sd(d);$i('uv-modal').style.display='none';uvRenderStats();uvRenderTable();alert('Importados: '+(d.comisiones||[]).length+' comisiones, '+(d.pagos||[]).length+' pagos, '+(d.detalle||[]).length+' movimientos.');}catch(e){alert('JSON inválido: '+e.message);}
-};
-$i('uv-modal').addEventListener('click',function(e){if(e.target===$i('uv-modal'))$i('uv-modal').style.display='none'});
-var pg=$i('pg-uv');
-if(pg)new MutationObserver(function(){if(pg.classList.contains('on')){uvRenderStats();uvRenderTable();}}).observe(pg,{attributes:true,attributeFilter:['class']});
-if(typeof RD==='function')RD();if(typeof RCom==='function')RCom();
-uvRenderStats();uvRenderTable();
-window.addEventListener("focus",loadFromCloud);
-setTimeout(loadFromCloud,2000);
-})();
+/* Bloque de UniVivir retirado — el módulo ya no existe. Se conservan los listeners de respaldo. */
+window.addEventListener("focus",function(){try{if(typeof loadFromCloud==="function")loadFromCloud();}catch(e){}});
+setTimeout(function(){try{if(typeof loadFromCloud==="function")loadFromCloud();}catch(e){}},2000);
 
 // v84 drag kanban
 var _pkDragId=null;
@@ -10752,6 +10626,7 @@ function calFixSize(){var el=document.getElementById('pg-cal');if(!el)return;var
 function calGetDate(){var d=window.calDate||new Date();return new Date(d.getFullYear(),d.getMonth(),(window._calSel||d.getDate())).toISOString().slice(0,10);}
 function calRenderCurrentPane(){calFixSize();
   var tab=window._calTab||'agenda';
+  if(tab==='alertas'){jacAlertasRender();return;}
   if(tab==='tareas'){RTar();}
   else if(tab==='metas')calRenderMetas();
   else if(tab==='diario')calLoadDiario();
@@ -11103,7 +10978,7 @@ function calAbrirDiaCompleto(d){
 function calDay(d){window._calSel=d;renderCal();calAbrirDiaCompleto(d);}
 function calTab(t){
   window._calTab=t;
-  ['agenda','semana','tareas','metas','diario','reun','notas','historial','cobros'].forEach(function(x){
+  ['agenda','semana','tareas','metas','diario','reun','notas','alertas','historial','cobros'].forEach(function(x){
     var tb=document.getElementById('cal-tab-'+x);
     var pn=document.getElementById('cal-pane-'+x);
     if(tb){tb.style.borderBottomColor=(x===t?'#2563EB':'transparent');tb.style.background=(x===t?'#EEF2FF':'transparent');tb.style.color=(x===t?'#2563EB':'#78716C');tb.style.fontWeight=(x===t?'700':'400');}
@@ -12108,7 +11983,7 @@ function _qSaveCal(){
 
 
 
-<div id="pg-cal" class="pg" style="padding:0!important"><div style="display:flex;height:calc(100vh - 58px);background:linear-gradient(135deg,#F5F0E8,#EDE8DF);border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.15);border:1px solid #C8B89A"><div style="width:260px;flex-shrink:0;background:linear-gradient(180deg,#FAF7F2,#F2EDE4);border-right:2px solid #C8B89A;display:flex;flex-direction:column;overflow:hidden"><div style="padding:20px 20px 12px"><div id="cal-day-num" style="font-size:80px;font-weight:900;color:#1E293B;line-height:1;font-family:Georgia,serif;letter-spacing:-4px"></div><div id="cal-day-name" style="font-size:18px;font-weight:600;color:#475569;text-transform:lowercase;margin-top:-4px"></div><div id="cal-month-year" style="font-size:13px;color:#94A3B8;font-weight:400;margin-top:2px"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px"><span style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:1px">Agregar Tarea</span><button onclick="calAddTask()" style="width:26px;height:26px;border-radius:50%;background:#2563EB;border:none;cursor:pointer;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;padding:0">+</button><div style="position:relative;display:inline-block;margin-left:6px"><button onclick="calToggleCrearMenu()" style="width:26px;height:26px;border-radius:50%;background:#059669;border:none;cursor:pointer;color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;line-height:1;padding:0" title="Crear">&#10010;</button><div id="cal-crear-menu" style="display:none;position:absolute;right:0;top:30px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:9998;min-width:190px;overflow:hidden"><div onclick="calAddAgendaItem('cita')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #F1F5F9">&#128197; Cita</div><div onclick="calAddAgendaItem('visita')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #F1F5F9">&#127968; Visita</div><div onclick="calAddAgendaItem('llamada')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #F1F5F9">&#128222; Llamada</div><div onclick="calAddAgendaItem('correo')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #F1F5F9">&#9993; Mensaje por correo</div><div onclick="calAddAgendaItem('mensajeria')" style="padding:8px 12px;font-size:12px;cursor:pointer">&#128230; Env&iacute;o de mensajer&iacute;a</div><div onclick="calAddAgendaItem('whatsapp')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-top:1px solid #F1F5F9">💬 Mensaje por WhatsApp</div></div></div></div></div><div id="cal-day-tasks" style="flex:1;overflow-y:auto;padding:0 14px 12px"></div><div style="border-top:1px solid #C8B89A;padding:10px;background:rgba(255,255,255,.4)"><div id="cal-mini1" style="margin-bottom:8px"></div><div id="cal-mini2"></div></div></div><div style="width:32px;flex-shrink:0;background:linear-gradient(90deg,#7A5C42 0%,#B8895A 40%,#A07548 60%,#7A5C42 100%);display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:30px 0"><div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#E8D0B0,#8B6340);border:2px solid #5C3D20;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div><div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#E8D0B0,#8B6340);border:2px solid #5C3D20;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div><div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#E8D0B0,#8B6340);border:2px solid #5C3D20;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div><div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#E8D0B0,#8B6340);border:2px solid #5C3D20;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div></div><div style="flex:1;display:flex;flex-direction:column;background:#FAFAF8;overflow:hidden"><div style="display:flex;border-bottom:2px solid #D4C5A9;background:#F5F0E8;flex-shrink:0"><button id="cal-tab-agenda" onclick="calTab('agenda')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid #2563EB;background:#EEF2FF;color:#2563EB;font-weight:700;font-size:11px;cursor:pointer">&#128197; Agenda</button><button id="cal-tab-semana" onclick="calTab('semana')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:11px;cursor:pointer">&#128198; Semana</button><button id="cal-tab-tareas" onclick="calTab('tareas')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:11px;cursor:pointer">&#9989; Tareas</button><button id="cal-tab-metas" onclick="calTab('metas')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:11px;cursor:pointer">&#127919; Metas</button><button id="cal-tab-diario" onclick="calTab('diario')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:11px;cursor:pointer">&#128221; Diario</button><button id="cal-tab-reun" onclick="calTab('reun')" style="flex:1;padding:10px 4px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:10px;cursor:pointer">&#128101; Reuni.</button><button id="cal-tab-notas" onclick="calTab('notas')" style="flex:1;padding:10px 4px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:10px;cursor:pointer">&#128203; Notas</button><button id="cal-tab-historial" onclick="calTab('historial')" style="flex:1;padding:10px 4px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:10px;cursor:pointer">🕓 Historial</button></div><div style="flex:1;overflow-y:auto"><div id="cal-pane-agenda" style="padding:14px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><button class="btn bsm" onclick="calNav(-1)" style="font-size:16px;padding:4px 10px">&#9664;</button><span id="cal-title" style="font-size:14px;font-weight:700;color:#1E293B"></span><button class="btn bsm" onclick="calNav(1)" style="font-size:16px;padding:4px 10px">&#9654;</button></div><div id="cal-body"></div><div style="display:flex;gap:16px;margin-top:10px;font-size:10px;color:#64748B"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F59E0B;margin-right:3px"></span>P&#243;liza vence</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B5CF6;margin-right:3px"></span>Tarea</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10B981;margin-right:3px"></span>Seguimiento</span></div><div style="margin-top:14px;border-top:1px solid #E8DFD0;padding-top:10px"><div style="font-size:11px;font-weight:700;color:#78716C;margin-bottom:8px;text-transform:uppercase;letter-spacing:1.5px">Eventos del d&#237;a</div><div id="cal-timeline"></div></div></div><div id="cal-pane-semana" style="display:none;padding:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><button class="btn bsm" onclick="calWeekNav(-1)">&#9664;</button><span id="cal-week-title" style="font-size:13px;font-weight:700;color:#1E293B"></span><button class="btn bsm" onclick="calWeekNav(1)">&#9654;</button></div><div id="cal-week-body"></div></div><div id="cal-pane-tareas" style="display:none;padding:14px">
+<div id="pg-cal" class="pg" style="padding:0!important"><div style="display:flex;height:calc(100vh - 58px);background:linear-gradient(135deg,#F5F0E8,#EDE8DF);border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.15);border:1px solid #C8B89A"><div style="width:260px;flex-shrink:0;background:linear-gradient(180deg,#FAF7F2,#F2EDE4);border-right:2px solid #C8B89A;display:flex;flex-direction:column;overflow:hidden"><div style="padding:20px 20px 12px"><div id="cal-day-num" style="font-size:80px;font-weight:900;color:#1E293B;line-height:1;font-family:Georgia,serif;letter-spacing:-4px"></div><div id="cal-day-name" style="font-size:18px;font-weight:600;color:#475569;text-transform:lowercase;margin-top:-4px"></div><div id="cal-month-year" style="font-size:13px;color:#94A3B8;font-weight:400;margin-top:2px"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px"><span style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:1px">Agregar Tarea</span><button onclick="calAddTask()" style="width:26px;height:26px;border-radius:50%;background:#2563EB;border:none;cursor:pointer;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;padding:0">+</button><div style="position:relative;display:inline-block;margin-left:6px"><button onclick="calToggleCrearMenu()" style="width:26px;height:26px;border-radius:50%;background:#059669;border:none;cursor:pointer;color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;line-height:1;padding:0" title="Crear">&#10010;</button><div id="cal-crear-menu" style="display:none;position:absolute;right:0;top:30px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:9998;min-width:190px;overflow:hidden"><div onclick="calAddAgendaItem('cita')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #F1F5F9">&#128197; Cita</div><div onclick="calAddAgendaItem('visita')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #F1F5F9">&#127968; Visita</div><div onclick="calAddAgendaItem('llamada')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #F1F5F9">&#128222; Llamada</div><div onclick="calAddAgendaItem('correo')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid #F1F5F9">&#9993; Mensaje por correo</div><div onclick="calAddAgendaItem('mensajeria')" style="padding:8px 12px;font-size:12px;cursor:pointer">&#128230; Env&iacute;o de mensajer&iacute;a</div><div onclick="calAddAgendaItem('whatsapp')" style="padding:8px 12px;font-size:12px;cursor:pointer;border-top:1px solid #F1F5F9">💬 Mensaje por WhatsApp</div></div></div></div></div><div id="cal-day-tasks" style="flex:1;overflow-y:auto;padding:0 14px 12px"></div><div style="border-top:1px solid #C8B89A;padding:10px;background:rgba(255,255,255,.4)"><div id="cal-mini1" style="margin-bottom:8px"></div><div id="cal-mini2"></div></div></div><div style="width:32px;flex-shrink:0;background:linear-gradient(90deg,#7A5C42 0%,#B8895A 40%,#A07548 60%,#7A5C42 100%);display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;padding:30px 0"><div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#E8D0B0,#8B6340);border:2px solid #5C3D20;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div><div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#E8D0B0,#8B6340);border:2px solid #5C3D20;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div><div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#E8D0B0,#8B6340);border:2px solid #5C3D20;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div><div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#E8D0B0,#8B6340);border:2px solid #5C3D20;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div></div><div style="flex:1;display:flex;flex-direction:column;background:#FAFAF8;overflow:hidden"><div style="display:flex;border-bottom:2px solid #D4C5A9;background:#F5F0E8;flex-shrink:0"><button id="cal-tab-agenda" onclick="calTab('agenda')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid #2563EB;background:#EEF2FF;color:#2563EB;font-weight:700;font-size:11px;cursor:pointer">&#128197; Agenda</button><button id="cal-tab-semana" onclick="calTab('semana')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:11px;cursor:pointer">&#128198; Semana</button><button id="cal-tab-tareas" onclick="calTab('tareas')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:11px;cursor:pointer">&#9989; Tareas</button><button id="cal-tab-metas" onclick="calTab('metas')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:11px;cursor:pointer">&#127919; Metas</button><button id="cal-tab-diario" onclick="calTab('diario')" style="flex:1;padding:10px 6px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:11px;cursor:pointer">&#128221; Diario</button><button id="cal-tab-reun" onclick="calTab('reun')" style="flex:1;padding:10px 4px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:10px;cursor:pointer">&#128101; Reuni.</button><button id="cal-tab-notas" onclick="calTab('notas')" style="flex:1;padding:10px 4px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:10px;cursor:pointer">&#128203; Notas</button><button id="cal-tab-alertas" onclick="calTab('alertas')" style="flex:1;padding:10px 4px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:10px;cursor:pointer">&#128276; Alertas <span id="cal-alertas-badge" style="display:none;background:#DC2626;color:#fff;border-radius:999px;padding:0 5px;font-size:9px;font-weight:700;margin-left:2px"></span></button><button id="cal-tab-historial" onclick="calTab('historial')" style="flex:1;padding:10px 4px;border:none;border-bottom:3px solid transparent;background:transparent;color:#78716C;font-size:10px;cursor:pointer">🕓 Historial</button></div><div style="flex:1;overflow-y:auto"><div id="cal-pane-agenda" style="padding:14px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><button class="btn bsm" onclick="calNav(-1)" style="font-size:16px;padding:4px 10px">&#9664;</button><span id="cal-title" style="font-size:14px;font-weight:700;color:#1E293B"></span><button class="btn bsm" onclick="calNav(1)" style="font-size:16px;padding:4px 10px">&#9654;</button></div><div id="cal-body"></div><div style="display:flex;gap:16px;margin-top:10px;font-size:10px;color:#64748B"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F59E0B;margin-right:3px"></span>P&#243;liza vence</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B5CF6;margin-right:3px"></span>Tarea</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10B981;margin-right:3px"></span>Seguimiento</span></div><div style="margin-top:14px;border-top:1px solid #E8DFD0;padding-top:10px"><div style="font-size:11px;font-weight:700;color:#78716C;margin-bottom:8px;text-transform:uppercase;letter-spacing:1.5px">Eventos del d&#237;a</div><div id="cal-timeline"></div></div></div><div id="cal-pane-semana" style="display:none;padding:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><button class="btn bsm" onclick="calWeekNav(-1)">&#9664;</button><span id="cal-week-title" style="font-size:13px;font-weight:700;color:#1E293B"></span><button class="btn bsm" onclick="calWeekNav(1)">&#9654;</button></div><div id="cal-week-body"></div></div><div id="cal-pane-tareas" style="display:none;padding:14px">
  <div class="ph"><div><h2 style="font-size:14px">✅ Tareas</h2><small id="tarcnt"></small></div>
  <div class="tb">
  <div class="vtog"><button class="on" onclick="setTV('k',this)">🗂 Kanban</button><button onclick="setTV('l',this)">☰ Lista</button></div>
@@ -12116,7 +11991,7 @@ function _qSaveCal(){
  </div>
  </div>
  <div id="tar-view"></div>
-</div><div id="cal-pane-metas" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Metas Activas</div><button onclick="calAddMeta()" class="btn bsm" style="font-size:11px">+ Nueva Meta</button></div><div id="cal-metas-list"></div><div style="margin-top:20px;padding-top:14px;border-top:1px solid #E8DFD0"><div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:10px">&#127942; Logros</div><div id="cal-logros-list"></div></div></div><div id="cal-pane-diario" style="display:none;padding:14px"><div id="cal-diario-fecha" style="font-size:12px;color:#94A3B8;margin-bottom:6px;font-style:italic"></div><div id="cal-quote" style="font-size:11px;color:#78716C;margin-bottom:10px;font-style:italic;text-align:center;padding:6px;background:rgba(212,197,169,.3);border-radius:6px"></div><div style="margin-bottom:8px"><label style="font-size:11px;font-weight:600;color:#647569;display:block;margin-bottom:4px">Vincular a (opcional)</label><select id="cal-diario-cli" onchange="calDiarioToggleOtro()" style="width:100%;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><option value="">-- Sin vincular --</option><option value="otro">Otro contacto...</option></select><div id="cal-diario-otro-wrap" style="display:none;margin-top:6px"><input id="cal-diario-otro-nombre" placeholder="Nombre del contacto" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box;margin-bottom:4px"><input id="cal-diario-otro-tel" placeholder="Teléfono (para WhatsApp)" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box;margin-bottom:4px"><input id="cal-diario-otro-email" placeholder="Email" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box"></div></div><textarea id="cal-diario-txt" placeholder="Escribe una nueva anotación... (se guarda con fecha y hora, sin borrar lo anterior)" oninput="calDiarioDirty()" style="width:100%;min-height:16vh;height:16vh;border:1px solid #D4C5A9;border-radius:10px;padding:16px;font-size:16px;resize:vertical;font-family:inherit;color:#1E293B;background:#FDFCFA;line-height:1.7;box-sizing:border-box"></textarea><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><button onclick="calSaveDiario()" style="background:#1E293B;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">💾 Guardar anotación</button><span id="cal-diario-status" style="font-size:12px;color:#16A34A;opacity:0;transition:opacity .3s">Guardado ✓</span></div><div style="margin-top:18px;padding-top:14px;border-top:1px solid #E8DFD0"><div style="font-size:11px;font-weight:700;color:#78716C;margin-bottom:10px;text-transform:uppercase;letter-spacing:1.5px">📝 Anotaciones de este día</div><button id="cal-diario-hist-btn" onclick="calDiarioToggleHistorico()" style="font-size:10px;padding:3px 8px;border:1px solid #D4C5A9;border-radius:6px;background:#fff;cursor:pointer;margin-bottom:6px;color:#647569">&#128337; Ver anotaciones anteriores</button><div id="cal-diario-entries"></div></div></div><div id="cal-pane-reun" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Reuniones del Día</div><button onclick="calAddReunion()" class="btn bsm" style="font-size:11px;background:#2563EB;color:#fff;border-color:#2563EB">+ Nueva Reunión</button></div><div id="cal-reun-list"></div></div><div id="cal-pane-notas" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Notas Rápidas</div><button onclick="calAddNota()" class="btn bsm" style="font-size:11px;background:#7C3AED;color:#fff;border-color:#7C3AED">+ Nueva Nota</button></div><div id="cal-notas-list" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div></div><div id="cal-pane-historial" style="display:none;padding:14px"><div class="ph"><div><h2 style="font-size:14px">🕓 Historial</h2><small id="histcnt"></small></div></div><div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap"><input id="hist-q" type="text" placeholder="Buscar..." oninput="calRenderHistorial()" style="flex:2;min-width:140px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><input id="hist-desde" type="date" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><input id="hist-hasta" type="date" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><select id="hist-tipo" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><option value="">Todos</option><option value="tarea">Tareas</option><option value="reunion">Reuniones</option><option value="diario">Diario</option><option value="nota">Notas</option></select></div><div id="hist-list"></div></div></div></div></div><div id="cal-modal" onclick="if(event.target===this)calCloseModal()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.65);z-index:9999;align-items:center;justify-content:center"><div style="background:#fff;border-radius:16px;padding:24px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><div id="cal-modal-ttl" style="font-size:16px;font-weight:700;color:#1E293B"></div><button onclick="calCloseModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748B;padding:0;line-height:1">&#10005;</button></div><div id="cal-modal-body"></div><div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end"><button onclick="calCloseModal()" class="btn bsm">Cancelar</button><button onclick="calModalSave()" class="btn bsm" style="background:#2563EB;color:#fff;border-color:#2563EB">Guardar</button></div></div></div></div>
+</div><div id="cal-pane-metas" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Metas Activas</div><button onclick="calAddMeta()" class="btn bsm" style="font-size:11px">+ Nueva Meta</button></div><div id="cal-metas-list"></div><div style="margin-top:20px;padding-top:14px;border-top:1px solid #E8DFD0"><div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:10px">&#127942; Logros</div><div id="cal-logros-list"></div></div></div><div id="cal-pane-diario" style="display:none;padding:14px"><div id="cal-diario-fecha" style="font-size:12px;color:#94A3B8;margin-bottom:6px;font-style:italic"></div><div id="cal-quote" style="font-size:11px;color:#78716C;margin-bottom:10px;font-style:italic;text-align:center;padding:6px;background:rgba(212,197,169,.3);border-radius:6px"></div><div style="margin-bottom:8px"><label style="font-size:11px;font-weight:600;color:#647569;display:block;margin-bottom:4px">Vincular a (opcional)</label><select id="cal-diario-cli" onchange="calDiarioToggleOtro()" style="width:100%;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><option value="">-- Sin vincular --</option><option value="otro">Otro contacto...</option></select><div id="cal-diario-otro-wrap" style="display:none;margin-top:6px"><input id="cal-diario-otro-nombre" placeholder="Nombre del contacto" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box;margin-bottom:4px"><input id="cal-diario-otro-tel" placeholder="Teléfono (para WhatsApp)" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box;margin-bottom:4px"><input id="cal-diario-otro-email" placeholder="Email" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box"></div></div><textarea id="cal-diario-txt" placeholder="Escribe una nueva anotación... (se guarda con fecha y hora, sin borrar lo anterior)" oninput="calDiarioDirty()" style="width:100%;min-height:16vh;height:16vh;border:1px solid #D4C5A9;border-radius:10px;padding:16px;font-size:16px;resize:vertical;font-family:inherit;color:#1E293B;background:#FDFCFA;line-height:1.7;box-sizing:border-box"></textarea><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><button onclick="calSaveDiario()" style="background:#1E293B;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">💾 Guardar anotación</button><span id="cal-diario-status" style="font-size:12px;color:#16A34A;opacity:0;transition:opacity .3s">Guardado ✓</span></div><div style="margin-top:18px;padding-top:14px;border-top:1px solid #E8DFD0"><div style="font-size:11px;font-weight:700;color:#78716C;margin-bottom:10px;text-transform:uppercase;letter-spacing:1.5px">📝 Anotaciones de este día</div><button id="cal-diario-hist-btn" onclick="calDiarioToggleHistorico()" style="font-size:10px;padding:3px 8px;border:1px solid #D4C5A9;border-radius:6px;background:#fff;cursor:pointer;margin-bottom:6px;color:#647569">&#128337; Ver anotaciones anteriores</button><div id="cal-diario-entries"></div></div></div><div id="cal-pane-reun" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Reuniones del Día</div><button onclick="calAddReunion()" class="btn bsm" style="font-size:11px;background:#2563EB;color:#fff;border-color:#2563EB">+ Nueva Reunión</button></div><div id="cal-reun-list"></div></div><div id="cal-pane-notas" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Notas Rápidas</div><button onclick="calAddNota()" class="btn bsm" style="font-size:11px;background:#7C3AED;color:#fff;border-color:#7C3AED">+ Nueva Nota</button></div><div id="cal-notas-list" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div></div><div id="cal-pane-alertas" style="display:none;padding:14px"><div class="ph"><div><h2 style="font-size:14px">&#128276; Alertas</h2><small id="cal-alertas-sub">Renovaciones, pagos, tareas y cumplea&ntilde;os</small></div><button onclick="jacAlertasRender()" style="border:1px solid #CBD5E1;background:#fff;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer">&#128260; Actualizar</button></div><div id="cal-alertas-body" style="margin-top:12px"></div></div><div id="cal-pane-historial" style="display:none;padding:14px"><div class="ph"><div><h2 style="font-size:14px">🕓 Historial</h2><small id="histcnt"></small></div></div><div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap"><input id="hist-q" type="text" placeholder="Buscar..." oninput="calRenderHistorial()" style="flex:2;min-width:140px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><input id="hist-desde" type="date" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><input id="hist-hasta" type="date" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><select id="hist-tipo" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><option value="">Todos</option><option value="tarea">Tareas</option><option value="reunion">Reuniones</option><option value="diario">Diario</option><option value="nota">Notas</option></select></div><div id="hist-list"></div></div></div></div></div><div id="cal-modal" onclick="if(event.target===this)calCloseModal()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.65);z-index:9999;align-items:center;justify-content:center"><div style="background:#fff;border-radius:16px;padding:24px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><div id="cal-modal-ttl" style="font-size:16px;font-weight:700;color:#1E293B"></div><button onclick="calCloseModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748B;padding:0;line-height:1">&#10005;</button></div><div id="cal-modal-body"></div><div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end"><button onclick="calCloseModal()" class="btn bsm">Cancelar</button><button onclick="calModalSave()" class="btn bsm" style="background:#2563EB;color:#fff;border-color:#2563EB">Guardar</button></div></div></div></div>
 <div id="pg-com" class="pg">
 <h1 style="font-size:20px;font-weight:700;color:#1E293B;margin:0 0 20px">Comisiones</h1>
 <div id="com-kpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px"></div>
@@ -14760,6 +14635,168 @@ document.addEventListener('click', function(e){
   }
 })();
 </script>
+<script>
+/* ============================================================
+   JAC CRM — Alertas y sincronización ampliada con Google Calendar
+   ============================================================ */
+(function(){
+  var DIA=86400000;
+  function hoy0(){var d=new Date();d.setHours(0,0,0,0);return d;}
+  function fecha(v){ if(!v)return null; var d=new Date(String(v).slice(0,10)+'T12:00:00'); return isNaN(d.getTime())?null:d; }
+  function dias(d){ return Math.round((d-hoy0())/DIA); }
+  function num(v){ var n=parseFloat(v); return isNaN(n)?0:n; }
+  function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function mon(n){ return '$'+num(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+  /* Reúne todo lo que requiere atención. No inventa nada: solo lee el estado del CRM. */
+  window.jacAlertas=function(){
+    var S=window.S||{}, out={renovaciones:[],pagos:[],tareas:[],notas:[],cumples:[]};
+    (S.polizas||[]).forEach(function(p){
+      var est=String(p.estado||'').toLowerCase();
+      if(est==='cancelada')return;
+      var ff=fecha(p.fechaFin||p.vencimiento);
+      if(ff){ var d=dias(ff);
+        /* ventana de trabajo: lo que vence en 30 días y lo que venció hace menos de 30 */
+        if(d<=30&&d>=-30) out.renovaciones.push({d:d,nom:p.nombreCliente||p.cliente||'(sin cliente)',num:p.num||p.numero||'(sin nº)',
+          aseg:p.aseg||p.aseguradora||'',tel:p.celCliente||'',fin:ff.toISOString().slice(0,10),id:p.id,ramo:p.ramo||''}); }
+      var saldo=num(p.saldo);
+      if(saldo>0.05 && String(p.estadoCartera||'').toLowerCase().indexOf('pagad')<0){
+        var venc=fecha(p.fechaFact)||ff;
+        out.pagos.push({monto:saldo,nom:p.nombreCliente||'(sin cliente)',num:p.num||'(sin nº)',aseg:p.aseg||'',
+          d:venc?dias(venc):null,id:p.id,tramos:p.morosidad||null});
+      }
+    });
+    (S.tareas||[]).forEach(function(t){
+      if(String(t.estado||'').toLowerCase().indexOf('complet')===0)return;
+      var f=fecha(t.fechaLimite); if(!f)return; var d=dias(f);
+      if(d<=0) out.tareas.push({d:d,txt:t.titulo||t.texto||t.desc||'Tarea',id:t.id,prio:t.prioridad||''});
+    });
+    (S.notas||[]).forEach(function(n){
+      var f=fecha(n.fecha||n.fechaLimite); if(!f)return;
+      if(dias(f)<=0 && !n.hecha) out.notas.push({d:dias(f),txt:n.texto||n.titulo||'Nota',id:n.id});
+    });
+    var h=new Date();
+    (S.clientes||[]).forEach(function(c){
+      var fn=c.fNac||c.fechaNac||c.dob; if(!fn)return;
+      var p=String(fn).slice(0,10).split('-'); if(p.length<3)return;
+      var mes=parseInt(p[1],10)-1, dd=parseInt(p[2],10);
+      if(isNaN(mes)||isNaN(dd))return;
+      var prox=new Date(h.getFullYear(),mes,dd); prox.setHours(0,0,0,0);
+      if(prox<hoy0()) prox=new Date(h.getFullYear()+1,mes,dd);
+      var d=dias(prox);
+      if(d<=7) out.cumples.push({d:d,nom:c.nombre||'(sin nombre)',tel:c.cel||c.tel||'',id:c.id,
+        edad:h.getFullYear()-parseInt(p[0],10)});
+    });
+    out.renovaciones.sort(function(a,b){return a.d-b.d;});
+    out.pagos.sort(function(a,b){return b.monto-a.monto;});
+    out.tareas.sort(function(a,b){return a.d-b.d;});
+    out.cumples.sort(function(a,b){return a.d-b.d;});
+    out.total=out.renovaciones.length+out.pagos.length+out.tareas.length+out.notas.length+out.cumples.length;
+    return out;
+  };
+
+  function grupo(titulo, color, items, filaFn){
+    if(!items.length) return '';
+    var h='<div style="margin-bottom:18px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+      +'<span style="width:9px;height:9px;border-radius:50%;background:'+color+'"></span>'
+      +'<b style="font-size:12px">'+titulo+'</b>'
+      +'<span style="background:'+color+'22;color:'+color+';border-radius:999px;padding:1px 8px;font-size:10px;font-weight:700">'+items.length+'</span></div>'
+      +'<div style="display:flex;flex-direction:column;gap:5px">';
+    items.slice(0,40).forEach(function(x){ h+='<div style="background:#fff;border:1px solid #E2E8F0;border-left:3px solid '+color+';border-radius:8px;padding:8px 11px;font-size:11.5px;line-height:1.5">'+filaFn(x)+'</div>'; });
+    if(items.length>40) h+='<div style="font-size:10px;color:#94A3B8;padding:4px 2px">y '+(items.length-40)+' m&aacute;s…</div>';
+    return h+'</div></div>';
+  }
+  function cuando(d){
+    if(d<0) return '<b style="color:#DC2626">venci&oacute; hace '+Math.abs(d)+' d&iacute;a'+(Math.abs(d)===1?'':'s')+'</b>';
+    if(d===0) return '<b style="color:#DC2626">hoy</b>';
+    if(d<=7) return '<b style="color:#D97706">en '+d+' d&iacute;a'+(d===1?'':'s')+'</b>';
+    return 'en '+d+' d&iacute;as';
+  }
+
+  window.jacAlertasRender=function(){
+    var el=document.getElementById('cal-alertas-body'); if(!el)return;
+    var a=window.jacAlertas();
+    var b=document.getElementById('cal-alertas-badge');
+    if(b){ if(a.total){b.style.display='';b.textContent=a.total;} else b.style.display='none'; }
+    var sub=document.getElementById('cal-alertas-sub');
+    if(sub) sub.textContent=a.total? (a.total+' cosas requieren tu atención') : 'Todo al día';
+    var h='';
+    h+=grupo('&#128260; Renovaciones (30 d&iacute;as)','#F59E0B',a.renovaciones,function(x){
+      return esc(x.nom)+' &middot; <span style="color:#64748B">'+esc(x.aseg)+' '+esc(x.ramo)+'</span><br>'
+        +'P&oacute;liza '+esc(x.num)+' &mdash; vence '+esc(x.fin)+' ('+cuando(x.d)+')'
+        +(x.tel?' &middot; <a href="https://wa.me/507'+esc(String(x.tel).replace(/\D/g,''))+'" target="_blank" style="color:#059669">WhatsApp</a>':''); });
+    h+=grupo('&#128181; Pagos pendientes','#DC2626',a.pagos,function(x){
+      var t=x.tramos;
+      return esc(x.nom)+' &middot; <b>'+mon(x.monto)+'</b><br>P&oacute;liza '+esc(x.num)+' &middot; '+esc(x.aseg)
+        +(t?'<br><span style="color:#64748B;font-size:10.5px">0-30: '+mon(t.d0_30)+' &middot; 31-60: '+mon(t.d31_60)+' &middot; 61-90: '+mon(t.d61_90)+' &middot; +90: '+mon(t.d90plus)+'</span>':''); });
+    h+=grupo('&#9989; Tareas vencidas','#8B5CF6',a.tareas,function(x){
+      return esc(x.txt)+(x.prio?' <span style="color:#64748B">['+esc(x.prio)+']</span>':'')+'<br>'+cuando(x.d); });
+    h+=grupo('&#128221; Notas vencidas','#0EA5E9',a.notas,function(x){ return esc(x.txt)+'<br>'+cuando(x.d); });
+    h+=grupo('&#127874; Cumplea&ntilde;os (7 d&iacute;as)','#EC4899',a.cumples,function(x){
+      return esc(x.nom)+(x.edad>0&&x.edad<120?' &middot; cumple '+x.edad:'')+'<br>'+cuando(x.d)
+        +(x.tel?' &middot; <a href="https://wa.me/507'+esc(String(x.tel).replace(/\D/g,''))+'" target="_blank" style="color:#059669">WhatsApp</a>':''); });
+    if(!h) h='<div style="text-align:center;padding:40px 10px;color:#94A3B8"><div style="font-size:30px">&#10024;</div>'
+      +'<div style="font-size:12px;margin-top:6px">Nada pendiente. Todo al d&iacute;a.</div></div>';
+    el.innerHTML=h;
+  };
+
+  /* El contador de la pestaña se refresca solo, sin botones flotantes */
+  window.jacAlertasBadge=function(){
+    try{ var a=window.jacAlertas(), b=document.getElementById('cal-alertas-badge');
+      if(b){ if(a.total){b.style.display='';b.textContent=a.total;} else b.style.display='none'; } }catch(e){}
+  };
+  setTimeout(window.jacAlertasBadge,4000);
+  setInterval(window.jacAlertasBadge,300000);
+  window.addEventListener('focus',window.jacAlertasBadge);
+
+  /* ── Google Calendar: además de las tareas, manda renovaciones, cumpleaños y pagos ── */
+  window.jacGcalEventosDelCRM=function(){
+    var a=window.jacAlertas(), ev=[];
+    a.renovaciones.forEach(function(x){ if(x.d<0)return;
+      ev.push({_k:'ren_'+x.id, fecha:x.fin, titulo:'🔄 Renueva: '+x.nom+' ('+x.aseg+')',
+        desc:'Póliza '+x.num+' — '+x.ramo+'. Generado por el CRM de JAC Seguros.'}); });
+    a.cumples.forEach(function(x){
+      var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+x.d);
+      ev.push({_k:'cum_'+x.id, fecha:d.toISOString().slice(0,10), titulo:'🎂 Cumpleaños: '+x.nom,
+        desc:'Cumpleaños de un cliente. Generado por el CRM de JAC Seguros.'}); });
+    a.pagos.forEach(function(x){ if(x.d==null||x.d>30)return;
+      var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+Math.max(0,x.d));
+      ev.push({_k:'pag_'+x.id, fecha:d.toISOString().slice(0,10), titulo:'💵 Cobrar: '+x.nom+' '+mon(x.monto),
+        desc:'Póliza '+x.num+' — '+x.aseg+'. Generado por el CRM de JAC Seguros.'}); });
+    return ev;
+  };
+
+  var _syncOriginal=null;
+  function ampliarSync(){
+    if(typeof window.gcalSyncAll!=='function' || window.__gcalAmpliado) return;
+    _syncOriginal=window.gcalSyncAll; window.__gcalAmpliado=true;
+    window.gcalSyncAll=async function(){
+      await _syncOriginal.apply(this,arguments);
+      if(!window.__gcalToken) return;
+      if(!window.S.gcalRefs) window.S.gcalRefs={};
+      var ev=window.jacGcalEventosDelCRM(), n=0;
+      for(var i=0;i<ev.length;i++){
+        var e=ev[i], id=window.S.gcalRefs[e._k];
+        var body={summary:e.titulo, description:e.desc, start:{date:e.fecha}, end:{date:e.fecha}};
+        try{
+          var url='https://www.googleapis.com/calendar/v3/calendars/primary/events'+(id?'/'+id:'');
+          var r=await fetch(url,{method:id?'PATCH':'POST',
+            headers:{Authorization:'Bearer '+window.__gcalToken,'Content-Type':'application/json'},
+            body:JSON.stringify(body)});
+          var j=await r.json();
+          if(j&&j.id){ window.S.gcalRefs[e._k]=j.id; n++; }
+        }catch(err){}
+      }
+      try{save();}catch(err){}
+      if(typeof gcalStatus==='function') gcalStatus('✅ Tareas + '+n+' evento(s) del CRM (renovaciones, cumpleaños y cobros) · '+new Date().toLocaleTimeString());
+      if(typeof toast==='function') toast('📅 '+n+' eventos del CRM enviados a Google Calendar');
+    };
+  }
+  setTimeout(ampliarSync,3000);
+  setTimeout(ampliarSync,9000);
+})();
+</script>
+
 </body>
 </html>
 <!-- deploy-test -->
