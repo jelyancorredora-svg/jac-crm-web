@@ -3573,6 +3573,25 @@ function RAgenda(){
  d.innerHTML=`<div class="card">${h}</div>`;
 }
 
+/* ── JAC: criterio unico de vigencia ─────────────────────────────
+   El campo `estado` manda (viene de los portales). Si esta vacio se
+   deduce por la fecha de vencimiento. Asi el dashboard, las tarjetas
+   y los KPIs cuentan siempre lo mismo. */
+function jacEstadoPol(p){
+ var e=String((p&&p.estado)||'').trim().toLowerCase();
+ if(e==='cancelada')return 'Cancelada';
+ if(e==='vigente')return 'Vigente';
+ if(e==='vencida')return 'Vencida';
+ var f=p&&p.fechaFin;
+ if(!f)return 'Vigente';
+ var hoy=new Date();hoy.setHours(0,0,0,0);
+ return (f>=hoy.toISOString().slice(0,10))?'Vigente':'Vencida';
+}
+function jacVigentes(){return (S.polizas||[]).filter(function(p){return jacEstadoPol(p)==='Vigente';});}
+function jacVencidas(){return (S.polizas||[]).filter(function(p){return jacEstadoPol(p)==='Vencida';});}
+function jacCanceladas(){return (S.polizas||[]).filter(function(p){return jacEstadoPol(p)==='Cancelada';});}
+window.jacEstadoPol=jacEstadoPol;window.jacVigentes=jacVigentes;window.jacVencidas=jacVencidas;
+
 function calcKPIs(){
  var hoy=new Date(); hoy.setHours(0,0,0,0);
  var hoyStr=hoy.toISOString().slice(0,10);
@@ -3586,37 +3605,72 @@ function calcKPIs(){
  var comisionesMes=(S.comisiones||[]).filter(function(c){return c.mes===mesActual;});
  var comisionMesTotal=comisionesMes.reduce(function(a,c){return a+(Number(c.monto)||0);},0);
  var comisionMesPend=comisionesMes.filter(function(c){return c.estado==='pendiente';}).reduce(function(a,c){return a+(Number(c.monto)||0);},0);
- /* --- Metricas de cartera: siempre tienen valor, no dependen de que haya
-    comisiones registradas justo en el mes en curso --- */
- var _vig=(S.polizas||[]).filter(function(p){return p.estado==='Vigente';});
+ /* --- Metricas de cartera. Nunca dan cero: no dependen de que haya
+    comisiones registradas justo en el mes en curso.
+    OJO: la comision se calcula sobre PRIMA NETA (campo `prima`),
+    no sobre el total con ITBMS (campo `total`). --- */
+ var _vig=jacVigentes();
+ var _venc=jacVencidas();
+ var _canc=jacCanceladas();
  var comisionCartera=_vig.reduce(function(a,p){return a+(Number(p.comision)||0);},0);
  var saldoPorCobrar=_vig.reduce(function(a,p){return a+(Number(p.saldo)||0);},0);
- var primaCartera=_vig.reduce(function(a,p){return a+(Number(p.total)||0);},0);
+ var primaCartera=_vig.reduce(function(a,p){return a+(Number(p.prima)||0);},0);
+ var primaConItbms=_vig.reduce(function(a,p){return a+(Number(p.total)||Number(p.prima)||0);},0);
+ var primaPromedio=_vig.length?primaCartera/_vig.length:0;
+ var tasaCartera=primaCartera>0?(comisionCartera/primaCartera*100):0;
+
+ /* --- Comisiones: el libro real es S.comisiones (pendiente / cobrada) --- */
  var _12m=new Date(hoy.getTime()-365*86400000).toISOString().slice(0,7);
- var comisionAnio=(S.comisiones||[]).filter(function(c){return (c.mes||'')>=_12m;})
+ var _com=(S.comisiones||[]).filter(function(c){return c.estado!=='ajuste';});
+ var comCobradaAnio=_com.filter(function(c){return c.estado==='cobrada'&&(c.mes||'')>=_12m;})
    .reduce(function(a,c){return a+(Number(c.monto)||0);},0);
+ var comPorCobrar=_com.filter(function(c){return c.estado==='pendiente';})
+   .reduce(function(a,c){return a+(Number(c.monto)||0);},0);
+ var comPorCobrarN=_com.filter(function(c){return c.estado==='pendiente';}).length;
+ /* Ultimo corte con movimiento: asi la tarjeta nunca queda en $0 sin explicacion */
+ var _meses={};
+ _com.forEach(function(c){ if(c.mes){ _meses[c.mes]=(_meses[c.mes]||0)+(Number(c.monto)||0); } });
+ var _lista=Object.keys(_meses).filter(function(m){return m<=mesActual;}).sort();
+ var mesCorte=_lista.length?_lista[_lista.length-1]:'';
+ var comMesCorte=mesCorte?_meses[mesCorte]:0;
+ var comisionAnio=comCobradaAnio;
+
+ /* --- Calidad de datos: lo que hay que arreglar, a la vista --- */
+ var sinVencimiento=(S.polizas||[]).filter(function(p){return !p.fechaFin;}).length;
+ var vigVencidaFecha=_vig.filter(function(p){return p.fechaFin&&p.fechaFin<hoyStr;}).length;
+ var sinComision=_vig.filter(function(p){return !(Number(p.comision)>0);}).length;
  var tareasReales=(S.tareas||[]).filter(function(t){return t._autoTipo!=='comision';});
  var completadas=tareasReales.filter(function(t){return t.etapaTarea==='Hecho';}).length;
  var pendientes=tareasReales.filter(function(t){return t.etapaTarea!=='Hecho'&&t.etapaTarea!=='Cancelada'&&t.etapaTarea!=='Eliminada';}).length;
  var vencidas=tareasReales.filter(function(t){return t.fechaLimite&&t.fechaLimite<hoyStr&&t.etapaTarea!=='Hecho'&&t.etapaTarea!=='Cancelada'&&t.etapaTarea!=='Eliminada';}).length;
- var doneTareas=tareasReales.filter(function(t){return t.etapaTarea==='Hecho';});
- var tiempos=[];
- doneTareas.forEach(function(t){
-  var raw=String(t.id||'').replace(/^T/,'');
-  var ts=parseInt(raw,36);
-  if(ts && !isNaN(ts) && ts>1000000000000){
-   var dias=(Date.now()-ts)/86400000;
-   if(dias>=0 && dias<3650)tiempos.push(dias);
-  }
- });
- var tiempoResp=tiempos.length?Math.round(tiempos.reduce(function(a,b){return a+b;},0)/tiempos.length):null;
+ /* Las tareas no guardan fecha de cierre, asi que un "tiempo promedio"
+    seria inventado. En su lugar: cuanto se ha despachado y cuanto lleva
+    atrasada la mas vieja, que si sale de los datos. */
+ var _totTar=completadas+pendientes;
+ var avanceTareas=_totTar?Math.round(completadas/_totTar*100):0;
+ var _atrasos=tareasReales.filter(function(t){return t.fechaLimite&&t.fechaLimite<hoyStr&&t.etapaTarea!=='Hecho'&&t.etapaTarea!=='Cancelada'&&t.etapaTarea!=='Eliminada';})
+   .map(function(t){return Math.round((hoy-new Date(t.fechaLimite+'T00:00:00'))/86400000);});
+ var atrasoMax=_atrasos.length?Math.max.apply(null,_atrasos):0;
+ var tiempoResp=null;
  var renovacionesProx=(S.polizas||[]).filter(function(p){return p.fechaFin && p.fechaFin>=hoyStr && p.fechaFin<=en30;}).length;
  var porVencer60=(S.polizas||[]).filter(function(p){return p.fechaFin && p.fechaFin>=hoyStr && p.fechaFin<=en60;}).length;
  var clientesActivos=(S.clientes||[]).filter(function(c){return !c.estadoComercial || ['activo','ganado','vip'].indexOf(c.estadoComercial)!==-1;}).length;
  var reunRealizadas=(S.calReuniones||[]).filter(function(r){return r.fecha && r.fecha>=hace7 && r.fecha<=hoyStr;}).length;
  var llamadas=(S.tareas||[]).filter(function(t){return t.tipoAgenda==='llamada' && ((t.fechaLimite||t.fechaCreacion||'')>=hace7);}).length;
  var visitas=(S.tareas||[]).filter(function(t){return t.tipoAgenda==='visita' && ((t.fechaLimite||t.fechaCreacion||'')>=hace7);}).length;
- return {conversion:conversion,polizasMes:polizasMes,comisionMesTotal:comisionMesTotal,comisionMesPend:comisionMesPend,comisionCartera:comisionCartera,saldoPorCobrar:saldoPorCobrar,primaCartera:primaCartera,comisionAnio:comisionAnio,completadas:completadas,pendientes:pendientes,vencidas:vencidas,tiempoResp:tiempoResp,renovacionesProx:renovacionesProx,porVencer60:porVencer60,clientesActivos:clientesActivos,reunRealizadas:reunRealizadas,llamadas:llamadas,visitas:visitas};
+ return {conversion:conversion,polizasMes:polizasMes,
+  comisionMesTotal:comisionMesTotal,comisionMesPend:comisionMesPend,
+  comisionCartera:comisionCartera,saldoPorCobrar:saldoPorCobrar,
+  primaCartera:primaCartera,primaConItbms:primaConItbms,primaPromedio:primaPromedio,
+  tasaCartera:tasaCartera,comisionAnio:comisionAnio,
+  comCobradaAnio:comCobradaAnio,comPorCobrar:comPorCobrar,comPorCobrarN:comPorCobrarN,
+  mesCorte:mesCorte,comMesCorte:comMesCorte,
+  nVigentes:_vig.length,nVencidas:_venc.length,nCanceladas:_canc.length,
+  sinVencimiento:sinVencimiento,vigVencidaFecha:vigVencidaFecha,sinComision:sinComision,
+  completadas:completadas,pendientes:pendientes,vencidas:vencidas,
+  avanceTareas:avanceTareas,atrasoMax:atrasoMax,tiempoResp:tiempoResp,
+  renovacionesProx:renovacionesProx,porVencer60:porVencer60,clientesActivos:clientesActivos,
+  reunRealizadas:reunRealizadas,llamadas:llamadas,visitas:visitas};
 }
 function fmtMoneyKPI(n){
  try{return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});}catch(e){return '$'+Math.round(n);}
@@ -3632,26 +3686,59 @@ function renderKPIs(){
    h+='<div style="background:#fff;border-radius:8px;padding:10px;box-shadow:0 1px 2px rgba(0,0,0,.06)">';
    h+='<div style="font-size:10px;color:#78716C">'+it[0]+'</div>';
    h+='<div style="font-size:18px;font-weight:700;color:#1C1917">'+it[1]+'</div>';
+   if(it[2])h+='<div style="font-size:9px;color:#A8A29E;margin-top:2px">'+it[2]+'</div>';
    h+='</div>';
   });
   h+='</div></div>';
   return h;
  }
+ var MESN=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+ function mesLargo(m){ if(!m)return '—'; var a=m.split('-'); return MESN[parseInt(a[1],10)]+' '+a[0]; }
  var h='';
- h+=grp('💰 Ventas y conversion',[['Conversion prospecto→cliente',k.conversion+'%'],['Polizas vendidas (mes)',k.polizasMes],['Comisiones (mes)',fmtMoneyKPI(k.comisionMesTotal)],['Comisiones (12 meses)',fmtMoneyKPI(k.comisionAnio)]]);
- h+=grp('💼 Cartera vigente',[['Prima cartera vigente',fmtMoneyKPI(k.primaCartera)],['Comision de la cartera',fmtMoneyKPI(k.comisionCartera)],['Saldo por cobrar',fmtMoneyKPI(k.saldoPorCobrar)]]);
- h+=grp('✅ Productividad y tareas',[['Completadas',k.completadas],['Pendientes',k.pendientes],['Vencidas',k.vencidas],['Tiempo prom. (dias)',k.tiempoResp===null?'N/D':k.tiempoResp]]);
- h+=grp('📁 Cartera de clientes',[['Renovaciones (30d)',k.renovacionesProx],['Polizas por vencer (60d)',k.porVencer60],['Clientes activos',k.clientesActivos]]);
- h+=grp('📅 Actividad agenda (7 dias)',[['Reuniones',k.reunRealizadas],['Llamadas',k.llamadas],['Visitas',k.visitas]]);
+ h+=grp('💼 Cartera vigente ('+k.nVigentes+' polizas)',[
+   ['Prima neta vigente',fmtMoneyKPI(k.primaCartera),'suma de la prima sin ITBMS'],
+   ['Mi comision de cartera',fmtMoneyKPI(k.comisionCartera),k.tasaCartera.toFixed(1)+'% sobre prima neta'],
+   ['Saldo de primas por cobrar',fmtMoneyKPI(k.saldoPorCobrar),'lo que el cliente aun debe'],
+   ['Prima promedio por poliza',fmtMoneyKPI(k.primaPromedio),'']
+ ]);
+ h+=grp('💵 Comisiones',[
+   ['Comision por cobrar',fmtMoneyKPI(k.comPorCobrar),k.comPorCobrarN+' registros pendientes'],
+   ['Cobrado (ultimos 12 meses)',fmtMoneyKPI(k.comCobradaAnio),''],
+   ['Ultimo corte con movimiento',fmtMoneyKPI(k.comMesCorte),mesLargo(k.mesCorte)],
+   ['Corte del mes en curso',fmtMoneyKPI(k.comisionMesTotal),k.comisionMesTotal?'':'aun sin registrar']
+ ]);
+ h+=grp('📈 Ventas y conversion',[
+   ['Polizas emitidas (mes)',k.polizasMes,''],
+   ['Renovaciones (30d)',k.renovacionesProx,''],
+   ['Por vencer (60d)',k.porVencer60,''],
+   ['Conversion prospecto→cliente',k.conversion+'%',k.clientesActivos+' clientes activos']
+ ]);
+ h+=grp('✅ Productividad y tareas',[
+   ['Completadas',k.completadas,''],
+   ['Pendientes',k.pendientes,''],
+   ['Atrasadas',k.vencidas,k.atrasoMax?('la mas vieja: '+k.atrasoMax+' dias'):''],
+   ['Avance',k.avanceTareas+'%','']
+ ]);
+ h+=grp('📅 Actividad agenda (7 dias)',[
+   ['Reuniones',k.reunRealizadas,''],['Llamadas',k.llamadas,''],['Visitas',k.visitas,'']
+ ]);
+ var pend=[];
+ if(k.sinVencimiento)pend.push([k.sinVencimiento+' polizas sin fecha de vencimiento','⚠️','no entran en renovaciones']);
+ if(k.vigVencidaFecha)pend.push([k.vigVencidaFecha+' vigentes con fecha ya pasada','⚠️','falta cargar la renovacion']);
+ if(k.sinComision)pend.push([k.sinComision+' vigentes sin comision calculada','⚠️','revisar en Configuracion']);
+ if(pend.length)h+=grp('🔧 Pendientes por depurar',pend.map(function(x){return [x[0],x[1],x[2]];}));
  el.innerHTML=h;
 }
 function RD(){try{renderKPIs();}catch(e){}
  const ddt=document.getElementById('ddt');if(ddt)ddt.textContent='Hoy: '+fmt(TODAY.toISOString().split('T')[0]);
- const vp=S.polizas.filter(p=>dFrom(p.fechaFin)>=0&&p.estado!=='Cancelada').length;
- const vv=S.polizas.filter(p=>dFrom(p.fechaFin)<0&&p.estado!=='Cancelada'&&(p.estado||'').toLowerCase()!=='vigente').length;
- const p30=S.polizas.filter(p=>{const d=dFrom(p.fechaFin);return d>=0&&d<=30&&p.estado!=='Cancelada';}).length;
- const tP=S.polizas.reduce((s,p)=>s+(p.prima||0),0);
- const tC=S.polizas.reduce((s,p)=>s+(p.comision||0),0);
+ /* Mismo criterio que los KPIs: manda el campo estado */
+ const _polVig=jacVigentes(), _polVen=jacVencidas();
+ const vp=_polVig.length;
+ const vv=_polVen.length;
+ const p30=_polVig.filter(p=>{const d=dFrom(p.fechaFin);return d>=0&&d<=30;}).length;
+ const tP=_polVig.reduce((s,p)=>s+(Number(p.prima)||0),0);   /* prima NETA de la cartera viva */
+ const tC=_polVig.reduce((s,p)=>s+(Number(p.comision)||0),0);
+ const tSaldo=_polVig.reduce((s,p)=>s+(Number(p.saldo)||0),0);
  const cp=S.comisiones.filter(c=>c.estado==='pendiente');
  const tCom=cp.reduce((s,c)=>s+(c.monto||0),0);
  const tPend=S.tareas.filter(t=>t.etapaTarea!=='Hecho'&&t._autoTipo!=='comision').length;
@@ -3663,8 +3750,9 @@ function RD(){try{renderKPIs();}catch(e){}
  <div class="st" onclick="SH('pros')" style="cursor:pointer"><em>Prospectos</em><div class="n" style="color:#7E22CE">${prosAct}</div><div class="sv">activos</div></div>
  <div class="st" onclick="SH('pol')" style="cursor:pointer"><em>Pólizas</em><div class="n" style="color:#15803D">${S.polizas.length}</div><div class="sv">${vp} vigentes · ${vv} vencidas</div></div>
  <div class="st" onclick="SH('ren')" style="cursor:pointer"><em>Vencen en 30d</em><div class="n" style="color:#B45309">${p30}</div></div>
- <div class="st"><em>Prima Cartera</em><div class="n" style="font-size:14px">${fmtM(tP)}</div></div>
- <div class="st" onclick="SH('com')" style="cursor:pointer"><em>Por Cobrar</em><div class="n" style="color:#B45309;font-size:14px">${fmtM(tCom)}</div><div class="sv">${cp.length} pendientes</div></div>
+ <div class="st"><em>Prima Neta Vigente</em><div class="n" style="font-size:14px">${fmtM(tP)}</div><div class="sv">${vp} pólizas</div></div>
+ <div class="st"><em>Mi Comisión Cartera</em><div class="n" style="color:#15803D;font-size:14px">${fmtM(tC)}</div><div class="sv">saldo primas ${fmtM(tSaldo)}</div></div>
+ <div class="st" onclick="SH('com')" style="cursor:pointer"><em>Comisión por Cobrar</em><div class="n" style="color:#B45309;font-size:14px">${fmtM(tCom)}</div><div class="sv">${cp.length} pendientes</div></div>
  <div class="st" onclick="SH('vc')" style="cursor:pointer"><em>Venta Cruzada</em><div class="n" style="color:#EA580C">${vcOpps}</div><div class="sv">oportunidades</div></div>
  <div class="st" onclick="SH('cal');renderCal();calTab('tareas')" style="cursor:pointer"><em>Tareas Pend.</em><div class="n" style="color:#7E22CE">${tPend}</div>${(()=>{const h=TODAY.toISOString().split('T')[0];const t=(S.tareas||[]).filter(x=>x.fechaLimite===h&&x.etapaTarea!=='Hecho').length;return t?`<div class="sv" style="color:#DC2626;font-weight:700">🔴 ${t} hoy</div>`:''})()}</div>
  ${(()=>{const tot=S.clientes.length+(S.prospectos||[]).length;const rate=tot>0?Math.round(S.clientes.length/tot*100):0;return`<div class="st" onclick="SH('cli')" style="cursor:pointer"><em>Conversión</em><div class="n" style="color:#0891B2;font-size:16px">${rate}%</div><div class="sv">${S.clientes.length} clientes de ${tot}</div></div>`;})()}`;
@@ -6660,15 +6748,9 @@ function renderDashReminders(){
 function renderDashStatusCards() {
  const el = document.getElementById('dash-status-cards');
  if (!el) return;
- const vigentes = (S.polizas||[]).filter(p => {
- const d = typeof dFrom === 'function' ? dFrom(p.fechaFin) : 1;
- return d >= 0 && p.estado !== 'Cancelada';
- });
- const vencidas = (S.polizas||[]).filter(p => {
- const d = typeof dFrom === 'function' ? dFrom(p.fechaFin) : 1;
- return d < 0 && p.estado !== 'Cancelada';
- });
- const canceladas = (S.polizas||[]).filter(p => p.estado === 'Cancelada');
+ const vigentes = jacVigentes();
+ const vencidas = jacVencidas();
+ const canceladas = jacCanceladas();
  const perdidos = (S.clientes||[]).filter(c => c.estadoComercial === 'perdido');
  const vPrima = vigentes.reduce((s, p) => s + (p.prima || 0), 0);
  const vvPrima = vencidas.reduce((s, p) => s + (p.prima || 0), 0);
@@ -12001,7 +12083,7 @@ function _qSaveCal(){
  </div>
  </div>
  <div id="tar-view"></div>
-</div><div id="cal-pane-metas" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Metas Activas</div><button onclick="calAddMeta()" class="btn bsm" style="font-size:11px">+ Nueva Meta</button></div><div id="cal-metas-list"></div><div style="margin-top:20px;padding-top:14px;border-top:1px solid #E8DFD0"><div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:10px">&#127942; Logros</div><div id="cal-logros-list"></div></div></div><div id="cal-pane-diario" style="display:none;padding:14px"><div id="cal-diario-fecha" style="font-size:12px;color:#94A3B8;margin-bottom:6px;font-style:italic"></div><div id="cal-quote" style="font-size:11px;color:#78716C;margin-bottom:10px;font-style:italic;text-align:center;padding:6px;background:rgba(212,197,169,.3);border-radius:6px"></div><div style="margin-bottom:8px"><label style="font-size:11px;font-weight:600;color:#647569;display:block;margin-bottom:4px">Vincular a (opcional)</label><select id="cal-diario-cli" onchange="calDiarioToggleOtro()" style="width:100%;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><option value="">-- Sin vincular --</option><option value="otro">Otro contacto...</option></select><div id="cal-diario-otro-wrap" style="display:none;margin-top:6px"><input id="cal-diario-otro-nombre" placeholder="Nombre del contacto" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box;margin-bottom:4px"><input id="cal-diario-otro-tel" placeholder="Teléfono (para WhatsApp)" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box;margin-bottom:4px"><input id="cal-diario-otro-email" placeholder="Email" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box"></div></div><textarea id="cal-diario-txt" placeholder="Escribe una nueva anotación... (se guarda con fecha y hora, sin borrar lo anterior)" oninput="calDiarioDirty()" style="width:100%;min-height:16vh;height:16vh;border:1px solid #D4C5A9;border-radius:10px;padding:16px;font-size:16px;resize:vertical;font-family:inherit;color:#1E293B;background:#FDFCFA;line-height:1.7;box-sizing:border-box"></textarea><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><button onclick="calSaveDiario()" style="background:#1E293B;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">💾 Guardar anotación</button><span id="cal-diario-status" style="font-size:12px;color:#16A34A;opacity:0;transition:opacity .3s">Guardado ✓</span></div><div style="margin-top:18px;padding-top:14px;border-top:1px solid #E8DFD0"><div style="font-size:11px;font-weight:700;color:#78716C;margin-bottom:10px;text-transform:uppercase;letter-spacing:1.5px">📝 Anotaciones de este día</div><button id="cal-diario-hist-btn" onclick="calDiarioToggleHistorico()" style="font-size:10px;padding:3px 8px;border:1px solid #D4C5A9;border-radius:6px;background:#fff;cursor:pointer;margin-bottom:6px;color:#647569">&#128337; Ver anotaciones anteriores</button><div id="cal-diario-entries"></div></div></div><div id="cal-pane-reun" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Reuniones del Día</div><button onclick="calAddReunion()" class="btn bsm" style="font-size:11px;background:#2563EB;color:#fff;border-color:#2563EB">+ Nueva Reunión</button></div><div id="cal-reun-list"></div></div><div id="cal-pane-notas" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Notas Rápidas</div><button onclick="calAddNota()" class="btn bsm" style="font-size:11px;background:#7C3AED;color:#fff;border-color:#7C3AED">+ Nueva Nota</button></div><div id="cal-notas-list" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div></div><div id="cal-pane-alertas" style="display:none;padding:14px"><div class="ph"><div><h2 style="font-size:14px">&#128276; Alertas</h2><small id="cal-alertas-sub">Renovaciones, pagos, tareas y cumplea&ntilde;os</small></div><button onclick="jacAlertasRender()" style="border:1px solid #CBD5E1;background:#fff;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer">&#128260; Actualizar</button></div><div id="cal-alertas-body" style="margin-top:12px"></div></div><div id="cal-pane-historial" style="display:none;padding:14px"><div class="ph"><div><h2 style="font-size:14px">🕓 Historial</h2><small id="histcnt"></small></div></div><div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap"><input id="hist-q" type="text" placeholder="Buscar..." oninput="calRenderHistorial()" style="flex:2;min-width:140px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><input id="hist-desde" type="date" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><input id="hist-hasta" type="date" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><select id="hist-tipo" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><option value="">Todos</option><option value="tarea">Tareas</option><option value="reunion">Reuniones</option><option value="diario">Diario</option><option value="nota">Notas</option></select></div><div id="hist-list"></div></div></div></div></div><div id="cal-modal" onclick="if(event.target===this)calCloseModal()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.65);z-index:9999;align-items:center;justify-content:center"><div style="background:#fff;border-radius:16px;padding:24px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><div id="cal-modal-ttl" style="font-size:16px;font-weight:700;color:#1E293B"></div><button onclick="calCloseModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748B;padding:0;line-height:1">&#10005;</button></div><div id="cal-modal-body"></div><div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end"><button onclick="calCloseModal()" class="btn bsm">Cancelar</button><button onclick="calModalSave()" class="btn bsm" style="background:#2563EB;color:#fff;border-color:#2563EB">Guardar</button></div></div></div></div>
+</div><div id="cal-pane-metas" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Metas Activas</div><button onclick="calAddMeta()" class="btn bsm" style="font-size:11px">+ Nueva Meta</button></div><div id="cal-metas-list"></div><div style="margin-top:20px;padding-top:14px;border-top:1px solid #E8DFD0"><div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:10px">&#127942; Logros</div><div id="cal-logros-list"></div></div></div><div id="cal-pane-diario" style="display:none;padding:14px"><div id="cal-diario-fecha" style="font-size:12px;color:#94A3B8;margin-bottom:6px;font-style:italic"></div><div id="cal-quote" style="font-size:11px;color:#78716C;margin-bottom:10px;font-style:italic;text-align:center;padding:6px;background:rgba(212,197,169,.3);border-radius:6px"></div><div style="margin-bottom:8px"><label style="font-size:11px;font-weight:600;color:#647569;display:block;margin-bottom:4px">Vincular a (opcional)</label><select id="cal-diario-cli" onchange="calDiarioToggleOtro()" style="width:100%;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><option value="">-- Sin vincular --</option><option value="otro">Otro contacto...</option></select><div id="cal-diario-otro-wrap" style="display:none;margin-top:6px"><input id="cal-diario-otro-nombre" placeholder="Nombre del contacto" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box;margin-bottom:4px"><input id="cal-diario-otro-tel" placeholder="Teléfono (para WhatsApp)" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box;margin-bottom:4px"><input id="cal-diario-otro-email" placeholder="Email" style="width:100%;padding:6px 8px;border:1px solid #D4C5A9;border-radius:6px;font-size:12px;box-sizing:border-box"></div></div><textarea id="cal-diario-txt" placeholder="Escribe una nueva anotación... (se guarda con fecha y hora, sin borrar lo anterior)" oninput="calDiarioDirty()" style="width:100%;min-height:16vh;height:16vh;border:1px solid #D4C5A9;border-radius:10px;padding:16px;font-size:16px;resize:vertical;font-family:inherit;color:#1E293B;background:#FDFCFA;line-height:1.7;box-sizing:border-box"></textarea><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><button onclick="calSaveDiario()" style="background:#1E293B;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">💾 Guardar anotación</button><span id="cal-diario-status" style="font-size:12px;color:#16A34A;opacity:0;transition:opacity .3s">Guardado ✓</span></div><div style="margin-top:18px;padding-top:14px;border-top:1px solid #E8DFD0"><div style="font-size:11px;font-weight:700;color:#78716C;margin-bottom:10px;text-transform:uppercase;letter-spacing:1.5px">📝 Anotaciones de este día</div><button id="cal-diario-hist-btn" onclick="calDiarioToggleHistorico()" style="font-size:10px;padding:3px 8px;border:1px solid #D4C5A9;border-radius:6px;background:#fff;cursor:pointer;margin-bottom:6px;color:#647569">&#128337; Ver anotaciones anteriores</button><div id="cal-diario-entries"></div></div></div><div id="cal-pane-reun" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Reuniones del Día</div><button onclick="calAddReunion()" class="btn bsm" style="font-size:11px;background:#2563EB;color:#fff;border-color:#2563EB">+ Nueva Reunión</button></div><div id="cal-reun-list"></div></div><div id="cal-pane-notas" style="display:none;padding:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:14px;font-weight:700;color:#1E293B">Notas Rápidas</div><button onclick="calAddNota()" class="btn bsm" style="font-size:11px;background:#7C3AED;color:#fff;border-color:#7C3AED">+ Nueva Nota</button></div><div id="cal-notas-list" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div></div><div id="cal-pane-alertas" style="display:none;padding:14px"><div class="ph"><div><h2 style="font-size:14px">&#128276; Alertas</h2><small id="cal-alertas-sub">Renovaciones, pagos, tareas y cumplea&ntilde;os</small></div><button id="cal-alertas-btn" onclick="jacAlertasActualizar(this)" style="border:1px solid #CBD5E1;background:#fff;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer">&#128260; Actualizar</button></div><div id="cal-alertas-body" style="margin-top:12px"></div></div><div id="cal-pane-historial" style="display:none;padding:14px"><div class="ph"><div><h2 style="font-size:14px">🕓 Historial</h2><small id="histcnt"></small></div></div><div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap"><input id="hist-q" type="text" placeholder="Buscar..." oninput="calRenderHistorial()" style="flex:2;min-width:140px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><input id="hist-desde" type="date" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><input id="hist-hasta" type="date" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><select id="hist-tipo" onchange="calRenderHistorial()" style="flex:1;min-width:120px;padding:8px 10px;border:1px solid #D4C5A9;border-radius:8px;font-size:13px;box-sizing:border-box"><option value="">Todos</option><option value="tarea">Tareas</option><option value="reunion">Reuniones</option><option value="diario">Diario</option><option value="nota">Notas</option></select></div><div id="hist-list"></div></div></div></div></div><div id="cal-modal" onclick="if(event.target===this)calCloseModal()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.65);z-index:9999;align-items:center;justify-content:center"><div style="background:#fff;border-radius:16px;padding:24px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><div id="cal-modal-ttl" style="font-size:16px;font-weight:700;color:#1E293B"></div><button onclick="calCloseModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748B;padding:0;line-height:1">&#10005;</button></div><div id="cal-modal-body"></div><div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end"><button onclick="calCloseModal()" class="btn bsm">Cancelar</button><button onclick="calModalSave()" class="btn bsm" style="background:#2563EB;color:#fff;border-color:#2563EB">Guardar</button></div></div></div></div>
 <div id="pg-com" class="pg">
 <h1 style="font-size:20px;font-weight:700;color:#1E293B;margin:0 0 20px">Comisiones</h1>
 <div id="com-kpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px"></div>
@@ -14999,7 +15081,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-19-E';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-19-F';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15037,7 +15119,7 @@ document.addEventListener('click', function(e){
       for(var i=0;i<pgs.length;i++){ if(pgs[i].classList.contains('on')){ abierta=pgs[i].id; break; } }
       var mapa={'pg-pol':'RP','pg-cli':'RC','pg-pros':'RPros','pg-ren':'RRen','pg-pag':'RPag',
                 'pg-com':'RCom','pg-sin':'RSin','pg-veh':'RV','pg-emp':'REmp','pg-vc':'RVC',
-                'pg-pipe':'RPipe','pg-port':'RPort','pg-tar':'RTar'};
+                'pg-pipe':'RPipe','pg-port':'RPort','pg-tar':'RTar','pg-dash':'RD'};
       if(abierta && mapa[abierta] && typeof window[mapa[abierta]]==='function') window[mapa[abierta]]();
       if(abierta==='pg-cal' && typeof renderCal==='function') renderCal();
     }catch(e){}
@@ -15062,13 +15144,152 @@ document.addEventListener('click', function(e){
   setTimeout(envolverSincronizar, 2000);
   setTimeout(envolverSincronizar, 8000);
 
-  /* Repintado periodico suave, solo si no hay un formulario abierto */
+  /* Repintado inmediato cuando TU guardas algo: los KPIs se mueven
+     en el momento, no en el proximo ciclo. */
+  var _repDeb=null;
+  function repintarPronto(){
+    if(_repDeb) clearTimeout(_repDeb);
+    _repDeb=setTimeout(function(){
+      var m=document.querySelectorAll('.mo');
+      for(var i=0;i<m.length;i++){ if(m[i].offsetParent!==null && m[i].offsetHeight>80) return; }
+      repintar();
+    },400);
+  }
+  window.jacRepintarPronto=repintarPronto;
+
+  /* Boton "Actualizar" de Alertas: antes solo repintaba lo que ya estaba
+     en memoria, asi que parecia muerto. Ahora baja de la nube primero. */
+  window.jacAlertasActualizar=async function(btn){
+    var txt = btn ? btn.innerHTML : null;
+    if(btn){ btn.disabled=true; btn.innerHTML='\u23F3 Actualizando...'; }
+    try{
+      if(typeof window.jacVolcar==='function') await window.jacVolcar();
+      if(typeof window.sincronizar==='function') await window.sincronizar();
+    }catch(e){}
+    try{ if(typeof window.jacAlertasRender==='function') window.jacAlertasRender(); }catch(e){}
+    try{ if(typeof window.jacAlertasBadge==='function') window.jacAlertasBadge(); }catch(e){}
+    try{ repintar(); }catch(e){}
+    if(btn){ btn.disabled=false; btn.innerHTML = txt || '\uD83D\uDD04 Actualizar'; }
+  };
+
+  function envolverSave(){
+    if(typeof window.save!=='function' || window.__jacSaveRepinta) return;
+    window.__jacSaveRepinta=true;
+    var _sv=window.save;
+    window.save=function(){
+      var r=_sv.apply(this,arguments);
+      try{ repintarPronto(); }catch(e){}
+      return r;
+    };
+  }
+  setTimeout(envolverSave, 2500);
+  setTimeout(envolverSave, 9000);
+
+  /* Repintado periodico, solo si no hay un formulario abierto */
   setInterval(function(){
     if(document.visibilityState!=='visible') return;
     var m=document.querySelectorAll('.mo');
     for(var i=0;i<m.length;i++){ if(m[i].offsetParent!==null && m[i].offsetHeight>80) return; }
     repintar();
-  }, 120000);
+  }, 30000);
+
+  /* Al volver a la pestana, refrescar de una vez */
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='visible') setTimeout(repintar, 800);
+  });
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Guardián de la sesión de nube
+   Problema que resuelve: el CRM tiene DOS candados. Uno propio
+   (jac_s) que abre la pantalla, y la sesión de Supabase que
+   permite leer y escribir en la base. Cuando la de Supabase
+   caduca, el CRM se sigue viendo perfecto — pero cada subida
+   se cae en silencio y los otros equipos nunca ven los cambios.
+   A partir de aquí eso se avisa a gritos y se puede reconectar
+   sin salir de la pantalla.
+   ============================================================ */
+(function(){
+  'use strict';
+  var revisando=false;
+
+  function barra(hay){
+    var el=document.getElementById('jac-barra-sesion');
+    if(hay){ if(el) el.remove(); document.body.style.paddingTop=''; return; }
+    if(el) return;
+    el=document.createElement('div');
+    el.id='jac-barra-sesion';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483600;background:#B91C1C;color:#fff;'
+      +'padding:10px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:12px;'
+      +'justify-content:center;flex-wrap:wrap;box-shadow:0 3px 12px rgba(0,0,0,.35)';
+    el.innerHTML='<span>\u26A0\uFE0F Sin sesi\u00f3n de nube: lo que cambies se guarda <u>solo en esta computadora</u> '
+      +'y no llega a tus otros equipos.</span>'
+      +'<button id="jac-btn-reconectar" style="background:#fff;color:#B91C1C;border:0;border-radius:8px;'
+      +'padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer">Reconectar</button>';
+    document.body.appendChild(el);
+    var b=document.getElementById('jac-btn-reconectar');
+    if(b) b.onclick=function(){ reconectar(b); };
+  }
+
+  async function haySesion(){
+    try{
+      if(!window.db || window.db.__esStub || !window.db.auth) return false;
+      var r=await window.db.auth.getSession();
+      return !!(r && r.data && r.data.session);
+    }catch(e){ return false; }
+  }
+
+  async function revisar(){
+    if(revisando) return;
+    revisando=true;
+    try{
+      var ok=await haySesion();
+      if(!ok){
+        /* Antes de alarmar, intentar renovar el token en silencio */
+        try{ var r=await window.db.auth.refreshSession(); ok=!!(r && r.data && r.data.session); }catch(e){}
+      }
+      window.__jacSinNube = !ok;
+      barra(ok);
+    }catch(e){}
+    revisando=false;
+  }
+
+  async function reconectar(btn){
+    if(btn){ btn.disabled=true; btn.textContent='Conectando...'; }
+    try{ var r=await window.db.auth.refreshSession(); if(r && r.data && r.data.session){ await revisar(); if(typeof window.sincronizar==='function') await window.sincronizar(); if(btn){btn.disabled=false;btn.textContent='Reconectar';} return; } }catch(e){}
+    /* No se pudo renovar: hay que volver a entrar con correo y clave.
+       Se cierra el candado propio del CRM, NUNCA se toca jacv10. */
+    try{ sessionStorage.removeItem('jac_s'); localStorage.removeItem('jac_s_ts'); }catch(e){}
+    location.reload();
+  }
+  window.jacReconectarNube=reconectar;
+
+  /* volcar() sin sesión no sube nada; que no finja que sí */
+  function blindarVolcar(){
+    if(typeof window.jacVolcar!=='function' || window.__jacVolcarBlindado) return;
+    window.__jacVolcarBlindado=true;
+    var _v=window.jacVolcar;
+    window.jacVolcar=async function(){
+      if(!(await haySesion())){ window.__jacSinNube=true; barra(false); return {ok:false,motivo:'sin sesion de nube'}; }
+      return await _v.apply(this, arguments);
+    };
+  }
+  setTimeout(blindarVolcar, 3000);
+  setTimeout(blindarVolcar, 10000);
+
+  setTimeout(revisar, 4000);
+  setInterval(revisar, 60000);
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='visible') setTimeout(revisar, 1200);
+  });
+
+  window.jacEstadoSesion=async function(){
+    return { sesionNube: await haySesion(), avisoVisible: !!document.getElementById('jac-barra-sesion'),
+             realtime: window.__jacRealtime||'sin conectar', enLinea: navigator.onLine };
+  };
 })();
 </script>
 
