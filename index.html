@@ -15087,7 +15087,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-20-Q';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-20-S';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15712,13 +15712,40 @@ document.addEventListener('click', function(e){
   function hoy(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
   function num(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
 
+  /* Quita el sufijo de renovación del final: 030-012-000019229-3 → 030012000019229.
+     Se exige base de 8+ para no destrozar números cortos como 1-9-9640. */
+  function base(s){
+    var b=norm(String(s||'').replace(/-\d{1,6}$/,''));
+    return b.length>=8 ? b : null;
+  }
+
   function indice(){
     var ix={};
     (S.polizas||[]).forEach(function(p){
       var n=norm(p.num); if(!n) return;
       (ix[n]=ix[n]||[]).push(p);
+      /* Segunda entrada por número base: en el CRM muchas pólizas de
+         Capital Care llevan el ciclo pegado al final (…-3, …-000000) y
+         el reporte trae el número pelado. Sin esto no casaban y se
+         quedaban en Vencida. */
+      var b=base(p.num);
+      if(b && b!==n){ (ix['~'+b]=ix['~'+b]||[]).push(p); }
     });
     return ix;
+  }
+
+  /* Busca primero por número exacto; si no hay, por número base */
+  function buscar(ix, numPol){
+    var m=ix[norm(numPol)];
+    if(m && m.length) return m;
+    var b=base(numPol);
+    if(b){
+      var m2=ix['~'+b];
+      if(m2 && m2.length) return m2;
+      var m3=ix[b];
+      if(m3 && m3.length) return m3;
+    }
+    return null;
   }
 
   /* Regla que ella fijó: TODO lo que aparece en un reporte de la
@@ -15751,7 +15778,7 @@ document.addEventListener('click', function(e){
       var numPol=f[0], desde=f[1], hasta=f[2], primaN=f[3], total=f[4], pagado=f[5],
           saldo=f[6], pct=f[7], comEst=f[8], comp=f[9], ramo=f[10], sub=f[11],
           lider=f[12], forma=f[13], letras=f[14], tipoPago=f[15];
-      var m = ix[norm(numPol)];
+      var m = buscar(ix, numPol);
       if(!m){ r.capitalCare.sinRegistro.push(numPol); return; }
       m.forEach(function(p){
         var c=[];
@@ -15804,7 +15831,7 @@ document.addEventListener('click', function(e){
     /* ---------- 2. Portal ASSA (Vida y Salud) ---------- */
     ASSA.forEach(function(f){
       var numPol=f[0], primaA=f[1], pct=f[2], saldo=f[3], desde=f[4], hasta=f[5];
-      var m = ix[norm(numPol)];
+      var m = buscar(ix, numPol);
       if(!m){ r.assa.sinRegistro.push(numPol); return; }
       m.forEach(function(p){
         var c=[];
@@ -16077,15 +16104,38 @@ document.addEventListener('click', function(e){
     (q.data||[]).forEach(function(f){ cosechar(f.valor, f.clave, grupos); });
     r.fuentes=grupos.map(function(g){ return {origen:g.origen, filas:g.filas.length}; });
 
+    /* Mismo cruce doble que en el importador de reportes: por número
+       exacto y por número base sin el sufijo del ciclo. Sin esto, las
+       pólizas que en el CRM llevan el ciclo pegado (…-3, …-000000) no
+       casaban con el archivo y se quedaban sin actualizar. */
+    function base(x){
+      var b=norm(String(x||'').replace(/-\d{1,6}$/,''));
+      return b.length>=8 ? b : null;
+    }
     var ix={};
-    (S.polizas||[]).forEach(function(p){ var n=norm(p.num); if(n)(ix[n]=ix[n]||[]).push(p); });
+    (S.polizas||[]).forEach(function(p){
+      var n=norm(p.num); if(!n) return;
+      (ix[n]=ix[n]||[]).push(p);
+      var b=base(p.num);
+      if(b && b!==n){ (ix['~'+b]=ix['~'+b]||[]).push(p); }
+    });
+    function buscar(numPol){
+      var m=ix[norm(numPol)];
+      if(m && m.length) return m;
+      var b=base(numPol);
+      if(b){
+        var m2=ix['~'+b]; if(m2 && m2.length) return m2;
+        var m3=ix[b];     if(m3 && m3.length) return m3;
+      }
+      return null;
+    }
 
     grupos.forEach(function(g){
       g.filas.forEach(function(f){
         r.leidas++;
         var np=norm(campo(f,NUM));
         if(!np) return;
-        var m=ix[np];
+        var m=buscar(campo(f,NUM));
         if(!m){ if(r.sinRegistro.length<40) r.sinRegistro.push({origen:g.origen, num:String(campo(f,NUM))}); return; }
         var ini=fecha(campo(f,INI)), fin=fecha(campo(f,FIN));
         var prima=num(campo(f,PRIMA)), com=num(campo(f,COM)), pct=num(campo(f,PCT)), vidas=num(campo(f,VIDAS));
