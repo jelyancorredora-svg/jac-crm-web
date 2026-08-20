@@ -15087,7 +15087,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-20-O';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-20-Q';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15721,9 +15721,14 @@ document.addEventListener('click', function(e){
     return ix;
   }
 
+  /* Regla que ella fijó: TODO lo que aparece en un reporte de la
+     aseguradora está activo hoy. Los reportes suelen ir un ciclo
+     atrasados, así que la fecha del papel no sirve para decidir el
+     estado — la presencia en el reporte sí. Solo se respetan
+     Renovada (ya tiene su ciclo nuevo cargado) y Cancelada. */
   function estadoPorFecha(p, fin){
     if(p.estado==='Renovada'||p.estado==='Cancelada') return p.estado;
-    return (fin && fin>=hoy()) ? 'Vigente' : 'Vencida';
+    return 'Vigente';
   }
 
   function recalcularComision(p){
@@ -16106,10 +16111,10 @@ document.addEventListener('click', function(e){
           if(nueva>0 && Math.abs(num(p.comision)-nueva)>0.02){ c.push('comisión '+(p.comision||0)+'→'+nueva); p.comision=nueva; }
           if(p.comision===undefined || p.comision===null) p.comision=0;   /* nunca undefined */
           if(vidas>0){ p.extra=p.extra||{}; p.extra.vidas=vidas; }
-          /* Estado por la fecha, respetando Renovada y Cancelada */
-          if(p.estado!=='Renovada' && p.estado!=='Cancelada'){
-            var e=(p.fechaFin && p.fechaFin>=hoy())?'Vigente':'Vencida';
-            if(p.estado!==e){ c.push('estado '+(p.estado||'—')+'→'+e); p.estado=e; }
+          /* Si sale en el archivo del portal, está activa. El estado no
+             se decide por la fecha del papel, que va un ciclo atrás. */
+          if(p.estado!=='Renovada' && p.estado!=='Cancelada' && p.estado!=='Vigente'){
+            c.push('estado '+(p.estado||'—')+'→Vigente'); p.estado='Vigente';
           }
           p.extra=p.extra||{};
           p.extra.portal={origen:g.origen, corte:hoy()};
@@ -16503,6 +16508,140 @@ document.addEventListener('click', function(e){
     try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
     return r;
   };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Dos arreglos del formulario de póliza
+   ------------------------------------------------------------
+   1. "Etapa gestión: Cancelada" no cancelaba la póliza.
+      Estado y Etapa son dos campos distintos y nadie los ataba,
+      así que la póliza seguía contando como Vencida. Ahora al
+      poner la etapa en Cancelada el Estado se pone en Cancelada
+      solo, en el momento, y se registra la fecha de cancelación.
+      Igual con Renovada.
+
+   2. El co-corretaje no se guardaba.
+      Guardar solo escribía la agencia si la casilla "Activar
+      co-corretaje" estaba marcada. Al elegir la agencia en la
+      lista sin marcar la casilla —o al destildarla sin querer al
+      pulsar el título— se guardaba en blanco. Ahora basta con
+      elegir la agencia: la casilla se marca sola y el porcentaje
+      del socio se rellena con lo que tengas en Configuración.
+
+   Va envuelto sobre SP() en vez de tocarlo por dentro: se
+   corrigen los campos del formulario y después corre el guardado
+   de siempre, que ya lee de ahí.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function $(id){ return document.getElementById(id); }
+  function val(id){ var e=$(id); return e?String(e.value||'').trim():''; }
+
+  /* Parte que le toca al socio, según Configuración */
+  function parteSocio(agencia){
+    try{
+      var cc=(S.comisCfg&&S.comisCfg.cocor)||{};
+      if(cc[agencia] && parseFloat(cc[agencia].part)>0) return parseFloat(cc[agencia].part);
+    }catch(e){}
+    return 0;
+  }
+
+  /* --- 1. Etapa manda sobre Estado en los casos que no admiten duda --- */
+  function alinearEstado(){
+    var et=$('p-et'), es=$('p-es');
+    if(!et||!es) return;
+    var etapa=String(et.value||'').trim();
+    if(etapa==='Cancelada' && es.value!=='Cancelada'){
+      es.value='Cancelada';
+      var fc=$('p-fca');
+      if(fc && !fc.value) fc.value=new Date().toISOString().slice(0,10);
+      try{ toast('Estado puesto en Cancelada'); }catch(e){}
+    } else if(etapa==='Renovada' && es.value!=='Renovada' && es.value!=='Cancelada'){
+      es.value='Renovada';
+    }
+  }
+
+  /* --- 2. Elegir agencia = activar co-corretaje --- */
+  function alinearCoCor(){
+    var sel=$('p-cc'), chk=$('p-hc'), cp=$('p-cp');
+    if(!sel||!chk) return;
+    var agencia=String(sel.value||'').trim();
+    if(agencia){
+      if(!chk.checked){
+        chk.checked=true;
+        try{ if(typeof TC==='function') TC(); }catch(e){}
+      }
+      /* si no hay porcentaje del socio, se toma el de Configuración */
+      if(cp && !(parseFloat(cp.value)>0)){
+        var p=parteSocio(agencia);
+        if(p>0){ cp.value=p; try{ if(typeof CT==='function') CT(); }catch(e){} }
+      }
+    }
+  }
+
+  /* Se enganchan los cambios del formulario en cuanto exista */
+  function enganchar(){
+    var et=$('p-et'), sel=$('p-cc');
+    if(et && !et.__jacEtapa){
+      et.__jacEtapa=1;
+      et.addEventListener('change', alinearEstado);
+    }
+    if(sel && !sel.__jacCoCor){
+      sel.__jacCoCor=1;
+      sel.addEventListener('change', function(){
+        alinearCoCor();
+        try{ if(typeof CT==='function') CT(); }catch(e){}
+      });
+    }
+  }
+  setInterval(enganchar, 1500);
+  setTimeout(enganchar, 800);
+
+  /* --- Envoltura del guardado --- */
+  function envolver(){
+    if(typeof window.SP!=='function' || window.__jacSPArreglado) return;
+    window.__jacSPArreglado=true;
+    var _sp=window.SP;
+    window.SP=function(){
+      try{ alinearEstado(); }catch(e){}
+      try{ alinearCoCor(); }catch(e){}
+      var r=_sp.apply(this, arguments);
+      /* Red de seguridad: si a pesar de todo el registro quedó sin la
+         agencia o sin el estado correcto, se corrige sobre el dato. */
+      try{
+        if(typeof EID!=='undefined' && EID){
+          var p=(S.polizas||[]).filter(function(x){return x.id===EID;})[0];
+          if(p){
+            var agencia=val('p-cc');
+            if(agencia && p.coCor!==agencia){
+              p.coCor=agencia;
+              var cp=parseFloat(val('p-cp'))||parteSocio(agencia);
+              if(cp>0){
+                p.coCorPart=cp;
+                p.participacion=+(100-cp).toFixed(2);
+                var base=(Number(p.prima)||0)*(Number(p.comPct)||0)/100;
+                p.comision=+(base*p.participacion/100).toFixed(2);
+                p.coCorCom=+(base*cp/100).toFixed(2);
+              }
+            }
+            if(val('p-et')==='Cancelada' && p.estado!=='Cancelada'){
+              p.estado='Cancelada';
+              if(!p.fechaCancelada) p.fechaCancelada=new Date().toISOString().slice(0,10);
+            }
+            if(typeof save==='function') save();
+            try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+          }
+        }
+      }catch(e){}
+      return r;
+    };
+  }
+  setTimeout(envolver, 1200);
+  setTimeout(envolver, 5000);
 })();
 </script>
 
