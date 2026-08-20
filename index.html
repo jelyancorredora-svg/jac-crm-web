@@ -15087,7 +15087,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-20-S';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-20-T';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15888,6 +15888,7 @@ document.addEventListener('click', function(e){
       +'<button id="jac-btn-portales"  style="'+bs+';background:#7C3AED">UniVivir, iSeguros y BlueCross</button>'
       +'<button id="jac-btn-auditar"   style="'+bs+';background:#B45309">Auditar y corregir</button>'
       +'<button id="jac-btn-completar" style="'+bs+';background:#0891B2">Completar faltantes</button>'
+      +'<button id="jac-btn-verarch"   style="'+bs+';background:#64748B">Ver qu\u00e9 hay archivado</button>'
       +'<div id="jac-res-reportes" style="margin-top:10px;font-size:12px;color:#334155;line-height:1.7"></div>'
       +'<div style="margin-top:14px;padding-top:12px;border-top:1px solid #E8DFD0;font-size:12px;color:#64748B">'
       +'<b>Versi\u00f3n instalada:</b> <span id="jac-ver-corre">\u2026</span>'
@@ -15980,6 +15981,31 @@ document.addEventListener('click', function(e){
     document.getElementById('jac-btn-completar').onclick=async function(){
       var r=await correr(this,'', function(){ return window.jacCompletarFaltantes(); });
       pinta(resumenCompletar(r)); window.__jacUltimo=r;
+    };
+
+    document.getElementById('jac-btn-verarch').onclick=async function(){
+      var r=await correr(this,'', function(){ return window.jacVerArchivo(); });
+      window.__jacArchivo=r;
+      if(r.error){ pinta('<span style="color:#B91C1C">'+r.error+'</span>'); return; }
+      var h='<b>Lo que hay archivado en la base:</b><br>';
+      Object.keys(r).forEach(function(k){
+        if(k.indexOf('__')===0) return;
+        var g=r[k].grupos||[];
+        h+='<div style="margin:6px 0"><b>'+k+'</b> \u2014 '+g.length+' bloque(s)';
+        g.forEach(function(x){
+          h+='<div style="margin-left:14px">\u00b7 <i>'+x.origen+'</i>: <b>'+x.filas+'</b> filas'
+            +'<br><span style="color:#64748B;font-size:11px">campos: '+x.campos.join(', ')+'</span>'
+            +'<br><span style="font-size:11px">reconoce \u2192 n\u00famero: <b>'+(x.leido.numero||'\u2014')+'</b>'
+            +' \u00b7 inicio: <b>'+(x.leido.inicio||'\u2014')+'</b>'
+            +' \u00b7 fin: <b>'+(x.leido.fin||'\u2014')+'</b>'
+            +' \u00b7 prima: <b>'+(x.leido.prima||'\u2014')+'</b>'
+            +' \u00b7 comisi\u00f3n: <b>'+(x.leido.comision||'\u2014')+'</b></span></div>';
+        });
+        h+='</div>';
+      });
+      if((r.__clavesQueNoEstan||[]).length) h+='<span style="color:#B45309">No existen en la base: '+r.__clavesQueNoEstan.join(', ')+'</span>';
+      h+='<div style="margin-top:8px;font-size:11px;color:#64748B">El detalle completo queda en <code>window.__jacArchivo</code>.</div>';
+      pinta(h);
     };
 
     document.getElementById('jac-btn-todo').onclick=async function(){
@@ -16088,6 +16114,42 @@ document.addEventListener('click', function(e){
       cosechar(raiz[k], etiqueta+'.'+k, salida);
     });
   }
+
+  /* --- Diagnostico: que hay realmente archivado en crm_meta ---
+     Sirve para ver, sin adivinar, con que nombres vienen los campos
+     de UniVivir, iSeguros y BlueCross. Si el lector no reconoce
+     alguno, aqui se ve y se ajusta en una sola vuelta. */
+  window.jacVerArchivo = async function(){
+    if(!window.db || window.db.__esStub) return {error:'sin conexion a la base'};
+    var ses=await window.db.auth.getSession();
+    if(!(ses&&ses.data&&ses.data.session)) return {error:'sin sesion de nube'};
+    var claves=['univivir','iseguros_polizas','iseguros_comisiones','bluecross_asegurados','portales_archivo'];
+    var q=await window.db.from('crm_meta').select('clave,valor').in('clave',claves);
+    if(q.error) return {error:q.error.message};
+    var out={};
+    (q.data||[]).forEach(function(f){
+      var g=[]; cosechar(f.valor, f.clave, g);
+      out[f.clave]={
+        grupos:g.map(function(x){
+          var m=x.filas[0]||{};
+          return {
+            origen:x.origen,
+            filas:x.filas.length,
+            campos:Object.keys(m),
+            ejemplo:m,
+            leido:{
+              numero:campo(m,NUM), inicio:campo(m,INI), fin:campo(m,FIN),
+              prima:campo(m,PRIMA), comision:campo(m,COM), pct:campo(m,PCT), vidas:campo(m,VIDAS)
+            }
+          };
+        })
+      };
+    });
+    out.__clavesQueNoEstan=claves.filter(function(k){
+      return !(q.data||[]).some(function(f){return f.clave===k;});
+    });
+    return out;
+  };
 
   window.jacAplicarPortales = async function(opts){
     opts=opts||{};
