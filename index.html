@@ -15087,7 +15087,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-20-M';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-20-O';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15855,8 +15855,40 @@ document.addEventListener('click', function(e){
       +'<button id="jac-btn-reportes"  style="'+bs+';background:#1E3A8A">Capital Care y ASSA</button>'
       +'<button id="jac-btn-portales"  style="'+bs+';background:#7C3AED">UniVivir, iSeguros y BlueCross</button>'
       +'<button id="jac-btn-auditar"   style="'+bs+';background:#B45309">Auditar y corregir</button>'
-      +'<div id="jac-res-reportes" style="margin-top:10px;font-size:12px;color:#334155;line-height:1.7"></div></div>';
+      +'<button id="jac-btn-completar" style="'+bs+';background:#0891B2">Completar faltantes</button>'
+      +'<div id="jac-res-reportes" style="margin-top:10px;font-size:12px;color:#334155;line-height:1.7"></div>'
+      +'<div style="margin-top:14px;padding-top:12px;border-top:1px solid #E8DFD0;font-size:12px;color:#64748B">'
+      +'<b>Versi\u00f3n instalada:</b> <span id="jac-ver-corre">\u2026</span>'
+      +' &nbsp;\u00b7&nbsp; <b>Publicada en GitHub:</b> <span id="jac-ver-pub">\u2026</span>'
+      +' &nbsp; <button id="jac-btn-ver" style="padding:4px 10px;border-radius:6px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:11px">Revisar</button>'
+      +'<div id="jac-ver-msg" style="margin-top:6px"></div></div></div>';
     cont.appendChild(d);
+
+    /* --- Qu\u00e9 versi\u00f3n est\u00e1 corriendo y cu\u00e1l est\u00e1 publicada ---
+       Resuelve el "ya sub\u00ed el archivo y no veo los cambios": aqu\u00ed se ve
+       si el navegador se qued\u00f3 con la copia vieja. */
+    async function revisarVersion(){
+      var corre=window.JAC_BUILD||'desconocida';
+      document.getElementById('jac-ver-corre').textContent=corre;
+      var pub='no se pudo leer', msg='';
+      try{
+        var t=await fetch('/index.html?_='+Date.now(),{cache:'no-store'}).then(function(r){return r.text();});
+        var m=t.match(/JAC-BUILD-[0-9A-Za-z-]+/);
+        pub=m?m[0]:'sin marca';
+        if(m && m[0]!==corre){
+          msg='<span style="color:#B45309;font-weight:700">Hay una versi\u00f3n m\u00e1s nueva publicada. '
+             +'<a href="#" id="jac-recargar" style="color:#1E3A8A">Recargar ahora</a></span>';
+        } else if(m){
+          msg='<span style="color:#15803D;font-weight:700">\u2713 Est\u00e1s en la \u00faltima versi\u00f3n</span>';
+        }
+      }catch(e){ msg='<span style="color:#B91C1C">No se pudo consultar GitHub</span>'; }
+      document.getElementById('jac-ver-pub').textContent=pub;
+      document.getElementById('jac-ver-msg').innerHTML=msg;
+      var a=document.getElementById('jac-recargar');
+      if(a) a.onclick=function(ev){ ev.preventDefault(); location.replace(location.pathname+'?v='+Date.now()); };
+    }
+    document.getElementById('jac-btn-ver').onclick=revisarVersion;
+    setTimeout(revisarVersion, 400);
 
     function pinta(html){ document.getElementById('jac-res-reportes').innerHTML=html; }
     function dinero(n){ return '$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -15875,7 +15907,8 @@ document.addEventListener('click', function(e){
       var a=r.arreglado, v=r.revisar, c=r.cartera;
       return 'Auditor\u00eda \u2014 arreglado: compa\u00f1\u00eda <b>'+a.aseguradora+'</b>, ramo <b>'+a.ramo+'</b>,'
         +' participaci\u00f3n <b>'+a.participacion+'</b>, %com <b>'+a.comPct+'</b>, comisi\u00f3n <b>'+a.comision+'</b>,'
-        +' estado <b>'+a.estado+'</b>, vendedor <b>'+a.vendedor+'</b><br>'
+        +' estado <b>'+a.estado+'</b>, vendedor <b>'+a.vendedor+'</b>,'
+        +' libro de comisiones <b>'+(a.comisionesLibro||0)+'</b><br>'
         +'Por revisar: sin n\u00famero <b>'+v.sinNumero+'</b> \u00b7 sin fecha <b>'+v.sinFecha+'</b>'
         +' \u00b7 sin prima <b>'+v.sinPrima+'</b> \u00b7 vigentes con fecha pasada <b>'+v.vigentesConFechaPasada+'</b>'
         +' \u00b7 clientes repetidos <b>'+v.clientesDuplicados+'</b> \u00b7 p\u00f3lizas repetidas <b>'+v.polizasDuplicadas+'</b><br>'
@@ -15903,17 +15936,33 @@ document.addEventListener('click', function(e){
       var r=await correr(this,'', function(){ return window.jacAuditar(); });
       pinta(resumenAuditoria(r)); window.__jacUltimo=r;
     };
+    function resumenCompletar(r){
+      return 'Completar \u2014 vencimiento calculado <b>'+r.vencimientoCalculado+'</b>'
+        +' \u00b7 renovaci\u00f3n adelantada <b>'+r.renovacionAdelantada+'</b>'
+        +' \u00b7 comisi\u00f3n calculada <b>'+r.comisionCalculada+'</b>'
+        +' \u00b7 %com preparado <b>'+r.porcentajePuesto+'</b><br>'
+        +'Todav\u00eda sin resolver: sin fecha <b>'+r.aunSinFecha+'</b>'
+        +' \u00b7 vigentes con fecha pasada <b>'+r.aunVigenteVencida+'</b>'
+        +' \u00b7 sin comisi\u00f3n <b>'+r.aunSinComision+'</b>';
+    }
+    document.getElementById('jac-btn-completar').onclick=async function(){
+      var r=await correr(this,'', function(){ return window.jacCompletarFaltantes(); });
+      pinta(resumenCompletar(r)); window.__jacUltimo=r;
+    };
+
     document.getElementById('jac-btn-todo').onclick=async function(){
       var b=this, t=b.textContent; b.disabled=true;
       b.textContent='1/3 reportes\u2026'; pinta('Aplicando Capital Care y ASSA\u2026');
       var r1=await window.jacActualizarDesdeReportes({soloProbar:true});
       b.textContent='2/3 portales\u2026'; pinta(resumenReportes(r1)+'<br>Aplicando los portales\u2026');
       var r2=await window.jacAplicarPortales({soloProbar:true});
-      b.textContent='3/3 auditor\u00eda\u2026'; pinta(resumenReportes(r1)+'<br>'+resumenPortales(r2)+'<br>Auditando\u2026');
-      var r3=await window.jacAuditar();
+      b.textContent='3/4 auditor\u00eda\u2026'; pinta(resumenReportes(r1)+'<br>'+resumenPortales(r2)+'<br>Auditando\u2026');
+      var r3=await window.jacAuditar({soloProbar:true});
+      b.textContent='4/4 completando\u2026'; pinta(resumenReportes(r1)+'<br>'+resumenPortales(r2)+'<br>'+resumenAuditoria(r3)+'<br>Completando faltantes\u2026');
+      var r4=await window.jacCompletarFaltantes();
       b.disabled=false; b.textContent=t;
-      pinta(resumenReportes(r1)+'<br>'+resumenPortales(r2)+'<br>'+resumenAuditoria(r3));
-      window.__jacUltimo={reportes:r1, portales:r2, auditoria:r3};
+      pinta(resumenReportes(r1)+'<br>'+resumenPortales(r2)+'<br>'+resumenAuditoria(r3)+'<br>'+resumenCompletar(r4));
+      window.__jacUltimo={reportes:r1, portales:r2, auditoria:r3, completar:r4};
     };
   }
   setTimeout(ponerBoton, 4000);
@@ -16152,7 +16201,7 @@ document.addEventListener('click', function(e){
   window.jacAuditar = async function(opts){
     opts=opts||{};
     var P=S.polizas||[], C=S.clientes||[];
-    var arr = { aseguradora:0, ramo:0, participacion:0, comPct:0, comision:0, estado:0, coCor:0, vendedor:0 };
+    var arr = { aseguradora:0, ramo:0, participacion:0, comPct:0, comision:0, estado:0, coCor:0, vendedor:0, comisionesLibro:0 };
     var rep = { sinNumero:[], sinFecha:[], sinPrima:[], vigenteVencida:[], clientesDuplicados:[], polizasDuplicadas:[], ramoDesconocido:{} };
     var det = [];
 
@@ -16225,6 +16274,36 @@ document.addEventListener('click', function(e){
       if(c.length && det.length<50) det.push({num:p.num||'(sin número)', cli:(p.nombreCliente||'').slice(0,20), c:c});
     });
 
+    /* 9. Libro de comisiones: las filas que siguen cargando la CUOTA DE PRIMA
+       en vez de la comisión. Se reconocen porque no tienen la marca `rc`.
+       Con las tasas reales ya cargadas en las pólizas (las de ASSA salieron
+       del portal), ahora sí se pueden convertir. La cuota original queda
+       guardada en `pc`, así que es reversible. */
+    var C=S.comisiones||[];
+    var ixNum={};
+    P.forEach(function(p){ var n=norm(p.num); if(n && !ixNum[n]) ixNum[n]=p; });
+    var comArregladas=0, comSinTasa=0;
+    var faltanTasa={};
+    C.forEach(function(x){
+      if(x.rc || x.corte || x.recibo || x.origen) return;   /* ya convertida o viene del portal */
+      if(x.estado==='ajuste') return;
+      if(/^COM\d+$/.test(String(x.id||''))) return;          /* totales por aseguradora cargados a mano */
+      var monto=num(x.monto); if(!(monto>0)) return;
+      var p=ixNum[norm(x.numeroPol)];
+      if(!p || !(num(p.comPct)>0)){
+        comSinTasa++;
+        var k=(x.aseg||'?')+' | '+(x.ramo||'sin ramo');
+        faltanTasa[k]=(faltanTasa[k]||0)+1;
+        return;
+      }
+      var part=num(p.participacion)>0?num(p.participacion):100;
+      x.pc=monto; x.rc=1; x.comPct=num(p.comPct); x.participacion=part;
+      x.monto=+(monto*num(p.comPct)/100*part/100).toFixed(2);
+      comArregladas++;
+    });
+    arr.comisionesLibro=comArregladas;
+    rep.comisionesSinTasa=faltanTasa;
+
     /* Duplicados de póliza: mismo número y mismo cliente */
     var vistas={};
     P.forEach(function(p){
@@ -16260,8 +16339,15 @@ document.addEventListener('click', function(e){
         sinNumero:rep.sinNumero.length, sinFecha:rep.sinFecha.length, sinPrima:rep.sinPrima.length,
         vigentesConFechaPasada:rep.vigenteVencida.length,
         clientesDuplicados:rep.clientesDuplicados.length, polizasDuplicadas:rep.polizasDuplicadas.length,
-        ramosDesconocidos:rep.ramoDesconocido
+        ramosDesconocidos:rep.ramoDesconocido,
+        comisionesSinTasa:rep.comisionesSinTasa||{}
       },
+      libroComisiones:(function(){
+        var c=S.comisiones||[];
+        var t=function(e){ return +c.filter(function(x){return x.estado===e;})
+          .reduce(function(a,x){return a+num(x.monto);},0).toFixed(2); };
+        return { filas:c.length, porCobrar:t('pendiente'), cobrada:t('cobrada') };
+      })(),
       listas:rep,
       muestraCambios:det,
       cartera:{
@@ -16275,6 +16361,147 @@ document.addEventListener('click', function(e){
         saldo:+vig.reduce(function(a,p){return a+num(p.saldo);},0).toFixed(2)
       }
     };
+  };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Completar lo que quedó a medias
+   ------------------------------------------------------------
+   Los tres pendientes que salían en el panel:
+
+   1. Pólizas sin fecha de vencimiento. Si tienen fecha de inicio,
+      se calcula el vencimiento sumando el período (anual salvo
+      que la póliza diga otra cosa). Sin fecha de inicio no hay
+      de dónde sacarlo y se deja como está.
+
+   2. Vigentes con la fecha ya pasada. Son pólizas que siguen
+      activas pero cuya renovación nunca se cargó. Se adelanta la
+      vigencia período a período hasta que caiga en el futuro,
+      que es como renueva una póliza anual: la nueva empieza el
+      día que terminaba la anterior.
+
+   3. Vigentes sin comisión. Si hay prima, se calcula con la tasa
+      de Configuración. Si la prima está en cero no se inventa un
+      número: se le deja el porcentaje puesto para que la comisión
+      salga sola en cuanto cargues la prima.
+
+   TODO lo que se deduce queda marcado en `extra` con la fecha y
+   el motivo, así que se puede revisar y deshacer. Nada de esto
+   pisa un dato que ya venga de una aseguradora.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function norm(s){
+    return String(s||'').toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/Ñ/g,'N').replace(/[^A-Z0-9]/g,'');
+  }
+  function hoy(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+  function num(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
+
+  /* Meses que dura la vigencia según cómo esté escrito el período */
+  function meses(p){
+    var t=norm(p&&p.periodo);
+    if(/SEMESTR/.test(t)) return 6;
+    if(/TRIMESTR/.test(t)) return 3;
+    if(/BIMESTR/.test(t)) return 2;
+    if(/MENSUAL/.test(t)) return 1;
+    if(/BIANUAL|BIENAL|DOSANOS/.test(t)) return 24;
+    return 12;   /* lo normal en seguros */
+  }
+  function sumarMeses(iso, m){
+    var p=String(iso).split('-');
+    var d=new Date(Date.UTC(+p[0], +p[1]-1, +p[2]));
+    var dia=d.getUTCDate();
+    d.setUTCMonth(d.getUTCMonth()+m);
+    /* si el día no existe en el mes destino (31 → febrero) se ancla al último */
+    if(d.getUTCDate()!==dia) d.setUTCDate(0);
+    return d.toISOString().slice(0,10);
+  }
+
+  function tasa(p){
+    var cfg=(typeof S!=='undefined'&&S.comisCfg)||{};
+    var combos=cfg.combos||{}, ramos=cfg.ramos||{};
+    var k=(p.aseg||'')+'||'+(p.ramo||'');
+    if(combos[k] && num(combos[k].com)>0) return num(combos[k].com);
+    if(ramos[p.ramo] && num(ramos[p.ramo].com)>0) return num(ramos[p.ramo].com);
+    return 0;
+  }
+
+  window.jacCompletarFaltantes = async function(opts){
+    opts=opts||{};
+    var P=(typeof S!=='undefined'&&S.polizas)||[];
+    var r={ vencimientoCalculado:0, renovacionAdelantada:0, comisionCalculada:0,
+            porcentajePuesto:0, sinRemedio:[], detalle:[] };
+
+    P.forEach(function(p){
+      var c=[];
+
+      /* --- 1. Falta la fecha de vencimiento --- */
+      if(!p.fechaFin && p.fechaInicio){
+        p.fechaFin=sumarMeses(p.fechaInicio, meses(p));
+        p.extra=p.extra||{};
+        p.extra.fechaFinCalculada={desde:p.fechaInicio, meses:meses(p), cuando:hoy()};
+        c.push('vencimiento calculado → '+p.fechaFin);
+        r.vencimientoCalculado++;
+      }
+
+      /* --- 2. Vigente pero con la fecha ya pasada --- */
+      if(p.estado==='Vigente' && p.fechaFin && p.fechaFin<hoy()){
+        var m=meses(p), vueltas=0, iniOrig=p.fechaInicio, finOrig=p.fechaFin;
+        while(p.fechaFin<hoy() && vueltas<12){
+          p.fechaInicio=p.fechaFin;
+          p.fechaFin=sumarMeses(p.fechaFin, m);
+          vueltas++;
+        }
+        if(vueltas){
+          p.extra=p.extra||{};
+          p.extra.renovacionEstimada={desde:iniOrig||null, hasta:finOrig, periodos:vueltas, cuando:hoy()};
+          c.push('renovación adelantada '+finOrig+' → '+p.fechaFin);
+          r.renovacionAdelantada++;
+        }
+      }
+
+      /* --- 3. Vigente sin comisión --- */
+      if(p.estado==='Vigente' && !(num(p.comision)>0)){
+        var t=num(p.comPct)>0 ? num(p.comPct) : tasa(p);
+        var part=num(p.participacion)>0 ? num(p.participacion) : 100;
+        if(t>0 && num(p.prima)>0){
+          p.comPct=t; p.participacion=part;
+          p.comision=+(num(p.prima)*t/100*part/100).toFixed(2);
+          c.push('comisión calculada → '+p.comision);
+          r.comisionCalculada++;
+        } else if(t>0){
+          /* sin prima no hay comisión que calcular; se deja lista la tasa */
+          if(num(p.comPct)!==t){ p.comPct=t; r.porcentajePuesto++; c.push('%com preparado → '+t); }
+          if(r.sinRemedio.length<40) r.sinRemedio.push({
+            num:p.num||'(sin número)', cli:(p.nombreCliente||'').slice(0,22),
+            aseg:p.aseg, motivo:'falta la prima'});
+        } else {
+          if(r.sinRemedio.length<40) r.sinRemedio.push({
+            num:p.num||'(sin número)', cli:(p.nombreCliente||'').slice(0,22),
+            aseg:p.aseg, ramo:p.ramo, motivo:'no hay tasa configurada para esa compañía y ramo'});
+        }
+      }
+
+      if(c.length && r.detalle.length<50){
+        r.detalle.push({num:p.num||'(sin número)', cli:(p.nombreCliente||'').slice(0,20), c:c});
+      }
+    });
+
+    /* Lo que quedó sin poder resolver, para el panel */
+    r.aunSinFecha=P.filter(function(p){ return !p.fechaFin; }).length;
+    r.aunVigenteVencida=P.filter(function(p){ return p.estado==='Vigente' && p.fechaFin && p.fechaFin<hoy(); }).length;
+    r.aunSinComision=P.filter(function(p){ return p.estado==='Vigente' && !(num(p.comision)>0); }).length;
+
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+    if(!opts.soloProbar){ try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){} }
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+    return r;
   };
 })();
 </script>
