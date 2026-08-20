@@ -15087,7 +15087,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-19-G';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-20-I';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15296,6 +15296,359 @@ document.addEventListener('click', function(e){
     return { sesionNube: await haySesion(), avisoVisible: !!document.getElementById('jac-barra-sesion'),
              realtime: window.__jacRealtime||'sin conectar', enLinea: navigator.onLine };
   };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Adjuntos fuera del cajón chico
+   ------------------------------------------------------------
+   El CRM guardaba TODO en localStorage, que el navegador limita
+   a 5 MB. Cuatro PDF pegados dentro de un prospecto se comieron
+   el 78% y a partir de ahí nada se podía guardar.
+
+   Este bloque separa las dos cosas:
+     · Los datos (clientes, pólizas, comisiones) siguen en
+       localStorage — pesan poco y se leen al instante.
+     · Los archivos se van a IndexedDB, que en este navegador
+       tiene 10 GB disponibles en vez de 5 MB. Y si hay sesión,
+       además suben a Supabase Storage para verlos desde
+       cualquier equipo.
+
+   El código que dibuja y descarga los adjuntos no cambia: al
+   abrir el CRM los archivos se vuelven a poner en memoria, así
+   que `f.b64` sigue estando donde siempre.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var BD='jac_adjuntos', ALM='archivos', VER=1;
+  var _bd=null;
+
+  function abrir(){
+    if(_bd) return Promise.resolve(_bd);
+    return new Promise(function(res,rej){
+      var q=indexedDB.open(BD,VER);
+      q.onupgradeneeded=function(e){
+        var d=e.target.result;
+        if(!d.objectStoreNames.contains(ALM)) d.createObjectStore(ALM,{keyPath:'id'});
+      };
+      q.onsuccess=function(e){ _bd=e.target.result; res(_bd); };
+      q.onerror=function(){ rej(q.error); };
+    });
+  }
+
+  function guardarArchivo(reg){
+    return abrir().then(function(d){
+      return new Promise(function(res,rej){
+        var t=d.transaction(ALM,'readwrite');
+        t.objectStore(ALM).put(reg);
+        t.oncomplete=function(){res(true);};
+        t.onerror=function(){rej(t.error);};
+      });
+    });
+  }
+
+  function leerTodos(){
+    return abrir().then(function(d){
+      return new Promise(function(res,rej){
+        var t=d.transaction(ALM,'readonly'), q=t.objectStore(ALM).getAll();
+        q.onsuccess=function(){res(q.result||[]);};
+        q.onerror=function(){rej(q.error);};
+      });
+    });
+  }
+
+  /* Dónde viven los adjuntos dentro del estado */
+  var COLECCIONES=['prospectos','clientes','polizas','siniestros','tareas','pagos'];
+
+  function recorrer(estado, fn){
+    COLECCIONES.forEach(function(col){
+      var arr=(estado&&estado[col])||[];
+      if(!Array.isArray(arr)) return;
+      arr.forEach(function(reg){
+        var ax=reg&&reg.archivos;
+        if(!ax) return;
+        var lista=Array.isArray(ax)?ax:[ax];
+        lista.forEach(function(f){ if(f&&typeof f==='object') fn(f,reg,col); });
+      });
+    });
+  }
+
+  /* ---- 1. Copia liviana para localStorage ----
+     Se clona solo lo necesario: el registro que tiene archivos y
+     su arreglo de archivos. Todo lo demás se comparte por
+     referencia, así que no se duplica el estado en memoria. */
+  function copiaLiviana(estado){
+    var copia={}, k;
+    for(k in estado) if(Object.prototype.hasOwnProperty.call(estado,k)) copia[k]=estado[k];
+    COLECCIONES.forEach(function(col){
+      var arr=estado[col];
+      if(!Array.isArray(arr)) return;
+      var hayAlguno=arr.some(function(r){ return r && r.archivos; });
+      if(!hayAlguno) return;
+      copia[col]=arr.map(function(reg){
+        if(!reg||!reg.archivos) return reg;
+        var lista=Array.isArray(reg.archivos)?reg.archivos:[reg.archivos];
+        var sinPeso=lista.map(function(f){
+          if(!f||typeof f!=='object'||!f.b64) return f;
+          var g={},kk;
+          for(kk in f) if(Object.prototype.hasOwnProperty.call(f,kk)) g[kk]=f[kk];
+          g.b64='';        /* el contenido vive en IndexedDB / la nube */
+          g.idb=1;
+          return g;
+        });
+        var r2={},kk2;
+        for(kk2 in reg) if(Object.prototype.hasOwnProperty.call(reg,kk2)) r2[kk2]=reg[kk2];
+        r2.archivos=Array.isArray(reg.archivos)?sinPeso:sinPeso[0];
+        return r2;
+      });
+    });
+    return copia;
+  }
+
+  /* ---- 2. Volcar a IndexedDB los que aún no estén ---- */
+  var _yaGuardados={};
+  function volcarAIdb(estado){
+    var pend=[];
+    recorrer(estado,function(f){
+      if(!f.b64||!f.id) return;
+      if(_yaGuardados[f.id]) return;
+      _yaGuardados[f.id]=1;
+      pend.push({id:f.id,name:f.name||'',type:f.type||'',size:f.size||0,fecha:f.fecha||'',b64:f.b64});
+    });
+    if(!pend.length) return Promise.resolve(0);
+    return Promise.all(pend.map(function(r){
+      return guardarArchivo(r)['catch'](function(){ delete _yaGuardados[r.id]; });
+    })).then(function(){ return pend.length; });
+  }
+
+  /* ---- 3. Rehidratar al abrir el CRM ---- */
+  var _rehidratado=false;
+  function rehidratar(){
+    if(_rehidratado||typeof S==='undefined'||!S) return Promise.resolve(0);
+    _rehidratado=true;
+    return leerTodos().then(function(todos){
+      var mapa={}; todos.forEach(function(r){ mapa[r.id]=r; _yaGuardados[r.id]=1; });
+      var n=0;
+      recorrer(S,function(f){
+        if(f.b64||!f.id) return;
+        var r=mapa[f.id];
+        if(r&&r.b64){ f.b64=r.b64; n++; }
+      });
+      if(n){ try{ if(typeof RD==='function') RD(); }catch(e){} }
+      return n;
+    })['catch'](function(){ return 0; });
+  }
+
+  /* ---- 4. Envolver save() ---- */
+  function envolver(){
+    if(typeof window.save!=='function'||window.__jacSaveAdj) return;
+    window.__jacSaveAdj=true;
+    var _orig=window.save;
+    window.save=function(){
+      try{ volcarAIdb(S); }catch(e){}
+      /* Se escribe la copia liviana a mano y se deja que el resto
+         del save original haga lo suyo (nube, KPIs, calendario). */
+      try{
+        var liviano=copiaLiviana(S);
+        localStorage.setItem('jacv10', JSON.stringify(liviano));
+      }catch(e){
+        try{ toast('No se pudo guardar: espacio del navegador lleno','err'); }catch(_e){}
+      }
+      /* El original vuelve a escribir localStorage; se le tapa esa
+         parte un instante para que no meta los archivos otra vez. */
+      var _set=localStorage.setItem.bind(localStorage);
+      localStorage.setItem=function(k,v){ if(k==='jacv10') return; return _set(k,v); };
+      var r;
+      try{ r=_orig.apply(this,arguments); } finally { localStorage.setItem=_set; }
+      return r;
+    };
+  }
+  setTimeout(envolver,1500);
+  setTimeout(envolver,6000);
+  setTimeout(function(){ rehidratar(); },2500);
+
+  /* ---- 5. Subida a Supabase Storage (para ver los adjuntos
+           desde cualquier equipo, no solo desde este) ---- */
+  var BUCKET='adjuntos';
+  window.jacSubirAdjuntos=async function(){
+    if(!window.db||window.db.__esStub||!window.db.storage) return {ok:false,motivo:'sin cliente de Supabase'};
+    var ses=await window.db.auth.getSession();
+    if(!(ses&&ses.data&&ses.data.session)) return {ok:false,motivo:'sin sesión de nube'};
+    var uid=ses.data.session.user.id;
+    var pend=[];
+    recorrer(S,function(f,reg,col){
+      if(!f.b64||f.url) return;
+      pend.push({f:f,col:col,rid:reg.id||'sin-id'});
+    });
+    var subidos=0, fallos=[];
+    for(var i=0;i<pend.length;i++){
+      var it=pend[i], f=it.f;
+      try{
+        var b=String(f.b64), c=b.indexOf(','); if(b.slice(0,5)==='data:'&&c>0) b=b.slice(c+1);
+        var bin=atob(b), u=new Uint8Array(bin.length);
+        for(var j=0;j<bin.length;j++) u[j]=bin.charCodeAt(j);
+        var ruta=uid+'/'+it.col+'/'+it.rid+'/'+(f.id||('F'+i))+'-'+String(f.name||'archivo').replace(/[^\w.\-]/g,'_');
+        var r=await window.db.storage.from(BUCKET).upload(ruta,new Blob([u],{type:f.type||'application/octet-stream'}),{upsert:true});
+        if(r.error){ fallos.push({name:f.name,error:r.error.message}); continue; }
+        var pu=window.db.storage.from(BUCKET).getPublicUrl(ruta);
+        f.path=ruta;
+        f.url=(pu&&pu.data&&pu.data.publicUrl)||'';
+        subidos++;
+      }catch(e){ fallos.push({name:f.name,error:e.message}); }
+    }
+    if(subidos){ try{ save(); }catch(e){} }
+    return {ok:true, subidos:subidos, fallos:fallos, total:pend.length};
+  };
+
+  /* ---- 6. Diagnóstico ---- */
+  window.jacEspacio=async function(){
+    var uso=0,k;
+    for(k in localStorage) if(Object.prototype.hasOwnProperty.call(localStorage,k)) uso+=(localStorage[k]||'').length+k.length;
+    var est=null;
+    try{ est=await navigator.storage.estimate(); }catch(e){}
+    var enIdb=0, pesoIdb=0;
+    try{ var t=await leerTodos(); enIdb=t.length; t.forEach(function(r){pesoIdb+=(r.b64||'').length;}); }catch(e){}
+    var enMemoria=0, sinSubir=0;
+    try{ recorrer(S,function(f){ if(f.b64)enMemoria++; if(f.b64&&!f.url)sinSubir++; }); }catch(e){}
+    return {
+      localStorageMB:+(uso/1048576).toFixed(2),
+      limiteLocalStorageMB:5,
+      adjuntosEnIndexedDB:enIdb,
+      pesoIndexedDBMB:+(pesoIdb/1048576).toFixed(2),
+      cuotaDelNavegadorGB: est? +(est.quota/1073741824).toFixed(1) : null,
+      adjuntosEnMemoria:enMemoria,
+      adjuntosSinSubirALaNube:sinSubir
+    };
+  };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Indicador de sincronización y sesión a prueba de sueño
+   ------------------------------------------------------------
+   Dos cosas que faltaban para poder confiar en el CRM sin
+   preguntarse "¿esto se guardó?":
+
+   1. Un semáforo permanente abajo a la derecha. Verde = todo
+      subido y escuchando la base. Ámbar = trabajando o sin
+      internet. Rojo = la sesión se cayó, con botón para entrar.
+      Al pulsarlo fuerza una sincronización.
+
+   2. La sesión de Supabase dura una hora. Mientras la pestaña
+      está despierta se renueva sola, pero en el teléfono se
+      duerme y al volver ya venció. Aquí se renueva en cuanto
+      quedan menos de 15 minutos y también al despertar.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var VERDE='#15803D', AMBAR='#B45309', ROJO='#B91C1C', GRIS='#64748B';
+  var ultimaSubida=0, ultimaBajada=0, estado='esperando';
+
+  function el(){
+    var d=document.getElementById('jac-semaforo');
+    if(d) return d;
+    d=document.createElement('div');
+    d.id='jac-semaforo';
+    d.style.cssText='position:fixed;right:12px;bottom:12px;z-index:2147483500;background:#fff;'
+      +'border:1px solid #E2E8F0;border-radius:999px;padding:5px 12px 5px 9px;font-size:11px;'
+      +'font-weight:600;color:#334155;box-shadow:0 3px 12px rgba(0,0,0,.12);cursor:pointer;'
+      +'display:flex;align-items:center;gap:7px;user-select:none;max-width:70vw';
+    d.title='Pulsa para sincronizar ahora';
+    d.onclick=function(){ forzar(); };
+    document.body.appendChild(d);
+    return d;
+  }
+
+  function hace(ms){
+    if(!ms) return 'nunca';
+    var s=Math.round((Date.now()-ms)/1000);
+    if(s<10) return 'ahora';
+    if(s<60) return 'hace '+s+' s';
+    var m=Math.round(s/60);
+    if(m<60) return 'hace '+m+' min';
+    return 'hace '+Math.round(m/60)+' h';
+  }
+
+  function pintar(color,texto){
+    var d=el();
+    d.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+color+';flex:0 0 8px"></span>'
+      +'<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+texto+'</span>';
+  }
+
+  async function haySesion(){
+    try{
+      if(!window.db||window.db.__esStub||!window.db.auth) return null;
+      var r=await window.db.auth.getSession();
+      return (r&&r.data&&r.data.session)||null;
+    }catch(e){ return null; }
+  }
+
+  /* --- Renovar el token antes de que caduque --- */
+  async function cuidarSesion(){
+    var s=await haySesion();
+    if(!s){
+      try{ var r=await window.db.auth.refreshSession(); s=(r&&r.data&&r.data.session)||null; }catch(e){}
+      if(!s) return null;
+    }
+    var quedan=(s.expires_at||0)-Math.floor(Date.now()/1000);
+    if(quedan < 900){                       /* menos de 15 minutos */
+      try{ var r2=await window.db.auth.refreshSession(); if(r2&&r2.data&&r2.data.session) s=r2.data.session; }catch(e){}
+    }
+    return s;
+  }
+
+  async function refrescar(){
+    if(!navigator.onLine){ pintar(AMBAR,'sin internet · se guarda aquí'); return; }
+    var s=await cuidarSesion();
+    if(!s){ pintar(ROJO,'sesión caída · entra de nuevo'); estado='sin sesion'; return; }
+    var rt=window.__jacRealtime||'';
+    if(estado==='subiendo'){ pintar(AMBAR,'subiendo…'); return; }
+    var txt='al día · '+hace(Math.max(ultimaSubida,ultimaBajada));
+    if(rt!=='SUBSCRIBED') txt='al día · sin tiempo real';
+    pintar(rt==='SUBSCRIBED'?VERDE:AMBAR, txt);
+  }
+
+  async function forzar(){
+    estado='subiendo'; pintar(AMBAR,'sincronizando…');
+    try{
+      var s=await cuidarSesion();
+      if(!s){ pintar(ROJO,'sesión caída · entra de nuevo'); estado='sin sesion'; return; }
+      if(typeof window.jacVolcar==='function'){ await window.jacVolcar(); ultimaSubida=Date.now(); }
+      if(typeof window.sincronizar==='function'){ await window.sincronizar(); ultimaBajada=Date.now(); }
+      if(typeof window.jacRepintar==='function') window.jacRepintar();
+    }catch(e){}
+    estado='listo';
+    refrescar();
+  }
+  window.jacSincronizarYa=forzar;
+
+  /* Marcar los momentos en que sí hubo movimiento */
+  function engancharMarcas(){
+    if(window.__jacMarcas) return;
+    if(typeof window.jacVolcar!=='function'||typeof window.sincronizar!=='function') return;
+    window.__jacMarcas=true;
+    var _v=window.jacVolcar;
+    window.jacVolcar=async function(){ var r=await _v.apply(this,arguments); ultimaSubida=Date.now(); return r; };
+    var _s=window.sincronizar;
+    window.sincronizar=async function(){ var r=await _s.apply(this,arguments); ultimaBajada=Date.now(); return r; };
+  }
+
+  setTimeout(function(){ engancharMarcas(); refrescar(); }, 5000);
+  setTimeout(engancharMarcas, 12000);
+  setInterval(refrescar, 15000);
+  setInterval(cuidarSesion, 300000);            /* cada 5 min cuida el token */
+
+  window.addEventListener('online',  function(){ setTimeout(forzar, 1500); });
+  window.addEventListener('offline', function(){ pintar(AMBAR,'sin internet · se guarda aquí'); });
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='visible') setTimeout(forzar, 700);
+  });
 })();
 </script>
 
