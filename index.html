@@ -15087,7 +15087,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-20-I';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-20-M';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15649,6 +15649,633 @@ document.addEventListener('click', function(e){
   document.addEventListener('visibilitychange', function(){
     if(document.visibilityState==='visible') setTimeout(forzar, 700);
   });
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Actualizar desde los reportes de las aseguradoras
+   ------------------------------------------------------------
+   Trae incorporados los dos reportes buenos:
+     · Cartera Capital Care (Softseguros) — 76 pólizas, con
+       vigencia, prima neta, total, pagado, saldo, % y compañía.
+     · Portal ASSA (Vida y Salud) — 29 pólizas, con vigencia,
+       prima anual, % de comisión real y saldo.
+
+   Reglas al cruzar, para no retroceder datos buenos:
+     · Se cruza por número de póliza, ignorando guiones y ceros.
+     · La vigencia del reporte solo entra si es igual o MÁS NUEVA
+       que la que ya tiene el CRM. Si el CRM va un ciclo adelante,
+       se respeta.
+     · Prima, pagado y saldo solo se escriben cuando la vigencia
+       del reporte es la misma que la del CRM: si no, son de otro
+       período y ensuciarían el saldo.
+     · El % de comisión y la compañía sí se aplican siempre —
+       esos no dependen del período.
+     · La comisión se recalcula como prima neta × % × tu parte.
+     · Estado por la fecha final, salvo Renovada y Cancelada,
+       que se respetan.
+
+   Botón en Configuración. Se puede correr las veces que quieras.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var CC = [["03G50509","2025-02-10","2026-02-10",113.4,115.5,115.5,0.0,20.0,22.0,"ASSA COMPAÑÍA DE SEGUROS, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",10.0,"TARJETA DE CREDITO"],["02B3408559","2025-03-26","2026-03-26",437.95,430.14,430.14,0.0,20.0,81.16,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,"TARJETA DE CREDITO"],["02B3423338","2025-08-30","2026-08-30",920.77,904.04,527.31,376.73,20.0,170.57,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,"TARJETA DE CREDITO"],["030-001-000773693","2026-02-23","2027-02-23",486.12,515.29,489.53,25.76,20.0,97.22,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","ANUAL",1.0,"EFECTIVO"],["030-001-000773675","2026-01-14","2027-01-14",448.92,475.86,452.07,23.79,20.0,89.78,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","ANUAL",1.0,"EFECTIVO"],["030-012-000021492","2026-03-26","2027-03-26",1212.15,1284.88,0.0,1284.88,20.0,242.43,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["02-92-1054443-2","2026-01-13","2027-01-13",164.73,174.61,0.0,174.61,20.0,32.95,"SEGUROS SURAMERICANA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",3.0,"EFECTIVO"],["02B3425396","2025-10-04","2026-10-04",567.51,575.29,345.12,230.17,20.0,108.55,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,"TARJETA DE CREDITO"],["030-001-000653812","2025-11-23","2026-11-23",466.14,494.11,187.76,306.35,20.0,93.23,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["030-001-000762087","2026-03-31","2027-03-31",811.37,860.05,0.0,860.05,20.0,162.27,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["030-012-000019308","2026-01-19","2027-01-19",172.64,183.0,109.83,73.17,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["030-001-000773605","2025-06-03","2026-06-03",172.64,183.0,183.0,0.0,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["04-05-1970094-0","2025-07-18","2026-07-18",117.92,152.17,114.12,38.05,20.0,28.71,"SEGUROS FEDPA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",2.0,"EFECTIVO"],["02-93-1159210-1","2025-10-19","2026-10-19",570.0,604.2,181.26,422.94,20.0,114.0,"SEGUROS SURAMERICANA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,"EFECTIVO"],["01-82-1165813-1","2025-11-15","2026-11-15",75.6,79.38,39.69,39.69,20.0,15.12,"SEGUROS SURAMERICANA, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",6.0,"EFECTIVO"],["030-001-000773687","2026-02-09","2027-02-09",172.64,183.0,122.01,60.99,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["02B3408498","2025-03-25","2026-03-25",1256.95,1231.88,1231.88,0.0,20.0,232.43,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,"TARJETA DE CREDITO"],["02BR2908859","2024-12-31","2025-12-31",150.94,160.0,160.0,0.0,20.0,30.19,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["04-05-2113514-0","2026-02-05","2027-02-05",122.65,130.01,130.0,0.01,20.0,24.53,"SEGUROS FEDPA, S.A.","AUTOMÓVIL","DAÑOS A TERCEROS","CAPITAL CARE & CO","ANUAL",1.0,""],["030-001-000762067","2026-02-08","2027-02-08",196.23,208.0,0.0,208.0,20.0,39.25,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["030-001-000773684","2026-01-28","2027-01-28",196.23,208.0,208.0,0.0,20.0,39.25,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","ANUAL",1.0,"EFECTIVO"],["01-82-1180631-1","2026-02-01","2027-02-01",77.4,81.27,4.04,77.23,20.0,15.48,"SEGUROS SURAMERICANA, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",10.0,"EFECTIVO"],["02B3419013","2025-07-15","2026-07-15",1662.78,1650.88,1238.22,412.66,20.0,311.49,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,"TARJETA DE CREDITO"],["030-012-000018094","2026-04-10","2027-04-10",626.58,664.17,0.0,664.17,20.0,125.32,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["06B52344","2025-02-17","2025-07-17",500.0,525.0,525.0,0.0,20.0,100.0,"ASSA COMPAÑÍA DE SEGUROS, S.A.","PROPIEDAD","TODO RIESGO CONSTRUCCION","CAPITAL CARE & CO","MENSUAL",1.0,"ACH"],["08300000034748","2026-03-07","2027-03-07",131.48,138.05,138.05,0.0,20.0,26.3,"MAPFRE PANAMA, S.A.","INCENDIO","INCENDIO","","MENSUAL",1.0,"EFECTIVO"],["04-04-570284-9","2025-10-22","2026-10-22",342.53,363.08,108.93,254.15,20.0,68.51,"SEGUROS FEDPA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,""],["030-012-000019229","2026-01-03","2027-01-03",172.64,183.0,109.83,73.17,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["0225-03756-09","2025-05-31","2026-05-31",1034.55,600.91,540.87,60.04,20.0,113.38,"ASEGURADORA ANCON, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,"PAGO DIRECTO"],["15051544000000","2025-05-03","2026-05-03",100.0,105.0,105.0,0.0,20.0,20.0,"MAPFRE PANAMA, S.A.","FIANZA","FIANZA","CAPITAL CARE & CO","ANUAL",1.0,"EFECTIVO"],["033-012-000001062","2025-08-12","2026-08-12",110.0,115.5,115.5,0.0,20.0,22.0,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["030-001-000773626","2025-09-08","2026-09-08",172.64,183.0,183.0,0.0,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["04-05-1950814-0","2025-06-23","2026-06-23",108.49,140.0,140.0,0.0,20.0,26.42,"SEGUROS FEDPA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",2.0,"EFECTIVO"],["030-001-000773640","2025-10-20","2026-10-20",172.64,183.0,183.0,0.0,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["030-001-000773641","2025-10-21","2026-10-21",172.64,183.0,183.0,0.0,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["033-012-000000792","2025-04-19","2026-04-19",222.0,233.1,258.05,-24.95,20.0,44.4,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","ANUAL",1.0,"TARJETA DE CREDITO"],["040-012-000000204","2026-04-19","2027-04-19",250.0,262.5,0.0,262.5,20.0,50.0,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","PROPIEDAD","RESPONSABILIDAD CIVIL","CAPITAL CARE & CO","ANUAL",1.0,"TARJETA DE CREDITO"],["15300000041391","2026-03-04","2026-08-31",311.33,326.9,326.9,0.0,10.0,31.13,"MAPFRE PANAMA, S.A.","FIANZA","FIANZA","","ANUAL",1.0,"EFECTIVO"],["15300000041392","2026-03-04","2026-08-31",100.0,105.0,105.0,0.0,10.0,10.0,"MAPFRE PANAMA, S.A.","FIANZA","FIANZA","","ANUAL",1.0,"EFECTIVO"],["06-01-1057584-2","2026-01-23","2027-01-23",990.57,1050.0,175.0,875.0,20.0,198.11,"SEGUROS SURAMERICANA, S.A.","AUTOMÓVIL","RESPONSABILIDAD CIVIL AUTO","CAPITAL CARE & CO","MENSUAL",10.0,""],["02-85-1183801-1","2026-02-03","2027-02-03",144.44,153.11,15.31,137.8,20.0,28.89,"SEGUROS SURAMERICANA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,"EFECTIVO"],["02-12696563-0","2025-09-15","2026-09-15",490.19,519.6,311.76,207.84,20.0,98.04,"ACERTA SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,""],["0225-03316-09","2026-05-19","2027-05-19",1157.05,517.63,0.0,517.63,20.0,97.67,"ASEGURADORA ANCON, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",11.0,"TARJETA DE CREDITO"],["02B3347696","2025-12-22","2026-12-22",643.05,616.01,153.99,462.02,20.0,116.23,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,"TARJETA DE CREDITO"],["03B91806","2025-10-14","2026-10-14",140.0,147.0,147.0,0.0,20.0,28.0,"ASSA COMPAÑÍA DE SEGUROS, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["15B36395","2025-10-14","2026-10-14",69.0,72.45,72.45,0.0,20.0,13.8,"ASSA COMPAÑÍA DE SEGUROS, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["02B3412557","2026-05-20","2027-05-20",645.71,623.64,0.0,623.64,20.0,117.67,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,"TARJETA DE CREDITO"],["030-001-000773678","2026-01-07","2027-01-07",543.65,576.27,172.89,403.38,20.0,108.73,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["04-05-1708297-1","2025-08-09","2026-08-09",117.92,125.0,125.0,0.0,20.0,23.58,"SEGUROS FEDPA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["31300000003528","2025-05-21","2026-05-21",40.0,42.0,42.0,0.0,20.0,8.0,"MAPFRE PANAMA, S.A.","PROPIEDAD","MULTIRIESGO FAMILIAR","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["0225-01591-01","2025-06-12","2026-06-12",5914.45,2069.02,2069.02,0.0,20.0,390.38,"ASEGURADORA ANCON, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,"PAGO DIRECTO"],["03B104489","2026-01-26","2027-01-26",612.0,610.47,610.47,0.0,20.0,116.28,"ASSA COMPAÑÍA DE SEGUROS, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["15B103910","2026-01-26","2027-01-26",275.0,274.31,274.31,0.0,20.0,52.25,"ASSA COMPAÑÍA DE SEGUROS, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["02-93-1237187-0","2025-11-06","2026-11-06",1968.06,2086.14,1043.05,1043.09,20.0,393.61,"SEGUROS SURAMERICANA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,"EFECTIVO"],["02-93-1245991-0","2026-01-05","2027-01-05",2505.75,2656.1,802.98,1853.12,20.0,501.15,"SEGUROS SURAMERICANA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,"EFECTIVO"],["030-001-000773686","2026-01-29","2027-01-29",196.23,208.0,69.34,138.66,20.0,39.25,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["08300000034589","2026-01-29","2027-01-29",232.0,243.6,243.6,0.0,20.0,46.4,"MAPFRE PANAMA, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["030-001-000773652","2025-11-16","2026-11-16",172.64,183.0,183.0,0.0,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","ANUAL",1.0,"EFECTIVO"],["030-012-000021218","2026-01-25","2027-01-25",172.64,183.0,73.22,109.78,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["02B3433365","2025-12-15","2026-12-15",1024.9,1019.18,259.93,759.25,20.0,192.3,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,"TARJETA DE CREDITO"],["02-12696031-0","2025-06-26","2026-06-26",169.82,180.01,90.0,90.01,20.0,33.96,"ACERTA SEGUROS, S.A.","AUTOMÓVIL","DAÑOS A TERCEROS","CAPITAL CARE & CO","ANUAL",1.0,""],["0830024041163","2024-12-28","2025-12-28",650.1,689.11,125.3,563.81,20.0,130.02,"MAPFRE PANAMA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["030-001-000762069","2026-02-12","2027-02-12",172.64,183.0,73.22,109.78,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["04-05-1810021-1","2025-12-26","2026-12-26",108.49,115.0,0.0,115.0,20.0,21.7,"SEGUROS FEDPA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["10-29-2176111-0","2025-03-29","2026-03-29",290.2,307.61,308.2,-0.59,20.0,58.04,"LA REGIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,""],["02-93-1072634-2","2026-04-29","2027-04-29",551.48,584.57,0.0,584.57,20.0,110.3,"SEGUROS SURAMERICANA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,"EFECTIVO"],["033-012-000000761","2026-01-16","2027-01-16",115.78,121.57,36.48,85.09,20.0,23.16,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["030-012-000021268","2026-02-01","2027-02-01",1507.41,1597.85,159.79,1438.06,20.0,301.48,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["032-012-000000064","2026-02-01","2027-02-01",250.0,262.5,0.0,262.5,20.0,50.0,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","PROPIEDAD","TRANSPORTE","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["04-04-1367045-2","2025-04-26","2026-04-26",547.27,580.11,580.1,0.01,20.0,109.45,"SEGUROS FEDPA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",12.0,""],["02B3423630","2025-09-04","2026-09-04",403.18,409.82,286.86,122.96,20.0,77.32,"ASSA COMPAÑÍA DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",10.0,"TARJETA DE CREDITO"],["15B103914","2026-02-01","2027-02-01",275.0,274.31,274.31,0.0,20.0,52.25,"ASSA COMPAÑÍA DE SEGUROS, S.A.","INCENDIO","INCENDIO","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["030-001-000762082","2026-03-25","2027-03-25",906.29,960.67,0.0,960.67,20.0,181.26,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"],["030-001-000773658","2025-12-04","2026-12-04",172.64,183.0,183.0,0.0,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["030-012-000019851","2026-04-23","2027-04-23",172.64,183.0,0.0,183.0,20.0,34.53,"CÍA. INTERNACIONAL DE SEGUROS, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"TARJETA DE CREDITO"],["04-05-1953528-0","2025-06-26","2026-06-26",117.92,125.0,125.0,0.0,20.0,23.58,"SEGUROS FEDPA, S.A.","AUTOMÓVIL","AUTOMÓVIL","CAPITAL CARE & CO","MENSUAL",1.0,"EFECTIVO"]];
+  var ASSA = [["70B32260",3758.64,10.0,0.0,"2026-06-24","2027-06-24"],["60G4565",522.36,1.0,0.0,"2025-12-04","2026-12-04"],["14G19735",600.0,2.0,0.0,"2025-10-10","2026-10-10"],["14G20469",280.0,2.0,28.0,"2026-02-24","2027-02-24"],["14B102984",600.0,2.0,0.0,"2023-08-18","2107-08-18"],["14G19805",476.0,2.0,34.0,"2025-10-24","2026-10-24"],["70B41561",825.0,10.0,288.76,"2026-02-19","2027-02-19"],["60B73056",240.0,10.0,0.0,"2024-09-09","2056-09-09"],["14G17837",667.5,2.0,0.0,"2025-10-28","2026-10-28"],["60B80248",132.73,45.0,12.1,"2026-04-21","2057-04-21"],["14G19737",780.0,0.0,180.0,"2025-10-11","2026-10-11"],["14B76364",831.96,10.0,0.0,"2024-01-19","2103-01-19"],["14G17078",705.0,2.0,117.5,"2026-06-26","2027-06-26"],["14BG1916",740.0,2.0,92.5,"2026-01-28","2027-01-28"],["14G18443",600.0,2.0,0.0,"2026-03-04","2027-03-04"],["14G16565",472.75,2.0,52.25,"2026-03-28","2027-03-28"],["14BG1869",774.0,2.0,0.0,"2026-01-19","2027-01-19"],["60B71264",225.0,5.0,20.33,"2023-09-01","2055-09-01"],["60B70109",177.0,5.0,0.0,"2022-11-07","2058-11-07"],["70B41562",825.0,10.0,288.76,"2026-02-26","2027-02-26"],["60B39250",131.85,5.0,0.0,"2020-11-13","2051-11-13"],["14G17694",750.0,2.0,0.0,"2025-10-08","2026-10-08"],["14G20429",306.0,2.0,52.0,"2026-02-22","2027-02-22"],["14G19958",630.5,2.0,0.0,"2025-11-25","2026-11-25"],["14G19738",462.0,2.0,33.0,"2025-10-11","2026-10-11"],["60B46557",189.0,5.0,0.0,"2022-09-20","2062-09-20"],["14B103845",345.0,10.0,28.75,"2023-12-22","2111-12-22"],["14G19728",795.0,2.0,0.0,"2025-10-07","2026-10-07"],["60B43944",168.0,5.0,0.0,"2022-02-15","2062-02-15"]];
+
+  /* Nombres oficiales de aseguradora tal como los usa el CRM */
+  var COMPANIA = {
+    'ASSA COMPAÑÍA DE SEGUROS, S.A.'      : 'ASSA',
+    'CÍA. INTERNACIONAL DE SEGUROS, S.A.' : 'Cía Internacional De Seguros, S.A.',
+    'SEGUROS SURAMERICANA, S.A.'          : 'SURA',
+    'SEGUROS FEDPA, S.A.'                 : 'FEDPA',
+    'MAPFRE PANAMA, S.A.'                 : 'MAPFRE',
+    'ASEGURADORA ANCON, S.A.'             : 'Ancón',
+    'ACERTA SEGUROS, S.A.'                : 'Acerta',
+    'LA REGIONAL DE SEGUROS, S.A.'        : 'La Regional de Seguros'
+  };
+  var RAMO = {
+    'AUTOMÓVIL':'AUTOS/VEHÍCULOS', 'AUTOMOVIL':'AUTOS/VEHÍCULOS',
+    'INCENDIO':'INCENDIO Y LÍNEAS ALIADAS',
+    'FIANZA':'FIANZAS/ROBO/SUSTRACCIÓN',
+    'PROPIEDAD':'PROPIEDAD', 'SALUD':'SALUD/MÉDICOS', 'VIDA':'VIDA'
+  };
+
+  function norm(s){
+    return String(s||'').toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/Ñ/g,'N')
+      .replace(/[^A-Z0-9]/g,'');
+  }
+  function hoy(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+  function num(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
+
+  function indice(){
+    var ix={};
+    (S.polizas||[]).forEach(function(p){
+      var n=norm(p.num); if(!n) return;
+      (ix[n]=ix[n]||[]).push(p);
+    });
+    return ix;
+  }
+
+  function estadoPorFecha(p, fin){
+    if(p.estado==='Renovada'||p.estado==='Cancelada') return p.estado;
+    return (fin && fin>=hoy()) ? 'Vigente' : 'Vencida';
+  }
+
+  function recalcularComision(p){
+    var part = num(p.participacion)>0 ? num(p.participacion) : 100;
+    p.participacion = part;
+    var c = +(num(p.prima) * num(p.comPct)/100 * part/100).toFixed(2);
+    if(c>0) p.comision = c;
+    return c;
+  }
+
+  window.jacActualizarDesdeReportes = async function(opts){
+    opts = opts || {};
+    var ix = indice();
+    var r = { capitalCare:{tocadas:0, sinRegistro:[], vigenciaVieja:0},
+              assa:{tocadas:0, sinRegistro:[]},
+              aseguradoraCorregida:0, ramoCorregido:0, comisionRecalculada:0, cambios:[] };
+
+    /* ---------- 1. Cartera Capital Care ---------- */
+    CC.forEach(function(f){
+      var numPol=f[0], desde=f[1], hasta=f[2], primaN=f[3], total=f[4], pagado=f[5],
+          saldo=f[6], pct=f[7], comEst=f[8], comp=f[9], ramo=f[10], sub=f[11],
+          lider=f[12], forma=f[13], letras=f[14], tipoPago=f[15];
+      var m = ix[norm(numPol)];
+      if(!m){ r.capitalCare.sinRegistro.push(numPol); return; }
+      m.forEach(function(p){
+        var c=[];
+        /* compañía y ramo: siempre */
+        var oficial = COMPANIA[comp];
+        if(oficial && p.aseg!==oficial){ c.push('compañía '+(p.aseg||'—')+'→'+oficial); p.aseg=oficial; r.aseguradoraCorregida++; }
+        var rc = RAMO[ramo];
+        if(rc && p.ramo!==rc){ c.push('ramo '+(p.ramo||'—')+'→'+rc); p.ramo=rc; r.ramoCorregido++; }
+        if(sub && !p.subramo) p.subramo=sub;
+        /* co-corretaje */
+        if(/CAPITAL CARE/i.test(lider||'')){
+          if(p.coCor!=='Capital Care & Co'){ p.coCor='Capital Care & Co'; c.push('co-corretaje'); }
+          if(!(num(p.participacion)>0)) p.participacion=65;
+          p.coCorPart = 100 - num(p.participacion);
+        }
+        /* % de comisión: siempre */
+        if(pct>0 && Math.abs(num(p.comPct)-pct)>0.01){ c.push('%com '+(p.comPct||0)+'→'+pct); p.comPct=pct; }
+        /* vigencia: solo si el reporte va igual o más adelante */
+        var reporteMasNuevo = !p.fechaFin || (hasta && hasta>=p.fechaFin);
+        if(reporteMasNuevo && desde && hasta){
+          if(p.fechaInicio!==desde){ c.push('inicio '+(p.fechaInicio||'—')+'→'+desde); p.fechaInicio=desde; }
+          if(p.fechaFin!==hasta){ c.push('fin '+(p.fechaFin||'—')+'→'+hasta); p.fechaFin=hasta; }
+        } else if(hasta && p.fechaFin && hasta<p.fechaFin){
+          r.capitalCare.vigenciaVieja++;
+        }
+        /* prima y saldos: solo si es la misma vigencia */
+        var mismaVigencia = (p.fechaInicio===desde && p.fechaFin===hasta);
+        if(mismaVigencia){
+          if(primaN>0 && Math.abs(num(p.prima)-primaN)>0.02){ c.push('prima '+(p.prima||0)+'→'+primaN); p.prima=primaN; }
+          if(total>0  && Math.abs(num(p.total)-total)>0.02){ p.total=total; }
+          if(Math.abs(num(p.pagado)-pagado)>0.02){ p.pagado=pagado; }
+          if(Math.abs(num(p.saldo)-saldo)>0.02){ c.push('saldo '+(p.saldo||0)+'→'+saldo); p.saldo=saldo; }
+          if(letras>0 && !p.numPagos) p.numPagos=letras;
+          if(forma && !p.periodo) p.periodo=forma;
+          if(tipoPago && !p.medio) p.medio=tipoPago;
+        } else if(primaN>0 && !(num(p.prima)>0)){
+          p.prima=primaN; c.push('prima (estaba en 0)→'+primaN);
+        }
+        var antes=num(p.comision);
+        recalcularComision(p);
+        if(Math.abs(antes-num(p.comision))>0.02){ c.push('comisión '+antes+'→'+p.comision); r.comisionRecalculada++; }
+        var e=estadoPorFecha(p,p.fechaFin);
+        if(p.estado!==e){ c.push('estado '+(p.estado||'—')+'→'+e); p.estado=e; }
+        p.extra=p.extra||{};
+        p.extra.capitalCare={corte:hoy(), primaNeta:primaN, total:total, pagado:pagado, saldo:saldo, pct:pct, comisionReporte:comEst};
+        if(c.length){ r.capitalCare.tocadas++; if(r.cambios.length<40) r.cambios.push({pol:numPol, cli:(p.nombreCliente||'').slice(0,20), c:c}); }
+      });
+    });
+
+    /* ---------- 2. Portal ASSA (Vida y Salud) ---------- */
+    ASSA.forEach(function(f){
+      var numPol=f[0], primaA=f[1], pct=f[2], saldo=f[3], desde=f[4], hasta=f[5];
+      var m = ix[norm(numPol)];
+      if(!m){ r.assa.sinRegistro.push(numPol); return; }
+      m.forEach(function(p){
+        var c=[];
+        if(p.aseg!=='ASSA'){ c.push('compañía '+(p.aseg||'—')+'→ASSA'); p.aseg='ASSA'; r.aseguradoraCorregida++; }
+        if(desde && p.fechaInicio!==desde){ c.push('inicio→'+desde); p.fechaInicio=desde; }
+        if(hasta && p.fechaFin!==hasta){ c.push('fin '+(p.fechaFin||'—')+'→'+hasta); p.fechaFin=hasta; }
+        if(primaA>0 && Math.abs(num(p.prima)-primaA)>0.02){ c.push('prima '+(p.prima||0)+'→'+primaA); p.prima=primaA; }
+        if(Math.abs(num(p.comPct)-pct)>0.01){ c.push('%com '+(p.comPct||0)+'→'+pct); p.comPct=pct; }
+        if(Math.abs(num(p.saldo)-saldo)>0.005){ p.saldo=saldo; }
+        var antes=num(p.comision);
+        recalcularComision(p);
+        if(Math.abs(antes-num(p.comision))>0.02){ c.push('comisión '+antes+'→'+p.comision); r.comisionRecalculada++; }
+        var e=estadoPorFecha(p,p.fechaFin);
+        if(p.estado!==e){ c.push('estado '+(p.estado||'—')+'→'+e); p.estado=e; }
+        p.extra=p.extra||{};
+        p.extra.assa=Object.assign({}, p.extra.assa||{}, {corte:hoy(), primaAnual:primaA, comisionPct:pct, saldo:saldo});
+        if(c.length){ r.assa.tocadas++; if(r.cambios.length<40) r.cambios.push({pol:numPol, cli:(p.nombreCliente||'').slice(0,20), c:c}); }
+      });
+    });
+
+    /* ---------- 3. Guardar y subir ---------- */
+    try{ S._ts=Date.now(); }catch(e){}
+    try{ if(typeof save==='function') save(); }catch(e){}
+    if(!opts.soloProbar){
+      try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
+    }
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+
+    var P=S.polizas||[];
+    r.resumen = {
+      vigentes:P.filter(function(p){return p.estado==='Vigente';}).length,
+      vencidas:P.filter(function(p){return p.estado==='Vencida';}).length,
+      renovadas:P.filter(function(p){return p.estado==='Renovada';}).length,
+      canceladas:P.filter(function(p){return p.estado==='Cancelada';}).length,
+      primaNetaVigente:+P.filter(function(p){return p.estado==='Vigente';}).reduce(function(a,p){return a+num(p.prima);},0).toFixed(2),
+      comisionVigente:+P.filter(function(p){return p.estado==='Vigente';}).reduce(function(a,p){return a+num(p.comision);},0).toFixed(2)
+    };
+    return r;
+  };
+
+  /* ---- Botón en Configuración ---- */
+  function ponerBoton(){
+    if(document.getElementById('jac-card-reportes')) return;
+    var cont = document.getElementById('pg-cfg') || document.getElementById('pg-conf');
+    if(!cont) return;
+    var d=document.createElement('div');
+    d.className='card'; d.id='jac-card-reportes';
+    var bs='padding:8px 14px;border-radius:8px;border:none;color:#fff;cursor:pointer;font-size:13px;margin:0 8px 8px 0';
+    d.innerHTML='<div class="ch"><h3>\uD83D\uDCC4 Reportes de aseguradoras</h3></div>'
+      +'<div style="padding:12px 16px">'
+      +'<p style="color:#6b7280;font-size:13px;margin:0 0 12px">Vuelve a poner el CRM al d\u00eda con lo que dicen las aseguradoras: vigencias, primas, % de comisi\u00f3n y compa\u00f1\u00eda. Nunca retrocede una vigencia que en el CRM ya va m\u00e1s adelante. Se puede correr las veces que quieras.</p>'
+      +'<button id="jac-btn-todo"      style="'+bs+';background:#15803D;font-weight:700">\u25B6 Actualizar todo</button>'
+      +'<button id="jac-btn-reportes"  style="'+bs+';background:#1E3A8A">Capital Care y ASSA</button>'
+      +'<button id="jac-btn-portales"  style="'+bs+';background:#7C3AED">UniVivir, iSeguros y BlueCross</button>'
+      +'<button id="jac-btn-auditar"   style="'+bs+';background:#B45309">Auditar y corregir</button>'
+      +'<div id="jac-res-reportes" style="margin-top:10px;font-size:12px;color:#334155;line-height:1.7"></div></div>';
+    cont.appendChild(d);
+
+    function pinta(html){ document.getElementById('jac-res-reportes').innerHTML=html; }
+    function dinero(n){ return '$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+    function resumenReportes(r){
+      return 'Capital Care <b>'+r.capitalCare.tocadas+'</b> \u00b7 ASSA <b>'+r.assa.tocadas+'</b>'
+        +' \u00b7 compa\u00f1\u00eda corregida <b>'+r.aseguradoraCorregida+'</b>'
+        +' \u00b7 comisi\u00f3n recalculada <b>'+r.comisionRecalculada+'</b>';
+    }
+    function resumenPortales(r){
+      if(r.error) return '<span style="color:#B91C1C">'+r.error+'</span>';
+      return 'Portales: le\u00eddos <b>'+r.leidas+'</b> \u00b7 aplicados <b>'+r.aplicadas+'</b>'
+        +' \u00b7 sin p\u00f3liza en el CRM <b>'+r.sinRegistro.length+'</b>';
+    }
+    function resumenAuditoria(r){
+      var a=r.arreglado, v=r.revisar, c=r.cartera;
+      return 'Auditor\u00eda \u2014 arreglado: compa\u00f1\u00eda <b>'+a.aseguradora+'</b>, ramo <b>'+a.ramo+'</b>,'
+        +' participaci\u00f3n <b>'+a.participacion+'</b>, %com <b>'+a.comPct+'</b>, comisi\u00f3n <b>'+a.comision+'</b>,'
+        +' estado <b>'+a.estado+'</b>, vendedor <b>'+a.vendedor+'</b><br>'
+        +'Por revisar: sin n\u00famero <b>'+v.sinNumero+'</b> \u00b7 sin fecha <b>'+v.sinFecha+'</b>'
+        +' \u00b7 sin prima <b>'+v.sinPrima+'</b> \u00b7 vigentes con fecha pasada <b>'+v.vigentesConFechaPasada+'</b>'
+        +' \u00b7 clientes repetidos <b>'+v.clientesDuplicados+'</b> \u00b7 p\u00f3lizas repetidas <b>'+v.polizasDuplicadas+'</b><br>'
+        +'<b>Cartera:</b> '+c.vigentes+' vigentes \u00b7 '+c.vencidas+' vencidas \u00b7 '+c.renovadas+' renovadas \u00b7 '
+        +c.canceladas+' canceladas \u2014 prima neta '+dinero(c.primaNeta)+' \u00b7 comisi\u00f3n '+dinero(c.comision)
+        +' \u00b7 saldo por cobrar '+dinero(c.saldo);
+    }
+
+    async function correr(btn, etiqueta, fn){
+      var t=btn.textContent; btn.disabled=true; btn.textContent='Trabajando\u2026';
+      var r=await fn();
+      btn.disabled=false; btn.textContent=t;
+      return r;
+    }
+
+    document.getElementById('jac-btn-reportes').onclick=async function(){
+      var r=await correr(this,'', function(){ return window.jacActualizarDesdeReportes(); });
+      pinta(resumenReportes(r)); window.__jacUltimo=r;
+    };
+    document.getElementById('jac-btn-portales').onclick=async function(){
+      var r=await correr(this,'', function(){ return window.jacAplicarPortales(); });
+      pinta(resumenPortales(r)); window.__jacUltimo=r;
+    };
+    document.getElementById('jac-btn-auditar').onclick=async function(){
+      var r=await correr(this,'', function(){ return window.jacAuditar(); });
+      pinta(resumenAuditoria(r)); window.__jacUltimo=r;
+    };
+    document.getElementById('jac-btn-todo').onclick=async function(){
+      var b=this, t=b.textContent; b.disabled=true;
+      b.textContent='1/3 reportes\u2026'; pinta('Aplicando Capital Care y ASSA\u2026');
+      var r1=await window.jacActualizarDesdeReportes({soloProbar:true});
+      b.textContent='2/3 portales\u2026'; pinta(resumenReportes(r1)+'<br>Aplicando los portales\u2026');
+      var r2=await window.jacAplicarPortales({soloProbar:true});
+      b.textContent='3/3 auditor\u00eda\u2026'; pinta(resumenReportes(r1)+'<br>'+resumenPortales(r2)+'<br>Auditando\u2026');
+      var r3=await window.jacAuditar();
+      b.disabled=false; b.textContent=t;
+      pinta(resumenReportes(r1)+'<br>'+resumenPortales(r2)+'<br>'+resumenAuditoria(r3));
+      window.__jacUltimo={reportes:r1, portales:r2, auditoria:r3};
+    };
+  }
+  setTimeout(ponerBoton, 4000);
+  setTimeout(ponerBoton, 12000);
+  document.addEventListener('click', function(){ setTimeout(ponerBoton, 600); });
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Aplicar UniVivir, iSeguros y BlueCross
+   ------------------------------------------------------------
+   Estos tres portales ya no tienen módulo propio: sus datos
+   quedaron archivados en la base, en crm_meta. En vez de traer
+   los números incrustados en el código, este bloque los LEE de
+   tu propia base cada vez que corre, así que siempre aplica lo
+   último que se haya archivado.
+
+   Claves que busca en crm_meta:
+     univivir · iseguros_polizas · iseguros_comisiones
+     bluecross_asegurados · portales_archivo
+
+   Como cada portal nombra sus campos distinto, la lectura es
+   tolerante: para cada registro prueba varias grafías del
+   número de póliza, de las fechas, de la prima y de la comisión.
+   Lo que no reconoce, lo reporta en vez de inventarlo.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function norm(s){
+    return String(s||'').toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/Ñ/g,'N')
+      .replace(/[^A-Z0-9]/g,'');
+  }
+  function hoy(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+  function num(v){
+    if(v==null) return 0;
+    var n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+    return isFinite(n)?n:0;
+  }
+  /* Acepta 2026-05-31, 31/05/2026 y 31-05-2026 */
+  function fecha(v){
+    if(!v) return null;
+    var s=String(v).trim();
+    var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m) return m[1]+'-'+m[2]+'-'+m[3];
+    m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if(m) return m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);
+    var d=new Date(s);
+    if(!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+    return null;
+  }
+  /* Primer valor no vacío entre varias grafías posibles */
+  function campo(o, nombres){
+    for(var i=0;i<nombres.length;i++){
+      var k=nombres[i];
+      if(o[k]!==undefined && o[k]!==null && o[k]!=='') return o[k];
+    }
+    /* búsqueda laxa: por si la clave viene con otra capitalización */
+    var claves=Object.keys(o);
+    for(var j=0;j<nombres.length;j++){
+      var buscado=norm(nombres[j]);
+      for(var k2=0;k2<claves.length;k2++){
+        if(norm(claves[k2])===buscado && o[claves[k2]]!=='' && o[claves[k2]]!=null) return o[claves[k2]];
+      }
+    }
+    return null;
+  }
+
+  var NUM   = ['nroPol','numeroPol','numPoliza','poliza','nroPoliza','num','policy','nro','no_poliza','numero'];
+  var INI   = ['fechaInicio','fechaIni','fecIni','fIni','fecha_inicio','desde','vigenciaDesde','inicio','fechaDesde','fecInicio','vigDesde'];
+  var FIN   = ['fechaFin','fecFin','fFin','fecha_fin','hasta','vigenciaHasta','fin','fechaHasta','vence','vencimiento','vigHasta'];
+  var PRIMA = ['prima','primaNeta','primaSinImpuesto','primaAnual','montoPrima','valorPrima'];
+  var COM   = ['comision','comisionPagada','montoComision','comisionEstimada'];
+  var PCT   = ['comPct','porcentaje','pctComision','porcComision','comisionPct'];
+  var VIDAS = ['vidas','cantVidas','asegurados','numAsegurados'];
+
+  /* Recoge de cualquier objeto todos los arreglos de registros que
+     tengan pinta de póliza (o sea, que traigan un número). */
+  function cosechar(raiz, etiqueta, salida){
+    if(!raiz || typeof raiz!=='object') return;
+    if(Array.isArray(raiz)){
+      var utiles=raiz.filter(function(x){ return x && typeof x==='object' && campo(x,NUM); });
+      if(utiles.length) salida.push({origen:etiqueta, filas:utiles});
+      return;
+    }
+    Object.keys(raiz).forEach(function(k){
+      cosechar(raiz[k], etiqueta+'.'+k, salida);
+    });
+  }
+
+  window.jacAplicarPortales = async function(opts){
+    opts=opts||{};
+    var r={leidas:0, aplicadas:0, sinRegistro:[], fuentes:[], cambios:[], error:null};
+    if(!window.db || window.db.__esStub){ r.error='sin conexión a la base'; return r; }
+    var ses=await window.db.auth.getSession();
+    if(!(ses&&ses.data&&ses.data.session)){ r.error='sin sesión de nube — pulsa Reconectar'; return r; }
+
+    var claves=['univivir','iseguros_polizas','iseguros_comisiones','bluecross_asegurados','portales_archivo'];
+    var q=await window.db.from('crm_meta').select('clave,valor').in('clave',claves);
+    if(q.error){ r.error=q.error.message; return r; }
+
+    var grupos=[];
+    (q.data||[]).forEach(function(f){ cosechar(f.valor, f.clave, grupos); });
+    r.fuentes=grupos.map(function(g){ return {origen:g.origen, filas:g.filas.length}; });
+
+    var ix={};
+    (S.polizas||[]).forEach(function(p){ var n=norm(p.num); if(n)(ix[n]=ix[n]||[]).push(p); });
+
+    grupos.forEach(function(g){
+      g.filas.forEach(function(f){
+        r.leidas++;
+        var np=norm(campo(f,NUM));
+        if(!np) return;
+        var m=ix[np];
+        if(!m){ if(r.sinRegistro.length<40) r.sinRegistro.push({origen:g.origen, num:String(campo(f,NUM))}); return; }
+        var ini=fecha(campo(f,INI)), fin=fecha(campo(f,FIN));
+        var prima=num(campo(f,PRIMA)), com=num(campo(f,COM)), pct=num(campo(f,PCT)), vidas=num(campo(f,VIDAS));
+        m.forEach(function(p){
+          var c=[];
+          /* Vigencia: solo si el archivo va igual o más adelante */
+          if(fin && (!p.fechaFin || fin>=p.fechaFin)){
+            if(ini && p.fechaInicio!==ini){ c.push('inicio '+(p.fechaInicio||'—')+'→'+ini); p.fechaInicio=ini; }
+            if(p.fechaFin!==fin){ c.push('fin '+(p.fechaFin||'—')+'→'+fin); p.fechaFin=fin; }
+          }
+          /* Prima: se escribe si el CRM no tiene, o si es la misma vigencia */
+          var misma = (ini && fin && p.fechaInicio===ini && p.fechaFin===fin);
+          if(prima>0 && (misma || !(num(p.prima)>0))){
+            if(Math.abs(num(p.prima)-prima)>0.02){ c.push('prima '+(p.prima||0)+'→'+prima); p.prima=prima; }
+          }
+          /* Porcentaje: del archivo, o deducido de comisión/prima cuando ambos vienen */
+          var tasa = pct>0 ? pct : ((com>0 && prima>0) ? +(com/prima*100).toFixed(2) : 0);
+          if(tasa>0 && Math.abs(num(p.comPct)-tasa)>0.01){ c.push('%com '+(p.comPct||0)+'→'+tasa); p.comPct=tasa; }
+          /* Comisión: la del portal manda; si no viene, se calcula */
+          var part = num(p.participacion)>0 ? num(p.participacion) : 100;
+          p.participacion=part;
+          var nueva = com>0 ? com : +(num(p.prima)*num(p.comPct)/100*part/100).toFixed(2);
+          if(nueva>0 && Math.abs(num(p.comision)-nueva)>0.02){ c.push('comisión '+(p.comision||0)+'→'+nueva); p.comision=nueva; }
+          if(p.comision===undefined || p.comision===null) p.comision=0;   /* nunca undefined */
+          if(vidas>0){ p.extra=p.extra||{}; p.extra.vidas=vidas; }
+          /* Estado por la fecha, respetando Renovada y Cancelada */
+          if(p.estado!=='Renovada' && p.estado!=='Cancelada'){
+            var e=(p.fechaFin && p.fechaFin>=hoy())?'Vigente':'Vencida';
+            if(p.estado!==e){ c.push('estado '+(p.estado||'—')+'→'+e); p.estado=e; }
+          }
+          p.extra=p.extra||{};
+          p.extra.portal={origen:g.origen, corte:hoy()};
+          if(c.length){ r.aplicadas++; if(r.cambios.length<40) r.cambios.push({num:p.num, cli:(p.nombreCliente||'').slice(0,20), origen:g.origen, c:c}); }
+        });
+      });
+    });
+
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+    if(!opts.soloProbar){ try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){} }
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+    return r;
+  };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Auditoría y reparación
+   ------------------------------------------------------------
+   Revisa el CRM entero y arregla lo que se puede arreglar sin
+   inventar nada. Lo que necesita un dato que no existe, no lo
+   toca: lo lista para que lo revises.
+
+   Qué corrige solo:
+     1. Nombres de aseguradora sueltos (grafías repetidas).
+     2. Ramos fuera del vocabulario del CRM.
+     3. Participación guardada como fracción (0.65 en vez de 65).
+     4. % de comisión guardado como fracción (0.2 en vez de 20).
+     5. Comisión que no cuadra con prima neta × % × participación.
+     6. Estado incoherente con la fecha de vencimiento.
+     7. Co-corretaje sin la parte del socio.
+     8. Vendedor con grafías distintas o en blanco.
+
+   Qué solo reporta:
+     · Pólizas sin número, sin fecha o sin prima.
+     · Vigentes con la fecha ya pasada y sin renovación cargada.
+     · Clientes duplicados por nombre.
+     · Pólizas duplicadas (mismo número, mismo cliente).
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* Se quitan tildes y la Ñ ANTES de filtrar: si no, "COMPAÑIA" pierde la Ñ
+     y deja de casar con "COMPANIA" en la tabla de nombres. */
+  function norm(s){
+    return String(s||'').toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/Ñ/g,'N')
+      .replace(/[^A-Z0-9]/g,'');
+  }
+  function hoy(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+  function num(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
+
+  var RAMOS_OK = ['AUTOS/VEHÍCULOS','SALUD/MÉDICOS','VIDA','INCENDIO Y LÍNEAS ALIADAS',
+    'FIANZAS/ROBO/SUSTRACCIÓN','PROPIEDAD','HOGAR','MOTOS','TODO RIESGO','VIAJES/TURISMO',
+    'RESPONSABILIDAD CIVIL','ACCIDENTES PERSONALES','TRANSPORTE'];
+
+  var RAMO_ALIAS = {
+    'AUTOMOVIL':'AUTOS/VEHÍCULOS','AUTO':'AUTOS/VEHÍCULOS','AUTOS':'AUTOS/VEHÍCULOS',
+    'VEHICULOS':'AUTOS/VEHÍCULOS','DANOSATERCEROS':'AUTOS/VEHÍCULOS',
+    'SALUD':'SALUD/MÉDICOS','MEDICOS':'SALUD/MÉDICOS','SALUDMEDICOS':'SALUD/MÉDICOS','ENFERMEDADES':'SALUD/MÉDICOS',
+    'INCENDIO':'INCENDIO Y LÍNEAS ALIADAS','LINEASALIADAS':'INCENDIO Y LÍNEAS ALIADAS',
+    'FIANZA':'FIANZAS/ROBO/SUSTRACCIÓN','FIANZAS':'FIANZAS/ROBO/SUSTRACCIÓN','ROBO':'FIANZAS/ROBO/SUSTRACCIÓN',
+    'VIDATRADICIONAL':'VIDA','VIDAUNIVERSAL':'VIDA',
+    'VIAJES':'VIAJES/TURISMO','VIAJESTURISMO':'VIAJES/TURISMO',
+    'ACCIDENTES':'ACCIDENTES PERSONALES','ACCIDENTESPERSONALES':'ACCIDENTES PERSONALES',
+    'TODORIESGOCONSTRUCCION':'TODO RIESGO','RESPONSABILIDADCIVIL':'RESPONSABILIDAD CIVIL'
+  };
+
+  var ASEG_ALIAS = {
+    'ASSA':'ASSA','ASSACOMPANIADESEGUROSSA':'ASSA',
+    'CIAINTERNACIONALDESEGUROSSA':'Cía Internacional De Seguros, S.A.',
+    'INTERNACIONALDESEGUROS':'Cía Internacional De Seguros, S.A.',
+    'IS':'Cía Internacional De Seguros, S.A.',
+    'SURA':'SURA','SEGUROSSURAMERICANASA':'SURA','SURAMERICANA':'SURA',
+    'FEDPA':'FEDPA','SEGUROSFEDPASA':'FEDPA','SEGUROSFEDPA':'FEDPA',
+    'MAPFRE':'MAPFRE','MAPFREPANAMASA':'MAPFRE',
+    'ANCON':'Ancón','ASEGURADORAANCONSA':'Ancón',
+    'ACERTA':'Acerta','ACERTASEGUROSSA':'Acerta',
+    'UNIVIVIR':'UNIVIVIR','VIVIRCOMPANIADESEGUROSSA':'UNIVIVIR','VIVIR':'UNIVIVIR',
+    'WORLDWIDEMEDICALASSURAN':'WORLDWIDE MEDICAL ASSURAN','WWMEDICAL':'WORLDWIDE MEDICAL ASSURAN',
+    'WORLDWIDEMEDICAL':'WORLDWIDE MEDICAL ASSURAN'
+  };
+
+  var VENDEDOR = 'JELY AN CASTRO PEREZ';
+
+  window.jacAuditar = async function(opts){
+    opts=opts||{};
+    var P=S.polizas||[], C=S.clientes||[];
+    var arr = { aseguradora:0, ramo:0, participacion:0, comPct:0, comision:0, estado:0, coCor:0, vendedor:0 };
+    var rep = { sinNumero:[], sinFecha:[], sinPrima:[], vigenteVencida:[], clientesDuplicados:[], polizasDuplicadas:[], ramoDesconocido:{} };
+    var det = [];
+
+    P.forEach(function(p){
+      var c=[];
+
+      /* 1. Aseguradora */
+      var a=ASEG_ALIAS[norm(p.aseg)];
+      if(a && p.aseg!==a){ c.push('compañía '+p.aseg+'→'+a); p.aseg=a; arr.aseguradora++; }
+
+      /* 2. Ramo */
+      if(p.ramo && RAMOS_OK.indexOf(p.ramo)===-1){
+        var rr=RAMO_ALIAS[norm(p.ramo)];
+        if(rr){ c.push('ramo '+p.ramo+'→'+rr); p.ramo=rr; arr.ramo++; }
+        else rep.ramoDesconocido[p.ramo]=(rep.ramoDesconocido[p.ramo]||0)+1;
+      }
+
+      /* 3. Participación como fracción */
+      var pa=num(p.participacion);
+      if(pa>0 && pa<=1){ p.participacion=+(pa*100).toFixed(0); c.push('participación '+pa+'→'+p.participacion); arr.participacion++; }
+      if(!(num(p.participacion)>0)) p.participacion=100;
+
+      /* 4. % de comisión como fracción */
+      var pc=num(p.comPct);
+      if(pc>0 && pc<1 && num(p.prima)>0){
+        /* 0.2 en un ramo de 20% es fracción; 0.27 en vida puede ser real.
+           Solo se corrige si al multiplicar por 100 cae en una tasa creíble. */
+        var cand=+(pc*100).toFixed(2);
+        if(cand>=1 && cand<=50){ p.comPct=cand; c.push('%com '+pc+'→'+cand); arr.comPct++; }
+      }
+
+      /* 5. Comisión = prima neta × % × participación */
+      if(num(p.prima)>0 && num(p.comPct)>0){
+        var esperada=+(num(p.prima)*num(p.comPct)/100*num(p.participacion)/100).toFixed(2);
+        if(esperada>0 && Math.abs(num(p.comision)-esperada)>0.02){
+          c.push('comisión '+(p.comision||0)+'→'+esperada); p.comision=esperada; arr.comision++;
+        }
+      } else if(p.comision===undefined || p.comision===null){
+        p.comision=0;   /* que nunca quede en undefined y rompa las sumas */
+      }
+
+      /* 6. Estado coherente con la fecha */
+      if(p.estado!=='Renovada' && p.estado!=='Cancelada'){
+        if(p.fechaFin){
+          var e=(p.fechaFin>=hoy())?'Vigente':'Vencida';
+          /* Si está marcada Vigente con fecha pasada NO se degrada sola:
+             puede ser una renovación que aún no se carga. Se reporta. */
+          if(p.estado==='Vigente' && p.fechaFin<hoy()){
+            rep.vigenteVencida.push({num:p.num||'(sin número)', cli:(p.nombreCliente||'').slice(0,22), fin:p.fechaFin, aseg:p.aseg});
+          } else if(p.estado!==e){
+            c.push('estado '+(p.estado||'—')+'→'+e); p.estado=e; arr.estado++;
+          }
+        } else if(!p.estado){ p.estado='Vigente'; arr.estado++; }
+      }
+
+      /* 7. Co-corretaje */
+      if(p.coCor && num(p.participacion)>0){
+        var socio=100-num(p.participacion);
+        if(Math.abs(num(p.coCorPart)-socio)>0.01){ p.coCorPart=socio; arr.coCor++; }
+      }
+
+      /* 8. Vendedor */
+      if(norm(p.vendedor)!==norm(VENDEDOR)){ p.vendedor=VENDEDOR; arr.vendedor++; }
+
+      /* Reportes */
+      if(!p.num) rep.sinNumero.push({cli:(p.nombreCliente||'').slice(0,22), aseg:p.aseg, ramo:p.ramo});
+      if(!p.fechaFin) rep.sinFecha.push({num:p.num||'(sin número)', cli:(p.nombreCliente||'').slice(0,22), aseg:p.aseg});
+      if(!(num(p.prima)>0)) rep.sinPrima.push({num:p.num||'(sin número)', cli:(p.nombreCliente||'').slice(0,22), aseg:p.aseg});
+
+      if(c.length && det.length<50) det.push({num:p.num||'(sin número)', cli:(p.nombreCliente||'').slice(0,20), c:c});
+    });
+
+    /* Duplicados de póliza: mismo número y mismo cliente */
+    var vistas={};
+    P.forEach(function(p){
+      if(!p.num) return;
+      var k=norm(p.num)+'@'+(p.clienteId||'');
+      (vistas[k]=vistas[k]||[]).push(p);
+    });
+    Object.keys(vistas).forEach(function(k){
+      var v=vistas[k];
+      if(v.length>1 && rep.polizasDuplicadas.length<20){
+        rep.polizasDuplicadas.push({num:v[0].num, cli:(v[0].nombreCliente||'').slice(0,22), veces:v.length,
+          estados:v.map(function(x){return x.estado+' hasta '+(x.fechaFin||'—');})});
+      }
+    });
+
+    /* Clientes con el mismo nombre */
+    var porNombre={};
+    C.forEach(function(x){ var n=norm(x.nombre); if(n)(porNombre[n]=porNombre[n]||[]).push(x); });
+    Object.keys(porNombre).forEach(function(n){
+      if(porNombre[n].length>1 && rep.clientesDuplicados.length<20){
+        rep.clientesDuplicados.push({nombre:porNombre[n][0].nombre, veces:porNombre[n].length});
+      }
+    });
+
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+    if(!opts.soloProbar){ try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){} }
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+
+    var vig=P.filter(function(p){return p.estado==='Vigente';});
+    return {
+      arreglado:arr,
+      revisar:{
+        sinNumero:rep.sinNumero.length, sinFecha:rep.sinFecha.length, sinPrima:rep.sinPrima.length,
+        vigentesConFechaPasada:rep.vigenteVencida.length,
+        clientesDuplicados:rep.clientesDuplicados.length, polizasDuplicadas:rep.polizasDuplicadas.length,
+        ramosDesconocidos:rep.ramoDesconocido
+      },
+      listas:rep,
+      muestraCambios:det,
+      cartera:{
+        total:P.length,
+        vigentes:vig.length,
+        vencidas:P.filter(function(p){return p.estado==='Vencida';}).length,
+        renovadas:P.filter(function(p){return p.estado==='Renovada';}).length,
+        canceladas:P.filter(function(p){return p.estado==='Cancelada';}).length,
+        primaNeta:+vig.reduce(function(a,p){return a+num(p.prima);},0).toFixed(2),
+        comision:+vig.reduce(function(a,p){return a+num(p.comision);},0).toFixed(2),
+        saldo:+vig.reduce(function(a,p){return a+num(p.saldo);},0).toFixed(2)
+      }
+    };
+  };
 })();
 </script>
 
