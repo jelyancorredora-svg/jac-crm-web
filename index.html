@@ -15087,7 +15087,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-20-T';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-20-V';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15889,6 +15889,7 @@ document.addEventListener('click', function(e){
       +'<button id="jac-btn-auditar"   style="'+bs+';background:#B45309">Auditar y corregir</button>'
       +'<button id="jac-btn-completar" style="'+bs+';background:#0891B2">Completar faltantes</button>'
       +'<button id="jac-btn-verarch"   style="'+bs+';background:#64748B">Ver qu\u00e9 hay archivado</button>'
+      +'<button id="jac-btn-tareas"    style="'+bs+';background:#7C3AED">Ordenar tareas</button>'
       +'<div id="jac-res-reportes" style="margin-top:10px;font-size:12px;color:#334155;line-height:1.7"></div>'
       +'<div style="margin-top:14px;padding-top:12px;border-top:1px solid #E8DFD0;font-size:12px;color:#64748B">'
       +'<b>Versi\u00f3n instalada:</b> <span id="jac-ver-corre">\u2026</span>'
@@ -16006,6 +16007,21 @@ document.addEventListener('click', function(e){
       if((r.__clavesQueNoEstan||[]).length) h+='<span style="color:#B45309">No existen en la base: '+r.__clavesQueNoEstan.join(', ')+'</span>';
       h+='<div style="margin-top:8px;font-size:11px;color:#64748B">El detalle completo queda en <code>window.__jacArchivo</code>.</div>';
       pinta(h);
+    };
+
+    document.getElementById('jac-btn-tareas').onclick=async function(){
+      var prev=await window.jacLimpiarTareas({soloVer:true});
+      if(!prev.candidatas){
+        pinta('Tareas: <b>'+prev.total+'</b> en total, <b>'+prev.automaticas+'</b> autom\u00e1ticas. '
+             +'Ninguna pasa de 120 d\u00edas, as\u00ed que no hay nada que archivar.');
+        return;
+      }
+      var r=await correr(this,'', function(){ return window.jacLimpiarTareas(); });
+      if(r.error){ pinta('<span style="color:#B91C1C">'+r.error+'</span>'); return; }
+      pinta('Tareas ordenadas \u2014 archivadas <b>'+r.archivadas+'</b> autom\u00e1ticas de m\u00e1s de 120 d\u00edas.<br>'
+        +'Quedan <b>'+r.quedan+'</b> en total, de las cuales <b>'+r.quedanMias+'</b> son tuyas.<br>'
+        +'<span style="font-size:11px;color:#64748B">Se guardaron en la base; con <code>jacRestaurarTareas()</code> vuelven.</span>');
+      window.__jacUltimo=r;
     };
 
     document.getElementById('jac-btn-todo').onclick=async function(){
@@ -16754,6 +16770,400 @@ document.addEventListener('click', function(e){
   }
   setTimeout(envolver, 1200);
   setTimeout(envolver, 5000);
+})();
+</script>
+
+
+<style id="jac-responsive">
+/* ============================================================
+   JAC CRM — Adaptación a celular y tablet
+   ------------------------------------------------------------
+   El CRM nació para pantalla de escritorio y solo tenía un
+   corte en 768px, resuelto a base de parches. Aquí se ordena:
+
+     · Tablet (769–1099): dos columnas en vez de tres, cabecera
+       y tarjetas más compactas. Antes la tablet recibía el
+       diseño de escritorio apretado y se salía por los lados.
+     · Celular (≤768): una sola columna, tablas que se deslizan
+       dentro de su caja en vez de estirar la página, modales a
+       pantalla completa y botones de al menos 44px.
+     · Agenda: el calendario se lee de verdad — días cuadrados,
+       pestañas deslizables y panel debajo, no al lado.
+     · Respeta el notch y la barra inferior del iPhone.
+
+   Va al final para ganarle a las reglas anteriores sin tener
+   que tocarlas una por una.
+   ============================================================ */
+
+/* ---------- Base: que la página nunca se desplace de lado ---------- */
+html, body { max-width: 100%; overflow-x: hidden; }
+*, *::before, *::after { box-sizing: border-box; }
+img, video, canvas, svg { max-width: 100%; height: auto; }
+
+/* Cualquier tabla se desliza dentro de su caja */
+.tw, .tabla-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+
+/* ================= TABLET (769–1099) ================= */
+@media (min-width: 769px) and (max-width: 1099px) {
+  .fg3 { grid-template-columns: 1fr 1fr; }
+  .sg .st { flex: 1 1 calc(33.333% - 8px); }
+  .dpanel { width: 62vw; }
+  nav a { padding: 6px 9px; font-size: 12px; }
+  .card { padding: 12px; }
+  /* Rejillas de tres o cuatro columnas puestas a mano */
+  [style*="grid-template-columns:repeat(4,1fr)"] { grid-template-columns: 1fr 1fr !important; }
+  [style*="grid-template-columns:repeat(3,1fr)"] { grid-template-columns: 1fr 1fr !important; }
+  /* La agenda cabe en dos bloques, no en tres columnas */
+  #pg-cal > div { gap: 10px !important; }
+}
+
+/* ================= CELULAR (≤768) ================= */
+@media (max-width: 768px) {
+
+  /* --- Espacio seguro del iPhone: notch arriba, barra abajo --- */
+  body { padding-bottom: env(safe-area-inset-bottom); }
+  .bnav { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+
+  /* --- Tipografía y densidad --- */
+  .card { padding: 11px; border-radius: 12px; }
+  h1 { font-size: 19px; } h2 { font-size: 16px; } h3 { font-size: 14px; }
+
+  /* --- Todo lo que sea tabla, deslizable --- */
+  table { min-width: 560px; }
+  .tw, .tabla-scroll { border-radius: 10px; }
+  /* Aviso visual de que hay más a la derecha */
+  .tw::-webkit-scrollbar { height: 4px; }
+  .tw::-webkit-scrollbar-thumb { background: rgba(100,116,139,.45); border-radius: 4px; }
+
+  /* --- Botones y campos: alcanzables con el dedo --- */
+  .btn { min-height: 40px; }
+  .btn.bsm { min-height: 36px; }
+  input, select, textarea, .fc { font-size: 16px !important; }  /* 16px evita el zoom automático de iOS */
+  select.fc { min-height: 42px; }
+
+  /* --- Tarjetas de resumen: dos por fila --- */
+  .sg { gap: 7px; }
+  .sg .st { flex: 1 1 calc(50% - 7px); min-width: 0; padding: 10px; }
+  .sg .st .n { font-size: 20px; }
+
+  /* --- Rejillas del panel: dos columnas en vez de una --- */
+  #kpi-panel > div > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr 1fr !important; gap: 7px !important;
+  }
+  #kpi-panel > div > div > div { padding: 9px !important; }
+
+  /* --- Modales como hoja a pantalla completa --- */
+  .mo .md {
+    width: 100% !important; max-width: 100% !important;
+    max-height: 92vh; margin: auto 0 0 !important;
+    border-radius: 16px 16px 0 0 !important;
+  }
+  .mo .md .fg, .mo .md .fg3 { grid-template-columns: 1fr !important; }
+
+  /* --- AGENDA --- */
+  #pg-cal { padding: 0 !important; padding-bottom: 66px !important; }
+  #pg-cal > div {
+    flex-direction: column !important;
+    height: auto !important; overflow: visible !important;
+    border-radius: 0 !important;
+  }
+  /* La columna lateral pasa a ser una franja de arriba */
+  #pg-cal [style*="width:260px"], #pg-cal [style*="width: 260px"] {
+    width: 100% !important; flex: 0 0 auto !important;
+    border-right: 0 !important; border-bottom: 1px solid var(--bd) !important;
+  }
+  /* Rejilla del mes: días cuadrados y legibles */
+  #cal-grid, [id^="cal-"][id$="-grid"] {
+    grid-template-columns: repeat(7, 1fr) !important;
+    gap: 2px !important;
+  }
+  #cal-grid > div { min-height: 44px !important; font-size: 11px !important; padding: 2px !important; }
+  #cal-grid > div .cal-num, #cal-grid > div > div:first-child { font-size: 12px !important; }
+  /* Pestañas de la agenda: se deslizan en vez de amontonarse */
+  #cal-tabs, .cal-tabs, #pg-cal [style*="display:flex"][style*="border-bottom"] {
+    overflow-x: auto !important; -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important; scrollbar-width: none;
+  }
+  #cal-tabs::-webkit-scrollbar, .cal-tabs::-webkit-scrollbar { display: none; }
+  #cal-tabs > *, .cal-tabs > * { flex: 0 0 auto !important; white-space: nowrap; }
+  /* Paneles de la agenda con aire */
+  [id^="cal-pane-"] { padding: 11px !important; }
+  #cal-notas-list { grid-template-columns: 1fr !important; }
+
+  /* --- Cotizador y formularios largos --- */
+  .fg, .fg3 { grid-template-columns: 1fr !important; }
+  .fl { min-width: 0; }
+
+  /* --- Cabecera --- */
+  .hd { padding: 8px 10px; }
+  .hd .b { font-size: 10px; padding: 3px 7px; }
+
+  /* --- El semáforo de sincronización no debe tapar la barra inferior --- */
+  #jac-semaforo { bottom: calc(64px + env(safe-area-inset-bottom)) !important; font-size: 10px !important; }
+  .waf { bottom: calc(72px + env(safe-area-inset-bottom)) !important; }
+}
+
+/* ================= CELULAR ANGOSTO (≤400) ================= */
+@media (max-width: 400px) {
+  .sg .st { flex: 1 1 100%; }
+  #kpi-panel > div > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+  #cal-grid > div { min-height: 38px !important; font-size: 10px !important; }
+  .hd img, .hd svg { max-height: 26px; }
+}
+
+/* ================= HORIZONTAL EN CELULAR ================= */
+@media (max-width: 900px) and (orientation: landscape) {
+  #pg-cal > div { flex-direction: row !important; }
+  #pg-cal [style*="width:260px"] { width: 240px !important; border-bottom: 0 !important; border-right: 1px solid var(--bd) !important; }
+  .mo .md { max-height: 96vh; }
+}
+</style>
+
+<script>
+/* ============================================================
+   Ajustes que el CSS solo no puede hacer
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* 1. Permitir el zoom con los dedos.
+        Estaba bloqueado con user-scalable=no, lo que además de
+        estorbar es un problema de accesibilidad. */
+  try{
+    var vp=document.querySelector('meta[name=viewport]');
+    if(!vp){ vp=document.createElement('meta'); vp.name='viewport'; document.head.appendChild(vp); }
+    vp.setAttribute('content','width=device-width, initial-scale=1, viewport-fit=cover');
+  }catch(e){}
+
+  /* 2. Envolver en una caja deslizable toda tabla que no lo esté.
+        Sin esto, una tabla ancha estira la página entera y el
+        contenido se sale por el costado. */
+  function envolverTablas(){
+    try{
+      document.querySelectorAll('table').forEach(function(t){
+        var p=t.parentElement;
+        if(p && (p.classList.contains('tw')||p.classList.contains('tabla-scroll'))) return;
+        var box=document.createElement('div');
+        box.className='tabla-scroll';
+        t.parentNode.insertBefore(box, t);
+        box.appendChild(t);
+      });
+    }catch(e){}
+  }
+  setTimeout(envolverTablas, 1200);
+  setInterval(envolverTablas, 4000);
+
+  /* 3. Avisar al CSS de la altura real de la ventana.
+        En móvil la barra del navegador aparece y desaparece, y
+        100vh se pasa de largo. Con --vh el alto es el de verdad. */
+  function altura(){
+    try{ document.documentElement.style.setProperty('--vh', (window.innerHeight*0.01)+'px'); }catch(e){}
+  }
+  altura();
+  window.addEventListener('resize', altura);
+  window.addEventListener('orientationchange', function(){ setTimeout(altura, 250); });
+
+  /* 4. Al abrir un modal en el celular, no dejar que el fondo
+        se desplace por detrás. */
+  function vigilarModales(){
+    try{
+      var abierto=false, m=document.querySelectorAll('.mo');
+      for(var i=0;i<m.length;i++){ if(m[i].offsetParent!==null && m[i].offsetHeight>80){ abierto=true; break; } }
+      if(window.innerWidth<=768) document.body.style.overflow = abierto ? 'hidden' : '';
+      else document.body.style.overflow='';
+    }catch(e){}
+  }
+  setInterval(vigilarModales, 900);
+
+  window.jacResponsive=function(){
+    return { ancho:window.innerWidth, alto:window.innerHeight,
+             modo: window.innerWidth<=400?'celular angosto': window.innerWidth<=768?'celular': window.innerWidth<=1099?'tablet':'escritorio',
+             desbordaDeLado: document.documentElement.scrollWidth > document.documentElement.clientWidth+2,
+             tablasSinCaja: [...document.querySelectorAll('table')].filter(function(t){
+               var p=t.parentElement; return !(p&&(p.classList.contains('tw')||p.classList.contains('tabla-scroll')));
+             }).length };
+  };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Ordenar las tareas
+   ------------------------------------------------------------
+   De 300 tareas, 228 las generó el propio sistema a partir de
+   comisiones pendientes — varias de 2018. No son trabajo suyo,
+   pero llenaban la lista y el contador decía 271 pendientes
+   mientras el tablero decía 49. Dos números para lo mismo.
+
+   Qué hace este bloque:
+
+   1. Unifica el conteo. La lista de Tareas ya no suma las
+      automáticas, igual que el tablero. Un solo número.
+
+   2. Separa las vistas. Arriba de la lista aparece un selector
+      — Mías / Automáticas / Todas — para que el trabajo real y
+      el recordatorio de cobro no se estorben.
+
+   3. `jacLimpiarTareas()` archiva las automáticas viejas.
+      No las borra: las mueve a `crm_meta` bajo `tareas_archivo`,
+      así que se pueden recuperar. Solo toca las que cumplen
+      TODAS estas condiciones — automática de comisión, sin
+      terminar, y con más de 120 días encima.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function esAuto(t){
+    return t && (t._autoTipo==='comision' || /^auto_comision/i.test(String(t.id||'')));
+  }
+  function hoy(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+  function diasDesde(f){
+    if(!f) return 0;
+    var d=new Date(f+'T00:00:00');
+    if(isNaN(d.getTime())) return 0;
+    return Math.round((new Date(hoy()+'T00:00:00') - d)/86400000);
+  }
+  window.jacTareaAuto = esAuto;
+
+  /* ---- 1. Que la lista de Tareas cuente lo mismo que el tablero ---- */
+  function arreglarConteo(){
+    if(typeof window.RTar!=='function' || window.__jacRTarArreglado) return;
+    window.__jacRTarArreglado=true;
+    var _r=window.RTar;
+    window.RTar=function(){
+      var r=_r.apply(this, arguments);
+      try{
+        var T=S.tareas||[];
+        var mias=T.filter(function(t){ return !esAuto(t); });
+        var pend=mias.filter(function(t){ return t.etapaTarea!=='Hecho'; }).length;
+        var atras=mias.filter(function(t){ return t.fechaLimite && t.fechaLimite<hoy() && t.etapaTarea!=='Hecho'; }).length;
+        var autos=T.length-mias.length;
+        var el=document.getElementById('tarcnt');
+        if(el){
+          el.innerHTML = mias.length+' tareas · '+pend+' pendientes'
+            + (atras? ' · ⚠️ '+atras+' atrasadas' : '')
+            + (autos? ' <span style="color:#94A3B8">· '+autos+' automáticas ocultas</span>' : '');
+        }
+      }catch(e){}
+      return r;
+    };
+  }
+  setTimeout(arreglarConteo, 1500);
+  setTimeout(arreglarConteo, 6000);
+
+  /* ---- 2. Selector Mías / Automáticas / Todas ---- */
+  var VISTA='mias';   /* por defecto, solo el trabajo real */
+  window.jacVistaTareas=function(v){
+    VISTA=v;
+    try{
+      document.querySelectorAll('#jac-filtro-tareas button').forEach(function(b){
+        b.style.background = (b.dataset.v===v) ? '#1E3A8A' : '#fff';
+        b.style.color      = (b.dataset.v===v) ? '#fff' : '#334155';
+      });
+    }catch(e){}
+    aplicar();
+  };
+
+  function aplicar(){
+    try{
+      /* Se ocultan las filas y tarjetas de las tareas que no tocan.
+         Se marca por el id de la tarea que el propio CRM ya imprime. */
+      var T=S.tareas||[], mapa={};
+      T.forEach(function(t){ mapa[t.id]=esAuto(t); });
+      var nodos=document.querySelectorAll('#pg-tar [onclick*="OT("], #pg-tar tr, #pg-tar .tcard');
+      nodos.forEach(function(n){
+        var m=(n.getAttribute('onclick')||n.innerHTML||'').match(/(auto_comision[\w-]*|T[\w]{8,})/);
+        if(!m) return;
+        var auto=mapa[m[1]];
+        if(auto===undefined) return;
+        var fila=n.closest('tr')||n.closest('.tcard')||n;
+        if(VISTA==='todas') fila.style.display='';
+        else if(VISTA==='mias') fila.style.display = auto ? 'none' : '';
+        else fila.style.display = auto ? '' : 'none';
+      });
+    }catch(e){}
+  }
+
+  function ponerFiltro(){
+    var cont=document.getElementById('tarcnt');
+    if(!cont || document.getElementById('jac-filtro-tareas')) return;
+    var d=document.createElement('div');
+    d.id='jac-filtro-tareas';
+    d.style.cssText='display:flex;gap:6px;margin:8px 0;flex-wrap:wrap';
+    var bs='padding:5px 12px;border:1px solid #CBD5E1;border-radius:999px;background:#fff;'
+          +'color:#334155;font-size:12px;font-weight:600;cursor:pointer';
+    d.innerHTML='<button data-v="mias"  style="'+bs+'">Mis tareas</button>'
+               +'<button data-v="auto"  style="'+bs+'">Automáticas</button>'
+               +'<button data-v="todas" style="'+bs+'">Todas</button>';
+    cont.parentNode.insertBefore(d, cont.nextSibling);
+    d.querySelectorAll('button').forEach(function(b){
+      b.onclick=function(){ window.jacVistaTareas(b.dataset.v); };
+    });
+    window.jacVistaTareas('mias');
+  }
+  setInterval(function(){ try{ ponerFiltro(); aplicar(); }catch(e){} }, 2000);
+
+  /* ---- 3. Archivar las automáticas viejas ---- */
+  window.jacLimpiarTareas = async function(opts){
+    opts=opts||{};
+    var dias = opts.dias!=null ? opts.dias : 120;
+    var T=S.tareas||[];
+    var aArchivar=T.filter(function(t){
+      if(!esAuto(t)) return false;
+      if(t.etapaTarea==='Hecho') return false;
+      var ref=t.fechaLimite||t.fechaCreacion||'';
+      return diasDesde(ref) > dias;
+    });
+    var r={ total:T.length, automaticas:T.filter(esAuto).length,
+            candidatas:aArchivar.length, archivadas:0, error:null,
+            muestra:aArchivar.slice(0,8).map(function(t){
+              return {tit:String(t.titulo||'').slice(0,58), limite:t.fechaLimite||'—',
+                      dias:diasDesde(t.fechaLimite||t.fechaCreacion)};
+            }) };
+    if(opts.soloVer || !aArchivar.length) return r;
+
+    /* Se guardan en la base antes de sacarlas de la lista */
+    try{
+      if(window.db && !window.db.__esStub){
+        var ses=await window.db.auth.getSession();
+        if(ses&&ses.data&&ses.data.session){
+          var prev=await window.db.from('crm_meta').select('valor').eq('clave','tareas_archivo').maybeSingle();
+          var antes=(prev.data&&prev.data.valor&&prev.data.valor.tareas)||[];
+          var w=await window.db.from('crm_meta').upsert(
+            {clave:'tareas_archivo', valor:{cuando:hoy(), motivo:'automáticas de comisión con más de '+dias+' días',
+              tareas:antes.concat(aArchivar)}}, {onConflict:'clave'});
+          if(w.error){ r.error='no se pudo archivar: '+w.error.message; return r; }
+        } else { r.error='sin sesión de nube — no se archivó nada'; return r; }
+      }
+    }catch(e){ r.error='no se pudo archivar: '+e.message; return r; }
+
+    var quitar={}; aArchivar.forEach(function(t){ quitar[t.id]=1; });
+    S.tareas = T.filter(function(t){ return !quitar[t.id]; });
+    r.archivadas = aArchivar.length;
+    r.quedan = S.tareas.length;
+    r.quedanMias = S.tareas.filter(function(t){ return !esAuto(t); }).length;
+
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+    try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+    return r;
+  };
+
+  /* Recuperar lo archivado, por si acaso */
+  window.jacRestaurarTareas = async function(){
+    try{
+      var q=await window.db.from('crm_meta').select('valor').eq('clave','tareas_archivo').maybeSingle();
+      var arr=(q.data&&q.data.valor&&q.data.valor.tareas)||[];
+      if(!arr.length) return {restauradas:0, motivo:'no hay nada archivado'};
+      var hay={}; (S.tareas||[]).forEach(function(t){ hay[t.id]=1; });
+      var nuevas=arr.filter(function(t){ return !hay[t.id]; });
+      S.tareas=(S.tareas||[]).concat(nuevas);
+      S._ts=Date.now(); if(typeof save==='function') save();
+      if(typeof window.jacVolcar==='function') await window.jacVolcar();
+      return {restauradas:nuevas.length, total:S.tareas.length};
+    }catch(e){ return {error:e.message}; }
+  };
 })();
 </script>
 
