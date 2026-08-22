@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-22-AH';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-22-AI';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -20191,22 +20191,9 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       .sort(function(a,b){ return b.n-a.n; });
   }
 
-  function banner(html){
-    var el=document.getElementById('jac-aviso-cc');
-    if(!el){
-      el=document.createElement('div');
-      el.id='jac-aviso-cc';
-      el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:2147482000;'
-        +'background:#0F766E;color:#fff;padding:12px 16px;border-radius:12px;font-size:12px;line-height:1.6;'
-        +'box-shadow:0 10px 30px rgba(0,0,0,.28);max-width:min(560px,94vw);text-align:left';
-      document.body.appendChild(el);
-    }
-    el.innerHTML=html
-      +'<div style="text-align:right;margin-top:8px">'
-      +'<button onclick="document.getElementById(\'jac-aviso-cc\').remove()" '
-      +'style="background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:7px;padding:4px 12px;'
-      +'cursor:pointer;font-size:11px">Entendido</button></div>';
-  }
+  /* El recuadro verde salia en cada apertura y estorbaba. Fuera.
+     El resultado sigue estando en el chip de la pagina de Polizas y
+     en window.__jacCC para consultarlo cuando haga falta. */
 
   async function correr(){
     if(YA) return;
@@ -20227,52 +20214,13 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     var quedan=vencidas();
     window.__jacCC=r; window.__jacCCBarrido=b;
 
-    var h='<b>Cartera CAPITAL CARE al día</b><br>'
-      +'Del reporte de '+r.filas+' pólizas: <b>'+r.encontradas+'</b> encontradas, '
-      +'<b>'+r.corregidas+'</b> corregidas, <b>'+r.marcadas+'</b> marcadas como Capital Care, '
-      +'<b>'+r.adelantadas+'</b> con la vigencia adelantada'
-      +(r.clientesCompletados?', <b>'+r.clientesCompletados+'</b> fichas de cliente completadas':'')+'.<br>';
-    var vias=r.porVia||{}, kv=Object.keys(vias);
-    if(kv.length){
-      h+='<span style="opacity:.85;font-size:11px">Encontradas por: '
-        +kv.map(function(k){ return k+' ('+vias[k]+')'; }).join(' · ')+'</span><br>';
-    }
-    if(b){
-      h+='<span style="opacity:.9">Barrido de la cartera: <b>'+b.revisadas+'</b> revisadas, '
-        +'<b>'+b.adelantadas+'</b> con vigencia adelantada, <b>'+b.aVigente+'</b> pasadas a Vigente.</span><br>';
-      if((b.sinFecha||[]).length){
-        h+='<span style="opacity:.8;font-size:11px">'+b.sinFecha.length+' de la cartera no tienen fecha de vencimiento; '
-          +'esas no se pueden adelantar hasta que tengan una.</span><br>';
-      }
-    }
-    var cc=(b&&b.carteraAhora&&b.carteraAhora.capitalCare);
-    if(cc===undefined && r.carteraAhora) cc=r.carteraAhora.capitalCare;
-    if(cc!==undefined){
-      h+='<span style="opacity:.9">Cartera marcada como Capital Care: <b>'+cc+'</b> pólizas.</span><br>';
-    }
-    if((r.avisoVencidas||[]).length){
-      h+='<span style="opacity:.85;font-size:11px">Ojo: '+r.avisoVencidas.length+' venían con estatus VENCIDA en tu propio cuadro '
-        +'('+r.avisoVencidas.map(function(x){return String(x.cli||'').split(' ')[0];}).join(', ')
-        +'). Las puse Vigente como pediste — quedan anotadas por si alguna de verdad se cayó.</span><br>';
-    }
-
-    if((r.noEstan||[]).length){
-      h+='<span style="opacity:.9">'+r.noEstan.length+' del reporte no existen en el CRM '
-        +'(Configuración → 📁 Cartera CAPITAL CARE para crearlas).</span><br>';
-    }
-
-    h+='<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.25)">'
-      +'Vencidas: <b>'+antes+' → '+quedan.length+'</b>';
-    if(quedan.length){
-      var pc=porCompania(quedan).slice(0,6);
-      h+='<br><span style="opacity:.9;font-size:11px">Las que quedan son de: '
-        +pc.map(function(x){ return x.aseg+' ('+x.n+')'; }).join(' · ')
-        +'</span><br><span style="opacity:.8;font-size:11px">Esas no están en el reporte de Capital Care: '
-        +'necesito su cuadro de renovaciones, o las adelanto yo con el botón «Completar faltantes».</span>';
-    }
-    h+='</div>';
-
-    banner(h);
+    /* Sin aviso en pantalla: el trabajo se hace callado. */
+    window.__jacCCResumen={
+      filas:r.filas, encontradas:r.encontradas, corregidas:r.corregidas,
+      marcadas:r.marcadas, adelantadas:r.adelantadas,
+      vencidasAntes:antes, vencidasAhora:quedan.length,
+      cartera:r.carteraAhora||null
+    };
 
     try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
   }
