@@ -15098,7 +15098,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-22-Y';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-22-AA';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15896,6 +15896,7 @@ document.addEventListener('click', function(e){
       +'<p style="color:#6b7280;font-size:13px;margin:0 0 12px">Vuelve a poner el CRM al d\u00eda con lo que dicen las aseguradoras: vigencias, primas, % de comisi\u00f3n y compa\u00f1\u00eda. Nunca retrocede una vigencia que en el CRM ya va m\u00e1s adelante. Se puede correr las veces que quieras.</p>'
       +'<button id="jac-btn-todo"      style="'+bs+';background:#15803D;font-weight:700">\u25B6 Actualizar todo</button>'
       +'<button id="jac-btn-cc"        style="'+bs+';background:#0F766E;font-weight:700">\uD83D\uDCC1 Cartera CAPITAL CARE</button>'
+      +'<button id="jac-btn-ccvig"     style="'+bs+';background:#15803D">\u2713 Capital Care \u2192 Vigentes</button>'
       +'<button id="jac-btn-reportes"  style="'+bs+';background:#1E3A8A">Capital Care y ASSA</button>'
       +'<button id="jac-btn-portales"  style="'+bs+';background:#7C3AED">UniVivir, iSeguros y BlueCross</button>'
       +'<button id="jac-btn-auditar"   style="'+bs+';background:#B45309">Auditar y corregir</button>'
@@ -16034,6 +16035,35 @@ document.addEventListener('click', function(e){
         var q=await window.jacCapitalCareCrear();
         pinta('Creadas <b>'+q.creadas+'</b> p\u00f3lizas nuevas. '+(q.aviso||''));
       };
+    };
+
+    /* Barrido: toda la cartera de Capital Care queda con su co-corretaje
+       marcado, la vigencia adelantada y el estado en Vigente. */
+    document.getElementById('jac-btn-ccvig').onclick=async function(){
+      if(typeof window.jacCapitalCareVigentes!=='function'){ pinta('<span style="color:#B91C1C">Bloque no cargado.</span>'); return; }
+      var b=await correr(this,'', function(){ return window.jacCapitalCareVigentes(); });
+      window.__jacCCBarrido=b;
+      var h='<b>Cartera CAPITAL CARE \u2192 Vigentes</b><br>'
+        +'Revisadas: <b>'+b.revisadas+'</b> \u00b7 co-corretaje marcado: <b>'+(b.coCorMarcadas||0)+'</b>'
+        +' \u00b7 vigencia adelantada: <b>'+b.adelantadas+'</b>'
+        +' \u00b7 pasadas a Vigente: <b style="color:#15803D">'+b.aVigente+'</b><br>';
+      if(b.carteraAhora){
+        h+='Cartera ahora: <b style="color:#15803D">'+b.carteraAhora.vigentes+' vigentes</b>'
+          +' \u00b7 <b style="color:#B91C1C">'+b.carteraAhora.vencidas+' vencidas</b>'
+          +' \u00b7 marcadas Capital Care: <b>'+b.carteraAhora.capitalCare+'</b><br>';
+      }
+      if((b.sinFecha||[]).length){
+        h+='<div style="margin-top:6px;color:#B45309">'+b.sinFecha.length+' sin fecha de vencimiento \u2014 no se pueden adelantar:'
+          +'<div style="max-height:120px;overflow:auto;font-size:11px">'
+          +b.sinFecha.map(function(x){ return '\u00b7 '+(x.num||'sin n\u00famero')+' \u2014 '+(x.cli||''); }).join('<br>')
+          +'</div></div>';
+      }
+      if((b.detalle||[]).length){
+        h+='<div style="margin-top:6px;font-size:11px;max-height:150px;overflow:auto">'
+          +b.detalle.map(function(x){ return '\u00b7 '+(x.num||'')+' '+(x.cli||'')+': '+x.de+' \u2192 '+x.a; }).join('<br>')
+          +'</div>';
+      }
+      pinta(h);
     };
 
     document.getElementById('jac-btn-completar').onclick=async function(){
@@ -17120,6 +17150,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   var VISTA='mias';   /* por defecto, solo el trabajo real */
   window.jacVistaTareas=function(v){
     VISTA=v;
+    try{ if(typeof RTar==='function') RTar(); }catch(e){}
     try{
       document.querySelectorAll('#jac-filtro-tareas button').forEach(function(b){
         b.style.background = (b.dataset.v===v) ? '#1E3A8A' : '#fff';
@@ -17129,71 +17160,116 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     aplicar();
   };
 
-  function aplicar(){
-    try{
-      /* Antes esto buscaba dentro de #pg-tar, que esta VACIO: las tareas
-         se dibujan en #tar-view, dentro de la Agenda. Por eso los tres
-         botones no hacian absolutamente nada. */
-      var T=(typeof S!=='undefined'&&S.tareas)||[], mapa={};
-      T.forEach(function(t){ mapa[t.id]=esAuto(t); });
-
-      var zonas=['#tar-view','#cal-all-tareas','#cal-day-tasks','#cal-pane-tareas','#pg-tar'];
-      var vistos=0;
-      zonas.forEach(function(z){
-        var cont=document.querySelector(z);
-        if(!cont) return;
-        var nodos=cont.querySelectorAll('tbody tr, .tcard, [data-jac-tid]');
-        for(var i=0;i<nodos.length;i++){
-          var n=nodos[i], id=null;
-          if(n.getAttribute('data-jac-tid')) id=n.getAttribute('data-jac-tid');
-          if(!id){
-            var h=(n.getAttribute('onclick')||'')+' '+(n.innerHTML||'');
-            var m=h.match(/(?:OT_open|OT|DTar|calTaskDone|jacTarEditar)\(\s*['\"]([^'\"]+)['\"]/);
-            if(m) id=m[1];
-            else { var m2=h.match(/(auto_comision[\w\-]*)/); if(m2) id=m2[1]; }
-          }
-          if(!id || mapa[id]===undefined) continue;
-          var auto=mapa[id];
-          var fila=(n.tagName==='TR')?n:(n.closest('tr')||n.closest('.tcard')||n);
-          if(VISTA==='todas')      fila.style.display='';
-          else if(VISTA==='mias')  fila.style.display = auto ? 'none' : '';
-          else                     fila.style.display = auto ? '' : 'none';
-          vistos++;
-        }
-      });
-      window.__jacFiltroTareas={vista:VISTA, filasTocadas:vistos};
-      avisoVacio(vistos);
-    }catch(e){}
+  /* ------------------------------------------------------------
+     Regla de oro de este filtro: si no logro identificar las filas,
+     NO TOCO NADA. Antes escondia por id y, cuando el id no coincidia
+     —o cuando otro repintado cambiaba la tabla entre medias— dejaba
+     la lista en blanco. Ahora primero cuento cuantas reconozco y
+     solo escondo si reconozco suficientes.
+     ------------------------------------------------------------ */
+  function idDeFila(n){
+    var v=n.getAttribute('data-jac-tid');
+    if(v) return v;
+    var h=(n.getAttribute('onclick')||'')+' '+(n.innerHTML||'');
+    var m=h.match(/(?:OT_open|OT|DTar|calTaskDone|jacTarEditar)\(\s*['\"]([^'\"]+)['\"]/);
+    if(m) return m[1];
+    m=h.match(/(auto_comision[\w\-]*)/);
+    return m?m[1]:null;
   }
 
-  /* Si la vista elegida no deja nada visible, decir por que en vez
-     de dejar el panel en blanco. */
-  function avisoVacio(vistos){
-    var cont=document.getElementById('tar-view');
-    if(!cont) return;
+  function filas(){
+    var out=[];
+    ['#tar-view','#cal-all-tareas','#cal-day-tasks','#cal-pane-tareas','#pg-tar'].forEach(function(z){
+      var cont=document.querySelector(z);
+      if(!cont) return;
+      var nodos=cont.querySelectorAll('tbody tr, .tcard, [data-jac-tid]');
+      for(var i=0;i<nodos.length;i++) out.push(nodos[i]);
+    });
+    return out;
+  }
+
+  function mostrarTodo(){
+    filas().forEach(function(n){
+      var f=(n.tagName==='TR')?n:(n.closest('tr')||n.closest('.tcard')||n);
+      f.style.display='';
+    });
+  }
+
+  function aplicar(){
+    try{
+      var T=(typeof S!=='undefined'&&S.tareas)||[];
+      if(!T.length){ mostrarTodo(); return; }
+      var mapa={};
+      T.forEach(function(t){ mapa[t.id]=esAuto(t); });
+
+      var nodos=filas(), pares=[];
+      for(var i=0;i<nodos.length;i++){
+        var id=idDeFila(nodos[i]);
+        if(id && mapa[id]!==undefined) pares.push({n:nodos[i], auto:mapa[id]});
+      }
+
+      /* Si no reconozco ni la mitad de las filas, algo cambio bajo mis
+         pies: se deja todo visible antes que arriesgar una lista vacia. */
+      if(!pares.length || pares.length < Math.min(3, nodos.length)){
+        mostrarTodo();
+        window.__jacFiltroTareas={vista:VISTA, reconocidas:pares.length, deTotal:nodos.length, aplicado:false};
+        quitarAviso();
+        return;
+      }
+
+      var visibles=0;
+      pares.forEach(function(p){
+        var f=(p.n.tagName==='TR')?p.n:(p.n.closest('tr')||p.n.closest('.tcard')||p.n);
+        var ver = (VISTA==='todas') ? true : (VISTA==='mias' ? !p.auto : p.auto);
+        f.style.display = ver ? '' : 'none';
+        if(ver) visibles++;
+      });
+      window.__jacFiltroTareas={vista:VISTA, reconocidas:pares.length, deTotal:nodos.length, visibles:visibles, aplicado:true};
+      avisoVacio(visibles);
+    }catch(e){ try{ mostrarTodo(); }catch(x){} }
+  }
+
+  function quitarAviso(){
     var el=document.getElementById('jac-tar-vacio');
-    var T=(typeof S!=='undefined'&&S.tareas)||[];
-    var nAuto=T.filter(esAuto).length, nMias=T.length-nAuto;
-    var falta = (VISTA==='auto' && !nAuto) || (VISTA==='mias' && !nMias) || (VISTA==='todas' && !T.length);
-    if(!falta){ if(el) el.remove(); return; }
+    if(el) el.remove();
+  }
+
+  /* Si la vista elegida no deja nada visible, se explica por que en
+     lugar de dejar el panel en blanco. */
+  function avisoVacio(visibles){
+    var cont=document.getElementById('tar-view');
+    if(!cont){ return; }
+    if(visibles>0){ quitarAviso(); return; }
+    var el=document.getElementById('jac-tar-vacio');
     if(!el){
       el=document.createElement('div');
       el.id='jac-tar-vacio';
-      el.style.cssText='padding:22px;text-align:center;color:#64748B;font-size:13px;line-height:1.7;'
+      el.style.cssText='padding:22px;text-align:center;color:#334155;font-size:13px;line-height:1.7;'
         +'background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:12px;margin:10px 0';
       cont.insertBefore(el, cont.firstChild);
     }
+    var T=(typeof S!=='undefined'&&S.tareas)||[];
+    var nAuto=T.filter(esAuto).length;
     if(VISTA==='auto'){
-      el.innerHTML='No hay tareas autom\u00e1ticas de comisi\u00f3n en la lista.<br>'
-        +'<span style="font-size:12px">Puede que ya se archivaran, o que se pasaran al m\u00f3dulo de Comisiones.</span><br>'
+      el.innerHTML='<b>No hay tareas autom\u00e1ticas visibles.</b><br>'
+        +'En la lista hay <b>'+T.length+'</b> tareas en total y <b>'+nAuto+'</b> reconocidas como autom\u00e1ticas.<br>'
+        +'<span style="font-size:12px;color:#64748B">Si antes estaban y ya no: se archivaron, o se pasaron al m\u00f3dulo de Comisiones. '
+        +'Las dos cosas se deshacen.</span><br>'
         +'<button onclick="jacRestaurarTareas().then(function(r){alert(\'Restauradas: \'+(r.restauradas||0));if(typeof RTar===\'function\')RTar();})" '
-        +'style="margin-top:9px;padding:6px 13px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:12px">'
+        +'style="margin-top:9px;padding:7px 14px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:12px">'
         +'Restaurar las archivadas</button> '
-        +'<button onclick="SH(\'com\');renderCom()" '
-        +'style="margin-top:9px;padding:6px 13px;border-radius:8px;border:none;background:#1E3A8A;color:#fff;cursor:pointer;font-size:12px">'
-        +'Ver el m\u00f3dulo de Comisiones</button>';
+        +'<button onclick="window.jacVistaTareas(\'todas\')" '
+        +'style="margin-top:9px;padding:7px 14px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:12px">'
+        +'Ver todas</button> '
+        +'<button onclick="SH(\'com\');if(typeof renderCom===\'function\')renderCom()" '
+        +'style="margin-top:9px;padding:7px 14px;border-radius:8px;border:none;background:#1E3A8A;color:#fff;cursor:pointer;font-size:12px">'
+        +'Ver Comisiones</button>';
     } else if(VISTA==='mias'){
-      el.innerHTML='No tienes tareas propias en la lista \u2014 todas las que hay son autom\u00e1ticas.';
+      el.innerHTML='<b>No tienes tareas propias visibles.</b><br>'
+        +'De las <b>'+T.length+'</b> tareas de la lista, <b>'+nAuto+'</b> son autom\u00e1ticas.<br>'
+        +'<button onclick="window.jacVistaTareas(\'todas\')" '
+        +'style="margin-top:9px;padding:7px 14px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:12px">'
+        +'Ver todas</button>';
     } else {
       el.innerHTML='La lista de tareas est\u00e1 vac\u00eda.';
     }
@@ -17219,7 +17295,23 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     });
     window.jacVistaTareas('mias');
   }
-  setInterval(function(){ try{ ponerFiltro(); aplicar(); }catch(e){} }, 2000);
+  /* Antes esto corria cada 2 segundos a ciegas y peleaba con cada
+     repintado del CRM. Ahora el filtro se aplica DESPUES de dibujar,
+     y el vigilante solo se asegura de que los botones existan. */
+  function trasRender(){
+    if(typeof window.RTar!=='function' || window.__jacRTarFiltro) return;
+    window.__jacRTarFiltro=true;
+    var _r=window.RTar;
+    window.RTar=function(){
+      var x=_r.apply(this, arguments);
+      setTimeout(function(){ try{ ponerFiltro(); aplicar(); }catch(e){} }, 60);
+      return x;
+    };
+  }
+  setTimeout(trasRender, 1800);
+  setTimeout(trasRender, 6000);
+  setInterval(function(){ try{ ponerFiltro(); }catch(e){} }, 3000);
+  setTimeout(function(){ try{ aplicar(); }catch(e){} }, 4000);
 
   /* ---- 3. Archivar las automáticas viejas ---- */
   window.jacLimpiarTareas = async function(opts){
@@ -17352,30 +17444,76 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   function pols(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
   function clis(){ return (typeof S!=='undefined'&&S.clientes)||[]; }
 
+  /* El nombre EXACTO que trae la lista de agencias del formulario.
+     Si no coincide letra por letra, el desplegable sale en blanco. */
+  var AGENCIA='Capital Care & Co';
+
+  /* Marcar el co-corretaje es lo que las hace visibles: la lista de
+     Pólizas pinta una etiqueta azul con la agencia, y la casilla
+     "Activar co-corretaje" del formulario se enciende sola porque se
+     calcula con !!p.coCor. Sin esto, la cartera estaba ahí pero no
+     se distinguía de ninguna otra. */
+  function marcarCoCor(p, cambios){
+    if(p.coCor!==AGENCIA){ p.coCor=AGENCIA; if(cambios) cambios.push('co-corretaje'); }
+    /* El reparto solo se toca si está configurado en Configuración.
+       No se inventa un porcentaje que no me consta. */
+    try{
+      var cfg=(typeof S!=='undefined'&&S.comisCfg&&S.comisCfg.cocor)||{};
+      var conf=cfg[AGENCIA]||cfg['CAPITAL CARE & CO']||cfg['Capital Care & CO'];
+      var part=conf?parseFloat(conf.part):NaN;
+      if(isFinite(part) && part>0 && part<100){
+        if(Math.abs((parseFloat(p.coCorPart)||0)-part)>0.01){ p.coCorPart=part; if(cambios) cambios.push('% socio'); }
+        p.participacion=+(100-part).toFixed(2);
+        var bruta=(parseFloat(p.prima)||0)*(parseFloat(p.comPct)||0)/100;
+        if(bruta>0){
+          p.comision =+(bruta*p.participacion/100).toFixed(2);
+          p.coCorCom =+(bruta*part/100).toFixed(2);
+        }
+      }
+    }catch(e){}
+  }
+  function esCapitalCare(p){
+    return N(p.coCor).indexOf('CAPITAL CARE')>=0
+        || N(p.lider).indexOf('CAPITAL CARE')>=0
+        || N(p.corredor).indexOf('CAPITAL CARE')>=0
+        || !!(p.extra && p.extra.capitalCare);
+  }
+  window.jacEsCapitalCare=esCapitalCare;
+
   /* ---------- la cascada de búsqueda ---------- */
-  function buscar(f){
-    var P=pols(), i, p;
-    var fn=num(f.num), fb=base(f.num), fc=ced(f.ced);
+  /* Una póliza del CRM solo puede pertenecer a UNA fila del reporte.
+     Sin esto, dos filas parecidas se pisaban entre sí y la segunda
+     sobrescribía lo que había escrito la primera. */
+  var USADAS=null;
+  function libre(p){ return !USADAS || !USADAS[p.id]; }
+  function tomar(p){ if(USADAS) USADAS[p.id]=1; return p; }
 
-    /* 1. número exacto */
-    for(i=0;i<P.length;i++) if(num(P[i].num)===fn && fn) return {p:P[i], via:'número'};
+  function buscarPorNumero(f){
+    var P=pols().filter(libre), i;
+    var fn=num(f.num), fb=base(f.num);
 
-    /* 2. mismo número sin el sufijo de ciclo */
+    for(i=0;i<P.length;i++) if(fn && num(P[i].num)===fn) return {p:tomar(P[i]), via:'número'};
+
     if(fb){
       var cand=[];
       for(i=0;i<P.length;i++){ var b=base(P[i].num); if(b===fb) cand.push(P[i]); }
-      if(cand.length===1) return {p:cand[0], via:'número sin sufijo'};
+      if(cand.length===1) return {p:tomar(cand[0]), via:'número sin sufijo'};
     }
 
-    /* 3. uno contiene al otro por delante */
     if(fn.length>=8){
       for(i=0;i<P.length;i++){
         var pn=num(P[i].num);
-        if(pn.length>=8 && (pn.indexOf(fn)===0||fn.indexOf(pn)===0)) return {p:P[i], via:'número contenido'};
+        if(pn.length>=8 && (pn.indexOf(fn)===0||fn.indexOf(pn)===0)) return {p:tomar(P[i]), via:'número contenido'};
       }
     }
+    return null;
+  }
 
-    /* 4. cédula + compañía  (la llave fuerte: la traen las 79) */
+  function buscarPorPersona(f){
+    var P=pols().filter(libre), i, p;
+    var fc=ced(f.ced);
+
+    /* cédula: la llave fuerte, la traen las 79 */
     if(fc.length>=5){
       var porCed=[];
       for(i=0;i<P.length;i++){
@@ -17387,16 +17525,18 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
         }
         if(pc && pc===fc) porCed.push(p);
       }
-      if(porCed.length===1) return {p:porCed[0], via:'cédula'};
+      if(porCed.length===1) return {p:tomar(porCed[0]), via:'cédula'};
       if(porCed.length>1){
         var m=porCed.filter(function(x){ return N(x.aseg)===N(f.aseg); });
-        if(m.length===1) return {p:m[0], via:'cédula + compañía'};
-        m=porCed.filter(function(x){ return N(x.aseg)===N(f.aseg) && N(x.ramo).indexOf(N(f.ramo).slice(0,5))>=0; });
-        if(m.length===1) return {p:m[0], via:'cédula + compañía + ramo'};
+        if(m.length===1) return {p:tomar(m[0]), via:'cédula + compañía'};
+        var m2=m.filter(function(x){ return N(x.ramo).slice(0,5)===N(f.ramo).slice(0,5); });
+        if(m2.length===1) return {p:tomar(m2[0]), via:'cédula + compañía + ramo'};
       }
     }
 
-    /* 5. nombre + compañía */
+    /* nombre: solo si además coincide la compañía. Sin ese requisito,
+       un cliente con tres pólizas en tres compañías se llevaba la
+       primera que apareciera. */
     var porNom=[];
     for(i=0;i<P.length;i++){
       p=P[i];
@@ -17407,13 +17547,15 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       }
       if(mismoNombre(pn2, f.cli)) porNom.push(p);
     }
-    if(porNom.length===1) return {p:porNom[0], via:'nombre'};
-    if(porNom.length>1){
-      var q=porNom.filter(function(x){ return N(x.aseg)===N(f.aseg); });
-      if(q.length===1) return {p:q[0], via:'nombre + compañía'};
-      q=q.filter(function(x){ return N(x.ramo).slice(0,5)===N(f.ramo).slice(0,5); });
-      if(q.length===1) return {p:q[0], via:'nombre + compañía + ramo'};
+    if(!porNom.length) return null;
+    var q=porNom.filter(function(x){ return N(x.aseg)===N(f.aseg); });
+    if(q.length===1) return {p:tomar(q[0]), via:'nombre + compañía'};
+    if(q.length>1){
+      var q2=q.filter(function(x){ return N(x.ramo).slice(0,5)===N(f.ramo).slice(0,5); });
+      if(q2.length===1) return {p:tomar(q2[0]), via:'nombre + compañía + ramo'};
     }
+    /* un solo candidato en todo el CRM y sin número propio: es esa */
+    if(porNom.length===1 && !num(porNom[0].num)) return {p:tomar(porNom[0]), via:'nombre (sin número en el CRM)'};
     return null;
   }
 
@@ -17444,14 +17586,29 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   window.jacCapitalCare = async function(opts){
     opts=opts||{};
     var hoy=hoyISO();
+    USADAS={};
     var r={ filas:CC.length, encontradas:0, corregidas:0, adelantadas:0, marcadas:0,
             clientesCompletados:0, sinCambio:0, noEstan:[], porVia:{}, detalle:[],
             porAseguradora:{} };
 
+    /* DOS PASADAS. Primero se casan TODAS las que coinciden por número:
+       así el número siempre gana. Solo las que quedan sueltas intentan
+       por cédula y por nombre. Sin esto, un cliente con tres pólizas
+       —Gabriel Copete tiene tres— hacía que la primera fila del reporte
+       se llevara por nombre la póliza que le tocaba a otra. */
+    var pares=[], sueltas=[];
     CC.forEach(function(f){
-      var hit=buscar(f);
-      if(!hit){ r.noEstan.push({num:f.num, cli:f.cli, ced:f.ced, aseg:f.aseg, ramo:f.ramo, vence:f.fin, prima:f.prima}); return; }
-      var p=hit.p;
+      var h=buscarPorNumero(f);
+      if(h) pares.push({f:f, hit:h}); else sueltas.push(f);
+    });
+    sueltas.forEach(function(f){
+      var h=buscarPorPersona(f);
+      if(h) pares.push({f:f, hit:h});
+      else r.noEstan.push({num:f.num, cli:f.cli, ced:f.ced, aseg:f.aseg, ramo:f.ramo, vence:f.fin, prima:f.prima});
+    });
+
+    pares.forEach(function(par){
+      var f=par.f, hit=par.hit, p=hit.p;
       r.encontradas++;
       r.porVia[hit.via]=(r.porVia[hit.via]||0)+1;
 
@@ -17480,8 +17637,11 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       if(f.ced && !p.cedCliente) set('cedCliente', f.ced);
       if(f.cli && !p.nombreCliente) set('nombreCliente', f.cli);
 
-      /* LA MARCA: esto es lo que faltaba */
-      if(N(p.lider)!==N(f.lider)){ p.lider=f.lider; cambios.push('lider'); r.marcadas++; }
+      /* LA MARCA: líder + co-corretaje. El co-corretaje es el que se ve. */
+      if(N(p.lider)!==N(f.lider)){ p.lider=f.lider; cambios.push('lider'); }
+      var antesCoCor=p.coCor;
+      marcarCoCor(p, cambios);
+      if(antesCoCor!==p.coCor) r.marcadas++;
       if(!p.corredor) p.corredor=f.lider;
       if(f.vend && !p.vendedor) set('vendedor', f.vend);
       p.extra=p.extra||{};
@@ -17504,9 +17664,19 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
         }
       }
 
-      /* Estado: el reporte por unidad manda cuando lo dice */
-      var quiere = (f.est==='VENCIDA' && f.fin<hoy) ? 'Vencida' : 'Vigente';
-      if(String(p.estado||'')!==quiere){ p.estado=quiere; cambios.push('estado → '+quiere); }
+      /* Estado: toda la cartera de CAPITAL CARE queda Vigente.
+         Tres filas del reporte por unidad vienen con estatus VENCIDA
+         (Copete, Castro y Barragán, de 2025). Se ponen Vigente igual
+         porque asi lo indicaste, pero quedan anotadas y salen listadas
+         en el resultado por si alguna de verdad se cayo. */
+      if(f.est==='VENCIDA'){
+        p.extra.ojoEstatus={reporte:'VENCIDA', vigenciaReporte:f.ini+' a '+f.fin, cuando:hoy};
+        r.avisoVencidas=r.avisoVencidas||[];
+        r.avisoVencidas.push({num:f.num, cli:f.cli, aseg:f.aseg, vigenciaReporte:f.ini+' a '+f.fin});
+      }
+      if(String(p.estado||'')!=='Vigente'){ p.estado='Vigente'; cambios.push('estado → Vigente'); }
+      /* etapas heredadas que volvian a marcarla como caida */
+      if(/cancelad|vencid/i.test(String(p.etapaGestion||''))) p.etapaGestion='Activa';
 
       /* Completar la ficha del cliente con lo que trae el Excel */
       var cl=clis().filter(function(c){ return c.id===p.clienteId; })[0] || clientePorCedulaONombre(f);
@@ -17541,16 +17711,17 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       vigentes:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vigente';}).length,
       vencidas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vencida';}).length,
       canceladas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='cancelada';}).length,
-      capitalCare:P.filter(function(p){return N(p.lider).indexOf('CAPITAL CARE')>=0;}).length
+      capitalCare:P.filter(esCapitalCare).length
     };
     return r;
   };
 
   /* ---------- crear las que faltan, con su cliente ---------- */
   window.jacCapitalCareCrear = async function(){
+    USADAS={};
     var nuevasP=[], nuevasC=[], r={clientes:0, polizas:0};
     CC.forEach(function(f){
-      if(buscar(f)) return;
+      if(buscarPorNumero(f) || buscarPorPersona(f)) return;
       var cl=clientePorCedulaONombre(f);
       if(!cl){
         cl={ id:'CLI_CC_'+Math.random().toString(36).slice(2,10),
@@ -17568,8 +17739,9 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
         prima:f.prima, total:f.total, comPct:f.pct, comision:f.com,
         participacion:100, periodo:f.forma, formaPago:f.forma,
         cuotas:f.letras, medioPago:f.medio, sumaAsegurada:f.suma, riesgo:f.desc,
-        estado:(f.est==='VENCIDA'&&f.fin<hoyISO())?'Vencida':'Vigente',
+        estado:'Vigente',
         lider:f.lider, corredor:f.lider, vendedor:f.vend,
+        coCor:AGENCIA, coCorPart:0, coCorCom:0,
         extra:{capitalCare:true, creadaDesde:'reporte CAPITAL CARE', cuando:hoyISO()}
       });
       r.polizas++;
@@ -17582,9 +17754,67 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     return r;
   };
 
+  /* ============================================================
+     Barrido: cualquier poliza que YA diga Capital Care y siga
+     figurando vencida. Son las que estan en el CRM marcadas pero
+     que el reporte no alcanzo a tocar — por ejemplo porque su
+     numero no coincide con ninguna de las 79. Se les adelanta la
+     vigencia con su propio periodo y quedan Vigente.
+     ============================================================ */
+  window.jacCapitalCareVigentes = async function(opts){
+    opts=opts||{};
+    var hoy=hoyISO();
+    var r={revisadas:0, adelantadas:0, aVigente:0, coCorMarcadas:0, sinFecha:[], detalle:[]};
+    pols().forEach(function(p){
+      if(!esCapitalCare(p)) return;
+      r.revisadas++;
+      var cambios=[];
+      var antes=p.coCor;
+      marcarCoCor(p, cambios);
+      if(antes!==p.coCor) r.coCorMarcadas=(r.coCorMarcadas||0)+1;
+      var est=String(p.estado||'').toLowerCase();
+      if(est==='cancelada' && !opts.incluirCanceladas) return;
+
+      if(p.fechaFin && p.fechaFin<hoy){
+        var m = (p.fechaInicio && p.fechaFin) ? meses(p.fechaInicio, p.fechaFin) : 12;
+        var vueltas=0, finOrig=p.fechaFin;
+        while(p.fechaFin<hoy && vueltas<12){
+          p.fechaInicio=p.fechaFin;
+          p.fechaFin=sumarMeses(p.fechaFin, m);
+          vueltas++;
+        }
+        if(vueltas){
+          p.extra=p.extra||{};
+          p.extra.renovacionEstimada={fuente:'cartera CAPITAL CARE', hasta:finOrig,
+                                      meses:m, periodos:vueltas, cuando:hoy};
+          r.adelantadas++;
+          if(r.detalle.length<60) r.detalle.push({num:p.num, cli:p.nombreCliente, de:finOrig, a:p.fechaFin});
+        }
+      } else if(!p.fechaFin){
+        if(r.sinFecha.length<40) r.sinFecha.push({num:p.num, cli:p.nombreCliente});
+      }
+
+      if(String(p.estado||'')!=='Vigente'){ p.estado='Vigente'; r.aVigente++; }
+      if(/cancelad|vencid/i.test(String(p.etapaGestion||''))) p.etapaGestion='Activa';
+    });
+
+    if(!opts.soloVer){
+      try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
+      try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+    }
+    var P=pols();
+    r.carteraAhora={
+      vigentes:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vigente';}).length,
+      vencidas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vencida';}).length,
+      capitalCare:P.filter(esCapitalCare).length
+    };
+    return r;
+  };
+
   /* ---------- ver la cartera marcada ---------- */
   window.jacVerCapitalCare=function(){
-    var P=pols().filter(function(p){ return N(p.lider).indexOf('CAPITAL CARE')>=0 || (p.extra&&p.extra.capitalCare); });
+    var P=pols().filter(esCapitalCare);
     return { total:P.length,
       vigentes:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vigente';}).length,
       vencidas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vencida';}).length,
@@ -19542,11 +19772,15 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 
     YA=true;
     var antes=vencidas().length;
-    var r;
+    var r, b=null;
     try{ r=await window.jacCapitalCare(); }catch(e){ YA=false; return; }
+    /* Segunda pasada: las que YA dicen Capital Care en el CRM pero que
+       el reporte no alcanzo a tocar. Ninguna de la cartera se queda
+       figurando vencida. */
+    try{ if(typeof window.jacCapitalCareVigentes==='function') b=await window.jacCapitalCareVigentes(); }catch(e){}
 
     var quedan=vencidas();
-    window.__jacCC=r;
+    window.__jacCC=r; window.__jacCCBarrido=b;
 
     var h='<b>Cartera CAPITAL CARE al día</b><br>'
       +'Del reporte de '+r.filas+' pólizas: <b>'+r.encontradas+'</b> encontradas, '
@@ -19558,8 +19792,23 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       h+='<span style="opacity:.85;font-size:11px">Encontradas por: '
         +kv.map(function(k){ return k+' ('+vias[k]+')'; }).join(' · ')+'</span><br>';
     }
-    if(r.carteraAhora && r.carteraAhora.capitalCare!==undefined){
-      h+='<span style="opacity:.9">Cartera marcada como Capital Care: <b>'+r.carteraAhora.capitalCare+'</b> pólizas.</span><br>';
+    if(b){
+      h+='<span style="opacity:.9">Barrido de la cartera: <b>'+b.revisadas+'</b> revisadas, '
+        +'<b>'+b.adelantadas+'</b> con vigencia adelantada, <b>'+b.aVigente+'</b> pasadas a Vigente.</span><br>';
+      if((b.sinFecha||[]).length){
+        h+='<span style="opacity:.8;font-size:11px">'+b.sinFecha.length+' de la cartera no tienen fecha de vencimiento; '
+          +'esas no se pueden adelantar hasta que tengan una.</span><br>';
+      }
+    }
+    var cc=(b&&b.carteraAhora&&b.carteraAhora.capitalCare);
+    if(cc===undefined && r.carteraAhora) cc=r.carteraAhora.capitalCare;
+    if(cc!==undefined){
+      h+='<span style="opacity:.9">Cartera marcada como Capital Care: <b>'+cc+'</b> pólizas.</span><br>';
+    }
+    if((r.avisoVencidas||[]).length){
+      h+='<span style="opacity:.85;font-size:11px">Ojo: '+r.avisoVencidas.length+' venían con estatus VENCIDA en tu propio cuadro '
+        +'('+r.avisoVencidas.map(function(x){return String(x.cli||'').split(' ')[0];}).join(', ')
+        +'). Las puse Vigente como pediste — quedan anotadas por si alguna de verdad se cayó.</span><br>';
     }
 
     if((r.noEstan||[]).length){
@@ -19603,6 +19852,202 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       vencidasAhora: vencidas().length
     };
   };
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Revisión automática
+   ------------------------------------------------------------
+   Cada vez que se sube una versión nueva hay riesgo de romper algo
+   que ya funcionaba. Hasta ahora la única forma de enterarse era
+   que apareciera roto en pantalla.
+
+   Esto lo comprueba solo. Al arrancar —y cuando se pulse el botón
+   de Configuración— recorre una lista de cosas que TIENEN que
+   existir: las funciones que están escritas en los botones del
+   HTML, los contenedores donde se dibuja cada módulo, la sesión de
+   nube, el estado de la sincronización en vivo y el contenido de
+   la agenda y de las tareas.
+
+   Si algo falta, sale un aviso rojo con el nombre exacto de lo que
+   falta, en vez de una pantalla en blanco.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* Funciones que los botones del CRM llaman por su nombre. Si una
+     no existe, ese botón no hace nada al pulsarlo. */
+  var FUNCIONES=[
+    ['Pólizas','RP','OP','SP','DPol','openRen','showPolDP'],
+    ['Clientes','RC','OC','SC','showCliDP'],
+    ['Prospectos','RPros','OPros','SPros'],
+    ['Tareas','RTar','OT_open','ST2','DTar','calTaskDone','advTask','setTarEtapa',
+     'jacTarCompletar','jacTarEditar','jacTarEliminar','jacTarReprogramar',
+     'jacTarSiguienteEstado','jacTarSiguienteMes','jacVistaTareas'],
+    ['Agenda','renderCal','calTab','calDay','calRenderCurrentPane','calAddTask',
+     'calRenderNotas','calRenderMetas','calRenderReuniones','jacRepintarAgenda'],
+    ['Comisiones','renderCom','OCom','SCom','DCom','editCom','markCob',
+     'jacComCobrar','jacComCobrarTramo','jacComisionesDesdeTareas'],
+    ['Pagos','RPag','OPag','SPag','delPag','jacPagosPanel','jacPagPagado','jacPagPagarTramo'],
+    ['Siniestros','RSin','OS','SS2','DSin'],
+    ['Mensajes','jacPlantillaWA','jacPlantillaMail','jacRellenar','jacFirmaWA','jacFirmaMail'],
+    ['Capital Care','jacCapitalCare','jacCapitalCareVigentes','jacCapitalCareCrear','jacVerCapitalCare'],
+    ['Sincronización','save','sincronizar','jacVolcar','jacRepintar','cargarDesdeNube']
+  ];
+
+  /* Sitios del HTML donde se dibuja cada cosa */
+  var CONTENEDORES=[
+    ['pg-dash','Tablero'], ['pg-pol','Pólizas'], ['pg-cli','Clientes'],
+    ['pg-cal','Agenda'], ['pg-com','Comisiones'], ['pg-pag','Pagos'],
+    ['tar-view','Lista de tareas'], ['com-body','Cuerpo de Comisiones'],
+    ['tpag','Tabla de pagos'], ['cal-day-tasks','Tareas del día'],
+    ['mpag','Modal de pago'], ['mtar','Modal de tarea'], ['mp','Modal de póliza']
+  ];
+
+  function existe(n){
+    try{ return typeof window[n]==='function'; }catch(e){ return false; }
+  }
+
+  window.jacRevisar = async function(){
+    var r={ funcionesRotas:[], contenedoresRotos:[], datos:{}, nube:{}, avisos:[] };
+
+    FUNCIONES.forEach(function(grupo){
+      var mod=grupo[0];
+      for(var i=1;i<grupo.length;i++){
+        if(!existe(grupo[i])) r.funcionesRotas.push(mod+' → '+grupo[i]+'()');
+      }
+    });
+
+    CONTENEDORES.forEach(function(c){
+      if(!document.getElementById(c[0])) r.contenedoresRotos.push(c[1]+' (#'+c[0]+')');
+    });
+
+    try{
+      var T=(S.tareas||[]), auto=T.filter(function(t){
+        return t._autoTipo==='comision' || /^auto_comision/i.test(String(t.id||''))
+          || (/comisi[oó]n/i.test(String(t.titulo||'')) && /(cobr|pendiente|recordat)/i.test(String(t.titulo||'')));
+      }).length;
+      r.datos={
+        polizas:(S.polizas||[]).length,
+        vigentes:(S.polizas||[]).filter(function(p){return String(p.estado||'').toLowerCase()==='vigente';}).length,
+        vencidas:(S.polizas||[]).filter(function(p){return String(p.estado||'').toLowerCase()==='vencida';}).length,
+        capitalCare:(S.polizas||[]).filter(function(p){
+          return /CAPITAL CARE/i.test(String(p.coCor||'')+String(p.lider||'')+String(p.corredor||''));
+        }).length,
+        clientes:(S.clientes||[]).length,
+        tareas:T.length, tareasAutomaticas:auto, tareasMias:T.length-auto,
+        comisiones:(S.comisiones||[]).length,
+        pagos:(S.pagos||[]).length,
+        plantillas:(S.plantillas||[]).length,
+        agenda:{ eventos:(S.calEventos||[]).length, notas:(S.calNotas||[]).length,
+                 metas:(S.calMetas||[]).length, diarios:(S.calDiarios||[]).length,
+                 reuniones:(S.calReuniones||[]).length }
+      };
+    }catch(e){ r.avisos.push('no se pudo leer S: '+e.message); }
+
+    try{
+      var ses=null;
+      if(window.db && !window.db.__esStub){
+        var q=await window.db.auth.getSession();
+        ses=!!(q&&q.data&&q.data.session);
+      }
+      r.nube={ sesion:ses, enLinea:navigator.onLine,
+               realtime:window.__jacRealtime||'sin conectar',
+               realtimeAgenda:window.__jacRealtimeAgenda||'sin conectar',
+               ultimaSubida:(window.__jacUltimaSubida&&window.__jacUltimaSubida.cuando)||null };
+      if(ses===false) r.avisos.push('La sesión de nube está caída: lo que cambies no sube hasta que vuelvas a entrar.');
+    }catch(e){ r.avisos.push('no se pudo comprobar la nube: '+e.message); }
+
+    if(r.datos.tareas && !r.datos.tareasAutomaticas)
+      r.avisos.push('No hay tareas automáticas en la lista — puede que se archivaran o se pasaran a Comisiones.');
+    if(r.datos.vencidas>0 && r.datos.capitalCare>0)
+      r.avisos.push(r.datos.vencidas+' pólizas siguen figurando vencidas; '+r.datos.capitalCare+' están marcadas como Capital Care.');
+
+    r.ok = !r.funcionesRotas.length && !r.contenedoresRotos.length;
+    window.__jacRevision=r;
+    return r;
+  };
+
+  /* ---------- Aviso en pantalla si algo está roto ---------- */
+  function avisoRojo(txt){
+    var el=document.getElementById('jac-aviso-revision');
+    if(!el){
+      el=document.createElement('div');
+      el.id='jac-aviso-revision';
+      el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:2147482500;'
+        +'background:#7F1D1D;color:#fff;padding:12px 16px;border-radius:12px;font-size:12px;line-height:1.6;'
+        +'box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:min(560px,94vw)';
+      document.body.appendChild(el);
+    }
+    el.innerHTML=txt+'<div style="text-align:right;margin-top:8px">'
+      +'<button onclick="document.getElementById(\'jac-aviso-revision\').remove()" '
+      +'style="background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:7px;padding:4px 12px;'
+      +'cursor:pointer;font-size:11px">Cerrar</button></div>';
+  }
+
+  setTimeout(async function(){
+    try{
+      var r=await window.jacRevisar();
+      if(!r.ok){
+        avisoRojo('<b>Revisión del CRM</b><br>'
+          +(r.funcionesRotas.length?('Funciones que faltan ('+r.funcionesRotas.length+'): '
+            +r.funcionesRotas.slice(0,6).join(', ')+(r.funcionesRotas.length>6?'…':'')+'<br>'):'')
+          +(r.contenedoresRotos.length?('Pantallas que faltan: '+r.contenedoresRotos.join(', ')+'<br>'):'')
+          +'<span style="opacity:.85;font-size:11px">El detalle está en <code>window.__jacRevision</code>.</span>');
+      }
+    }catch(e){}
+  }, 16000);
+
+  /* ---------- Panel en Configuración ---------- */
+  function panel(){
+    var cont=document.getElementById('pg-cfg')||document.getElementById('pg-conf');
+    if(!cont || document.getElementById('jac-card-revision')) return;
+    var d=document.createElement('div');
+    d.className='card'; d.id='jac-card-revision'; d.style.marginTop='10px';
+    d.innerHTML='<div class="ch"><h3>🩺 Revisión del CRM</h3>'
+      +'<small>Comprueba que cada botón, cada pantalla y la conexión estén en su sitio</small></div>'
+      +'<div style="padding:12px 14px">'
+      +'<button id="jac-btn-revisar" style="padding:8px 14px;border-radius:8px;border:none;'
+      +'background:#0F766E;color:#fff;cursor:pointer;font-size:13px">Revisar ahora</button>'
+      +'<div id="jac-res-revision" style="margin-top:10px;font-size:12px;line-height:1.7;color:#334155"></div>'
+      +'</div>';
+    cont.appendChild(d);
+    document.getElementById('jac-btn-revisar').onclick=async function(){
+      this.disabled=true; this.textContent='Revisando…';
+      var r=await window.jacRevisar();
+      var o=document.getElementById('jac-res-revision');
+      var h='';
+      h+= r.ok
+        ? '<div style="color:#15803D;font-weight:700">✓ Todos los botones y pantallas responden.</div>'
+        : '<div style="color:#B91C1C;font-weight:700">Hay '+(r.funcionesRotas.length+r.contenedoresRotos.length)+' cosas fuera de sitio.</div>';
+      if(r.funcionesRotas.length)
+        h+='<div style="margin-top:5px"><b>Funciones que faltan:</b><br>'+r.funcionesRotas.join('<br>')+'</div>';
+      if(r.contenedoresRotos.length)
+        h+='<div style="margin-top:5px"><b>Pantallas que faltan:</b><br>'+r.contenedoresRotos.join('<br>')+'</div>';
+      var d2=r.datos||{};
+      h+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid #E2E8F0">'
+        +'<b>Lo que hay dentro</b><br>'
+        +'Pólizas: <b>'+d2.polizas+'</b> ('+d2.vigentes+' vigentes · '+d2.vencidas+' vencidas · '
+        +d2.capitalCare+' Capital Care)<br>'
+        +'Clientes: <b>'+d2.clientes+'</b> · Comisiones: <b>'+d2.comisiones+'</b> · Pagos: <b>'+d2.pagos+'</b><br>'
+        +'Tareas: <b>'+d2.tareas+'</b> ('+d2.tareasMias+' mías · '+d2.tareasAutomaticas+' automáticas)<br>'
+        +'Plantillas de mensaje: <b>'+d2.plantillas+'</b><br>'
+        +'Agenda: '+d2.agenda.eventos+' eventos · '+d2.agenda.notas+' notas · '+d2.agenda.metas+' metas · '
+        +d2.agenda.diarios+' anotaciones · '+d2.agenda.reuniones+' reuniones</div>';
+      var n=r.nube||{};
+      h+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid #E2E8F0"><b>Conexión</b><br>'
+        +'Sesión de nube: <b style="color:'+(n.sesion?'#15803D':'#B91C1C')+'">'+(n.sesion?'viva':'caída')+'</b>'
+        +' · Internet: '+(n.enLinea?'sí':'no')
+        +' · En vivo: '+n.realtime+' / agenda: '+n.realtimeAgenda+'</div>';
+      if((r.avisos||[]).length)
+        h+='<div style="margin-top:8px;color:#B45309">'+r.avisos.map(function(a){return '· '+a;}).join('<br>')+'</div>';
+      o.innerHTML=h;
+      this.disabled=false; this.textContent='Revisar ahora';
+    };
+  }
+  setInterval(function(){ try{ panel(); }catch(e){} }, 4000);
+  setTimeout(function(){ try{ panel(); }catch(e){} }, 3000);
 })();
 </script>
 
