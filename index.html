@@ -4930,7 +4930,10 @@ function OPag(id){
     var elFe=document.getElementById("pg-fe");if(elFe)elFe.value=new Date().toISOString().slice(0,10);
     var elEs=document.getElementById("pg-es");if(elEs)elEs.value="Pendiente";
   }
-  CM('mpag');
+  /* Aqui decia CM('mpag') — CM CIERRA el modal. Por eso ni "+ Registrar"
+     ni el lapiz de Pagos abrian nada: preparaban el formulario y acto
+     seguido lo cerraban. OM lo abre. */
+  OM('mpag');
 }
 function onPC(){
   var polId=document.getElementById('pg-po').value;
@@ -5120,7 +5123,10 @@ function SCom(){
  }
  save();CM('mcom');RCom();
 }
-function DCom(id){confirm2('¿Eliminar?',()=>{S.comisiones=S.comisiones.filter(c=>c.id!==id);save();RCom();toast('Eliminada');});
+/* Faltaba la llave de cierre de DCom, asi que editCom quedaba declarada
+   DENTRO de DCom y nunca existia para el boton de la lista: el lapiz de
+   Comisiones no abria nada. */
+function DCom(id){confirm2('¿Eliminar?',()=>{S.comisiones=S.comisiones.filter(c=>c.id!==id);save();RCom();toast('Eliminada');});}
 function editCom(id){
  const c=S.comisiones.find(x=>x.id===id);if(!c)return;
  const asel=document.getElementById('cm-as');
@@ -5135,7 +5141,7 @@ function editCom(id){
  OM('mcom');
  // Update save button label
  const savBtn=document.querySelector('#mcom .btn.bp');if(savBtn)savBtn.textContent='💾 Actualizar';
-}}
+}
 // ── Tasas de Comisión por Aseguradora/Ramo ──
 function saveComRate(){
  const aseg=V('crt-as'),ramo=V('crt-ra'),pct=parseFloat(V('crt-pc'));
@@ -12215,8 +12221,13 @@ document.addEventListener('click', function(e){
     comisiones: 'comisiones', prospectos: 'prospectos',
     ventasCruzadas: 'ventas_cruzadas'
   };
+  /* La agenda vivia solo en este navegador: no estaba en esta lista, asi que
+     nada de lo que escribias en el calendario subia a la nube ni bajaba al
+     otro ordenador. Al entrar aqui viaja igual que el resto y ademas queda
+     cubierta por el aviso en vivo de crm_meta. */
   var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg', 'comisCfg',
-                  'univivir', 'integraciones', 'plantillas', 'metas', 'emailjs', 'gcalRefs'];
+                  'univivir', 'integraciones', 'plantillas', 'metas', 'emailjs', 'gcalRefs',
+                  'calEventos', 'calNotas', 'calMetas', 'calDiarios', 'calReuniones'];
   var COLS = window.__JAC_COLS || {};
 
   function snake(c) {
@@ -15087,7 +15098,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-20-V';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-22-W';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15884,6 +15895,7 @@ document.addEventListener('click', function(e){
       +'<div style="padding:12px 16px">'
       +'<p style="color:#6b7280;font-size:13px;margin:0 0 12px">Vuelve a poner el CRM al d\u00eda con lo que dicen las aseguradoras: vigencias, primas, % de comisi\u00f3n y compa\u00f1\u00eda. Nunca retrocede una vigencia que en el CRM ya va m\u00e1s adelante. Se puede correr las veces que quieras.</p>'
       +'<button id="jac-btn-todo"      style="'+bs+';background:#15803D;font-weight:700">\u25B6 Actualizar todo</button>'
+      +'<button id="jac-btn-cc"        style="'+bs+';background:#0F766E;font-weight:700">\uD83D\uDCC1 Cartera CAPITAL CARE</button>'
       +'<button id="jac-btn-reportes"  style="'+bs+';background:#1E3A8A">Capital Care y ASSA</button>'
       +'<button id="jac-btn-portales"  style="'+bs+';background:#7C3AED">UniVivir, iSeguros y BlueCross</button>'
       +'<button id="jac-btn-auditar"   style="'+bs+';background:#B45309">Auditar y corregir</button>'
@@ -15979,6 +15991,51 @@ document.addEventListener('click', function(e){
         +' \u00b7 vigentes con fecha pasada <b>'+r.aunVigenteVencida+'</b>'
         +' \u00b7 sin comisi\u00f3n <b>'+r.aunSinComision+'</b>';
     }
+    /* Cartera CAPITAL CARE: las 76 filas del reporte van dentro del propio
+       archivo, asi que no depende de que nada este cargado en la nube. */
+    document.getElementById('jac-btn-cc').onclick=async function(){
+      if(typeof window.jacCapitalCare!=='function'){ pinta('<span style="color:#B91C1C">El bloque de Capital Care no cargo.</span>'); return; }
+      var r=await correr(this,'', function(){ return window.jacCapitalCare(); });
+      window.__jacCC=r;
+      var h='<b>Cartera CAPITAL CARE &mdash; '+r.filas+' p\u00f3lizas en el reporte</b><br>'
+        +'Encontradas en el CRM: <b>'+r.encontradas+'</b>'
+        +' \u00b7 corregidas: <b style="color:#15803D">'+r.corregidas+'</b>'
+        +' \u00b7 vigencia adelantada: <b>'+r.adelantadas+'</b>'
+        +' \u00b7 ya estaban bien: <b>'+r.sinCambio+'</b><br>';
+      var pa=r.porAseguradora||{};
+      var ks=Object.keys(pa);
+      if(ks.length){
+        h+='<div style="margin:7px 0;font-size:11px">';
+        ks.sort(function(a,b){return pa[b].comision-pa[a].comision;}).forEach(function(k){
+          h+='<span style="display:inline-block;background:#F1F5F9;border-radius:999px;padding:2px 9px;margin:2px 4px 2px 0">'
+            +k+': <b>'+pa[k].n+'</b></span>';
+        });
+        h+='</div>';
+      }
+      if(r.carteraAhora){
+        h+='<div style="margin:6px 0">Cartera ahora: <b style="color:#15803D">'+r.carteraAhora.vigentes+' vigentes</b>'
+          +' \u00b7 <b style="color:#B91C1C">'+r.carteraAhora.vencidas+' vencidas</b>'
+          +' \u00b7 '+r.carteraAhora.canceladas+' canceladas</div>';
+      }
+      if((r.noEstan||[]).length){
+        h+='<div style="margin-top:8px;color:#B45309"><b>'+r.noEstan.length+' del reporte no est\u00e1n en el CRM:</b>'
+          +'<div style="max-height:160px;overflow:auto;font-size:11px;margin-top:4px">';
+        r.noEstan.forEach(function(x){
+          h+='<div>\u00b7 '+x.num+' \u2014 '+x.aseg+' \u2014 '+x.ramo+' \u2014 vence '+x.vence+'</div>';
+        });
+        h+='</div><button id="jac-btn-cc-crear" style="margin-top:7px;padding:6px 12px;border-radius:7px;border:none;'
+          +'background:#0F766E;color:#fff;cursor:pointer;font-size:12px">Crearlas en el CRM</button></div>';
+      }
+      h+='<div style="margin-top:8px;font-size:11px;color:#64748B">El detalle completo queda en <code>window.__jacCC</code>.</div>';
+      pinta(h);
+      var bc=document.getElementById('jac-btn-cc-crear');
+      if(bc) bc.onclick=async function(){
+        this.disabled=true; this.textContent='Creando\u2026';
+        var q=await window.jacCapitalCareCrear();
+        pinta('Creadas <b>'+q.creadas+'</b> p\u00f3lizas nuevas. '+(q.aviso||''));
+      };
+    };
+
     document.getElementById('jac-btn-completar').onclick=async function(){
       var r=await correr(this,'', function(){ return window.jacCompletarFaltantes(); });
       pinta(resumenCompletar(r)); window.__jacUltimo=r;
@@ -17163,6 +17220,1682 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       if(typeof window.jacVolcar==='function') await window.jacVolcar();
       return {restauradas:nuevas.length, total:S.tareas.length};
     }catch(e){ return {error:e.message}; }
+  };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Cartera CAPITAL CARE, con los datos del reporte
+   ------------------------------------------------------------
+   Aquí dentro van las 76 filas del reporte de cartera de
+   CAPITAL CARE & CO, tal como vienen: número de póliza,
+   vigencia, prima, porcentaje y comisión, aseguradora y ramo.
+   No se leen de la nube ni dependen de que otro módulo esté
+   cargado: están escritas en el propio archivo, así que el
+   botón funciona siempre.
+
+   Dos cosas que conviene tener claras:
+
+   · CAPITAL CARE no es una aseguradora, es la agencia. Esas 76
+     pólizas son de ocho compañías distintas — Internacional,
+     ASSA, SURA, FEDPA, MAPFRE, Ancón, ACERTA y La Regional.
+     Por eso "las vencidas de Capital Care" y "las vencidas de
+     ASSA" se pisan: son la misma cartera mirada de dos formas.
+
+   · De las 76, veintiuna traen en el reporte una fecha de fin
+     que ya pasó. No es que estén vencidas: es que el reporte se
+     sacó antes de la renovación. A esas se les adelanta la
+     vigencia período a período — usando la misma duración que
+     tenían, no una anual supuesta — hasta que caiga en el
+     futuro, y quedan Vigente. Lo adelantado se anota en
+     `extra.renovacionEstimada` por si hay que revisarlo.
+
+   El botón informa siempre tres números: cuántas encontró,
+   cuántas corrigió y cuáles no están en el CRM — con nombre y
+   número, para poder crearlas.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* [num, inicio, fin, prima, total, comPct, comision, aseguradora, ramo, formaPago, cuotas] */
+  var CC = [["03G50509","2025-02-10","2026-02-10",113.4,115.5,20.0,22.0,"ASSA","INCENDIO","MENSUAL",10.0],["02B3408559","2025-03-26","2026-03-26",437.95,430.14,20.0,81.16,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["02B3423338","2025-08-30","2026-08-30",920.77,904.04,20.0,170.57,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["030-001-000773693","2026-02-23","2027-02-23",486.12,515.29,20.0,97.22,"Internacional","AUTOMÓVIL","ANUAL",1.0],["030-001-000773675","2026-01-14","2027-01-14",448.92,475.86,20.0,89.78,"Internacional","AUTOMÓVIL","ANUAL",1.0],["030-012-000021492","2026-03-26","2027-03-26",1212.15,1284.88,20.0,242.43,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["02-92-1054443-2","2026-01-13","2027-01-13",164.73,174.61,20.0,32.95,"SURA","AUTOMÓVIL","MENSUAL",3.0],["02B3425396","2025-10-04","2026-10-04",567.51,575.29,20.0,108.55,"ASSA","AUTOMÓVIL","MENSUAL",10.0],["030-001-000653812","2025-11-23","2026-11-23",466.14,494.11,20.0,93.23,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000762087","2026-03-31","2027-03-31",811.37,860.05,20.0,162.27,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-012-000019308","2026-01-19","2027-01-19",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000773605","2025-06-03","2026-06-03",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1970094-0","2025-07-18","2026-07-18",117.92,152.17,20.0,28.71,"FEDPA","AUTOMÓVIL","MENSUAL",2.0],["02-93-1159210-1","2025-10-19","2026-10-19",570.0,604.2,20.0,114.0,"SURA","AUTOMÓVIL","MENSUAL",10.0],["01-82-1165813-1","2025-11-15","2026-11-15",75.6,79.38,20.0,15.12,"SURA","INCENDIO","MENSUAL",6.0],["030-001-000773687","2026-02-09","2027-02-09",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["02B3408498","2025-03-25","2026-03-25",1256.95,1231.88,20.0,232.43,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["02BR2908859","2024-12-31","2025-12-31",150.94,160.0,20.0,30.19,"ASSA","AUTOMÓVIL","MENSUAL",1.0],["04-05-2113514-0","2026-02-05","2027-02-05",122.65,130.01,20.0,24.53,"FEDPA","AUTOMÓVIL","ANUAL",1.0],["030-001-000762067","2026-02-08","2027-02-08",196.23,208.0,20.0,39.25,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000773684","2026-01-28","2027-01-28",196.23,208.0,20.0,39.25,"Internacional","AUTOMÓVIL","ANUAL",1.0],["01-82-1180631-1","2026-02-01","2027-02-01",77.4,81.27,20.0,15.48,"SURA","INCENDIO","MENSUAL",10.0],["02B3419013","2025-07-15","2026-07-15",1662.78,1650.88,20.0,311.49,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["030-012-000018094","2026-04-10","2027-04-10",626.58,664.17,20.0,125.32,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["06B52344","2025-02-17","2025-07-17",500.0,525.0,20.0,100.0,"ASSA","PROPIEDAD","MENSUAL",1.0],["08300000034748","2026-03-07","2027-03-07",131.48,138.05,20.0,26.3,"MAPFRE","INCENDIO","MENSUAL",1.0],["04-04-570284-9","2025-10-22","2026-10-22",342.53,363.08,20.0,68.51,"FEDPA","AUTOMÓVIL","MENSUAL",12.0],["030-012-000019229","2026-01-03","2027-01-03",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["0225-03756-09","2025-05-31","2026-05-31",1034.55,600.91,20.0,113.38,"Ancón","AUTOMÓVIL","MENSUAL",10.0],["15051544000000","2025-05-03","2026-05-03",100.0,105.0,20.0,20.0,"MAPFRE","FIANZA","ANUAL",1.0],["033-012-000001062","2025-08-12","2026-08-12",110.0,115.5,20.0,22.0,"Internacional","INCENDIO","MENSUAL",1.0],["030-001-000773626","2025-09-08","2026-09-08",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1950814-0","2025-06-23","2026-06-23",108.49,140.0,20.0,26.42,"FEDPA","AUTOMÓVIL","MENSUAL",2.0],["030-001-000773640","2025-10-20","2026-10-20",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000773641","2025-10-21","2026-10-21",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["033-012-000000792","2025-04-19","2026-04-19",222.0,233.1,20.0,44.4,"Internacional","INCENDIO","ANUAL",1.0],["040-012-000000204","2026-04-19","2027-04-19",250.0,262.5,20.0,50.0,"Internacional","PROPIEDAD","ANUAL",1.0],["15300000041391","2026-03-04","2026-08-31",311.33,326.9,10.0,31.13,"MAPFRE","FIANZA","ANUAL",1.0],["15300000041392","2026-03-04","2026-08-31",100.0,105.0,10.0,10.0,"MAPFRE","FIANZA","ANUAL",1.0],["06-01-1057584-2","2026-01-23","2027-01-23",990.57,1050.0,20.0,198.11,"SURA","AUTOMÓVIL","MENSUAL",10.0],["02-85-1183801-1","2026-02-03","2027-02-03",144.44,153.11,20.0,28.89,"SURA","AUTOMÓVIL","MENSUAL",10.0],["02-12696563-0","2025-09-15","2026-09-15",490.19,519.6,20.0,98.04,"ACERTA","AUTOMÓVIL","MENSUAL",10.0],["0225-03316-09","2026-05-19","2027-05-19",1157.05,517.63,20.0,97.67,"Ancón","AUTOMÓVIL","MENSUAL",11.0],["02B3347696","2025-12-22","2026-12-22",643.05,616.01,20.0,116.23,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["03B91806","2025-10-14","2026-10-14",140.0,147.0,20.0,28.0,"ASSA","INCENDIO","MENSUAL",1.0],["15B36395","2025-10-14","2026-10-14",69.0,72.45,20.0,13.8,"ASSA","INCENDIO","MENSUAL",1.0],["02B3412557","2026-05-20","2027-05-20",645.71,623.64,20.0,117.67,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["030-001-000773678","2026-01-07","2027-01-07",543.65,576.27,20.0,108.73,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1708297-1","2025-08-09","2026-08-09",117.92,125.0,20.0,23.58,"FEDPA","AUTOMÓVIL","MENSUAL",1.0],["31300000003528","2025-05-21","2026-05-21",40.0,42.0,20.0,8.0,"MAPFRE","PROPIEDAD","MENSUAL",1.0],["0225-01591-01","2025-06-12","2026-06-12",5914.45,2069.02,20.0,390.38,"Ancón","AUTOMÓVIL","MENSUAL",10.0],["03B104489","2026-01-26","2027-01-26",612.0,610.47,20.0,116.28,"ASSA","INCENDIO","MENSUAL",1.0],["15B103910","2026-01-26","2027-01-26",275.0,274.31,20.0,52.25,"ASSA","INCENDIO","MENSUAL",1.0],["02-93-1237187-0","2025-11-06","2026-11-06",1968.06,2086.14,20.0,393.61,"SURA","AUTOMÓVIL","MENSUAL",10.0],["02-93-1245991-0","2026-01-05","2027-01-05",2505.75,2656.1,20.0,501.15,"SURA","AUTOMÓVIL","MENSUAL",10.0],["030-001-000773686","2026-01-29","2027-01-29",196.23,208.0,20.0,39.25,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["08300000034589","2026-01-29","2027-01-29",232.0,243.6,20.0,46.4,"MAPFRE","INCENDIO","MENSUAL",1.0],["030-001-000773652","2025-11-16","2026-11-16",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","ANUAL",1.0],["030-012-000021218","2026-01-25","2027-01-25",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["02B3433365","2025-12-15","2026-12-15",1024.9,1019.18,20.0,192.3,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["02-12696031-0","2025-06-26","2026-06-26",169.82,180.01,20.0,33.96,"ACERTA","AUTOMÓVIL","ANUAL",1.0],["0830024041163","2024-12-28","2025-12-28",650.1,689.11,20.0,130.02,"MAPFRE","AUTOMÓVIL","MENSUAL",1.0],["030-001-000762069","2026-02-12","2027-02-12",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1810021-1","2025-12-26","2026-12-26",108.49,115.0,20.0,21.7,"FEDPA","AUTOMÓVIL","MENSUAL",1.0],["10-29-2176111-0","2025-03-29","2026-03-29",290.2,307.61,20.0,58.04,"La Regional","AUTOMÓVIL","MENSUAL",12.0],["02-93-1072634-2","2026-04-29","2027-04-29",551.48,584.57,20.0,110.3,"SURA","AUTOMÓVIL","MENSUAL",10.0],["033-012-000000761","2026-01-16","2027-01-16",115.78,121.57,20.0,23.16,"Internacional","INCENDIO","MENSUAL",1.0],["030-012-000021268","2026-02-01","2027-02-01",1507.41,1597.85,20.0,301.48,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["032-012-000000064","2026-02-01","2027-02-01",250.0,262.5,20.0,50.0,"Internacional","PROPIEDAD","MENSUAL",1.0],["04-04-1367045-2","2025-04-26","2026-04-26",547.27,580.11,20.0,109.45,"FEDPA","AUTOMÓVIL","MENSUAL",12.0],["02B3423630","2025-09-04","2026-09-04",403.18,409.82,20.0,77.32,"ASSA","AUTOMÓVIL","MENSUAL",10.0],["15B103914","2026-02-01","2027-02-01",275.0,274.31,20.0,52.25,"ASSA","INCENDIO","MENSUAL",1.0],["030-001-000762082","2026-03-25","2027-03-25",906.29,960.67,20.0,181.26,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000773658","2025-12-04","2026-12-04",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-012-000019851","2026-04-23","2027-04-23",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1953528-0","2025-06-26","2026-06-26",117.92,125.0,20.0,23.58,"FEDPA","AUTOMÓVIL","MENSUAL",1.0]]
+;
+
+  function norm(x){
+    return String(x||'').toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/Ñ/g,'N').replace(/[^A-Z0-9]/g,'');
+  }
+  /* El CRM a veces guarda el numero con un sufijo de ciclo: 123456-2 */
+  function base(x){
+    var b=norm(String(x||'').replace(/-\d{1,6}$/,''));
+    return b.length>=8 ? b : null;
+  }
+  function hoyISO(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+  function dif(a,b){
+    var x=new Date(a+'T00:00:00'), y=new Date(b+'T00:00:00');
+    if(isNaN(x)||isNaN(y)) return 12;
+    return Math.max(1, Math.round((y-x)/86400000/30.4));   /* meses aproximados */
+  }
+  function sumarMeses(iso,m){
+    var p=String(iso).split('-');
+    var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+    var dia=d.getUTCDate();
+    d.setUTCMonth(d.getUTCMonth()+m);
+    if(d.getUTCDate()!==dia) d.setUTCDate(0);
+    return d.toISOString().slice(0,10);
+  }
+  function n2(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
+
+  function indice(){
+    var P=(typeof S!=='undefined'&&S.polizas)||[];
+    var exacto={}, porBase={};
+    P.forEach(function(p){
+      var n=norm(p.num);
+      if(n){ if(!exacto[n]) exacto[n]=[]; exacto[n].push(p); }
+      var b=base(p.num);
+      if(b){ if(!porBase[b]) porBase[b]=[]; porBase[b].push(p); }
+    });
+    return {P:P, exacto:exacto, porBase:porBase};
+  }
+
+  function buscar(ix, numero){
+    var n=norm(numero);
+    if(ix.exacto[n] && ix.exacto[n].length) return ix.exacto[n][0];
+    var b=base(numero);
+    if(b && ix.porBase[b] && ix.porBase[b].length===1) return ix.porBase[b][0];
+    /* uno contiene al otro por delante, con 8 caracteres o mas */
+    if(n.length>=8){
+      for(var i=0;i<ix.P.length;i++){
+        var pn=norm(ix.P[i].num);
+        if(pn.length>=8 && (pn.indexOf(n)===0 || n.indexOf(pn)===0)) return ix.P[i];
+      }
+    }
+    return null;
+  }
+
+  window.jacCapitalCare = async function(opts){
+    opts=opts||{};
+    var hoy=hoyISO();
+    var ix=indice();
+    var r={ filas:CC.length, encontradas:0, corregidas:0, adelantadas:0,
+            sinCambio:0, noEstan:[], detalle:[], porAseguradora:{} };
+
+    CC.forEach(function(f){
+      var numero=f[0], ini=f[1], fin=f[2], prima=n2(f[3]), total=n2(f[4]),
+          pct=n2(f[5]), com=n2(f[6]), aseg=f[7], ramo=f[8], forma=f[9], cuotas=n2(f[10]);
+
+      var p=buscar(ix, numero);
+      if(!p){ r.noEstan.push({num:numero, aseg:aseg, ramo:ramo, vence:fin, prima:prima}); return; }
+      r.encontradas++;
+
+      var cambios=[];
+      function set(campo, valor){
+        if(valor===null||valor===undefined||valor==='') return;
+        if(String(p[campo]||'')!==String(valor)){ cambios.push(campo); p[campo]=valor; }
+      }
+
+      set('num', numero);
+      set('aseg', aseg);
+      if(!p.ramo || opts.forzarRamo) set('ramo', ramo);
+      set('fechaInicio', ini);
+      set('fechaFin', fin);
+      if(prima>0) set('prima', prima);
+      if(total>0) set('total', total);
+      if(pct>0)   set('comPct', pct);
+      if(com>0)   set('comision', com);
+      if(forma)   set('formaPago', forma);
+      if(cuotas>0)set('cuotas', cuotas);
+      if(!p.corredor) set('corredor','CAPITAL CARE & CO');
+
+      /* Vigencia al dia: se adelanta con la duracion real de la poliza */
+      if(p.fechaFin < hoy){
+        var meses=dif(ini, fin), vueltas=0, finOrig=p.fechaFin;
+        while(p.fechaFin < hoy && vueltas<12){
+          p.fechaInicio=p.fechaFin;
+          p.fechaFin=sumarMeses(p.fechaFin, meses);
+          vueltas++;
+        }
+        if(vueltas){
+          p.extra=p.extra||{};
+          p.extra.renovacionEstimada={fuente:'reporte CAPITAL CARE', hasta:finOrig,
+                                      meses:meses, periodos:vueltas, cuando:hoy};
+          cambios.push('vigencia adelantada '+finOrig+' → '+p.fechaFin);
+          r.adelantadas++;
+        }
+      }
+
+      if(String(p.estado||'').toLowerCase()!=='vigente'){
+        cambios.push('estado → Vigente');
+        p.estado='Vigente';
+      }
+      if(p.etapaGestion==='Cancelada' || p.etapaTarea==='Cancelada'){ p.etapaGestion='Activa'; }
+
+      if(!r.porAseguradora[aseg]) r.porAseguradora[aseg]={n:0, prima:0, comision:0};
+      r.porAseguradora[aseg].n++;
+      r.porAseguradora[aseg].prima+=prima;
+      r.porAseguradora[aseg].comision+=com;
+
+      if(cambios.length){
+        r.corregidas++;
+        if(r.detalle.length<60) r.detalle.push({num:numero, aseg:aseg, cambios:cambios});
+      } else r.sinCambio++;
+    });
+
+    if(!opts.soloVer){
+      try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
+      try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+    }
+
+    /* Como queda la cartera despues de aplicar */
+    var P=(typeof S!=='undefined'&&S.polizas)||[];
+    r.carteraAhora={
+      vigentes:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vigente';}).length,
+      vencidas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vencida';}).length,
+      canceladas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='cancelada';}).length
+    };
+    return r;
+  };
+
+  /* Crear en el CRM las que el reporte trae y el CRM no tiene */
+  window.jacCapitalCareCrear = async function(){
+    var ix=indice();
+    var nuevas=[];
+    CC.forEach(function(f){
+      if(buscar(ix, f[0])) return;
+      nuevas.push({
+        id:'POL_CC_'+Math.random().toString(36).slice(2,10),
+        num:f[0], aseg:f[7], ramo:f[8],
+        fechaInicio:f[1], fechaFin:f[2],
+        prima:n2(f[3]), total:n2(f[4]), comPct:n2(f[5]), comision:n2(f[6]),
+        formaPago:f[9], cuotas:n2(f[10]),
+        estado:'Vigente', participacion:100,
+        corredor:'CAPITAL CARE & CO',
+        nombreCliente:'', clienteId:'',
+        extra:{creadaDesde:'reporte CAPITAL CARE', cuando:hoyISO(), faltaCliente:true}
+      });
+    });
+    if(!nuevas.length) return {creadas:0, motivo:'no falta ninguna'};
+    S.polizas=((typeof S!=='undefined'&&S.polizas)||[]).concat(nuevas);
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+    try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+    return {creadas:nuevas.length, aviso:'quedaron sin cliente asignado — aparécelas desde Pólizas'};
+  };
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Los mensajes de cobro y de pago
+   ------------------------------------------------------------
+   Los textos que salían antes eran de una línea: "le contacto de
+   JAC Seguros por pago pendiente". No dicen qué póliza, ni de
+   cuánto, ni qué tiene que hacer la persona, y obligan a escribir
+   el mensaje de verdad a mano cada vez.
+
+   Aquí quedan escritos como se escribe un cobro que se quiere
+   cobrar: con el detalle delante, un solo paso a seguir, y el
+   tono cambiando según cuánto lleva pendiente — a los treinta
+   días es un recordatorio, pasados noventa es un aviso de que la
+   cobertura corre peligro. Nunca amenazan y nunca regañan.
+
+   Todos cierran con la firma de JAC Seguros | Jely An Castro y el
+   cintillo de la Superintendencia, que en el correo va con el
+   logo debajo de la firma.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function money(n){ return (typeof fmtM==='function')?fmtM(n||0):('$'+(Number(n)||0).toFixed(2)); }
+  function f(d){ return (typeof fmt==='function'&&d)?fmt(d):(d||'—'); }
+  function nom(x){ return String(x||'').trim().split(' ')[0] || 'buen día'; }
+  function firma(c){ return (typeof window.jacFirma==='function')?window.jacFirma(c):'\n\n— JAC Seguros | Jely An Castro'; }
+  function num(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
+  function hoyISO(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+  function dias(x){
+    if(!x) return null;
+    var d=new Date(String(x).slice(0,10)+'T00:00:00');
+    if(isNaN(d.getTime())) return null;
+    return Math.floor((new Date(hoyISO()+'T00:00:00')-d)/86400000);
+  }
+
+  /* ---------- WhatsApp: cobro de una cuota al cliente ---------- */
+  window.jacMsgPago=function(p,o){
+    p=p||{}; o=o||{};
+    var cli=o.cli||{}, pol=o.pol||{};
+    var d=dias(p.fecha);
+    var apertura, cierre;
+
+    if(d===null || d<0){
+      apertura='Te escribo con tiempo para avisarte de la cuota que viene, así la tienes prevista y tu cobertura sigue intacta.';
+      cierre='¿Te queda cómodo pagarla antes de la fecha? Si necesitas otra forma de pago, dime y lo acomodamos.';
+    } else if(d<=30){
+      apertura='Te escribo por la cuota de tu póliza, que quedó pendiente. Nada grave — pasa seguido y se resuelve rápido.';
+      cierre='Si ya la pagaste, mándame el comprobante y la registro hoy mismo. Si no, dime qué día te sirve y lo coordino con la aseguradora.';
+    } else if(d<=60){
+      apertura='Vuelvo contigo por la cuota pendiente. Prefiero recordártelo yo antes de que la aseguradora empiece a contar el plazo.';
+      cierre='Dime cómo prefieres resolverlo — pago completo, o lo dividimos. Lo importante es no dejar que avance.';
+    } else if(d<=90){
+      apertura='Te escribo porque la cuota lleva ya un tiempo pendiente y quiero evitarte un problema mayor.';
+      cierre='Con este atraso la aseguradora puede suspender la cobertura, y no quiero que te pase. Hablemos hoy y buscamos la salida que te sirva.';
+    } else {
+      apertura='Necesito hablar contigo de esta cuota. Lleva más de tres meses pendiente y tu cobertura está en riesgo real.';
+      cierre='Si la póliza se cae, volver a emitirla cuesta más y puede exigir requisitos nuevos. Contéstame y lo resolvemos antes de llegar a eso.';
+    }
+
+    return 'Hola ' + nom(cli.nombre||p.cliente) + ' 👋🏼\n\n' + apertura + '\n\n'
+      + '📋 *El detalle*\n'
+      + (pol.num  ? '• Póliza: ' + pol.num + '\n' : '')
+      + (pol.ramo ? '• Ramo: '   + pol.ramo + '\n' : '')
+      + (pol.aseg ? '• Aseguradora: ' + pol.aseg + '\n' : '')
+      + (p.cuota  ? '• Cuota: '   + p.cuota + '\n' : '')
+      + '• Monto: *' + money(p.monto) + '*\n'
+      + (p.fecha  ? '• Fecha de la cuota: ' + f(p.fecha) + (d>0?' (hace '+d+' días)':'') + '\n' : '')
+      + '\n' + cierre
+      + firma();
+  };
+
+  /* ---------- WhatsApp: comisión, para hablar con el cliente ---------- */
+  window.jacMsgComision=function(c,o){
+    c=c||{}; o=o||{};
+    var cli=o.cli||{}, pol=o.pol||{};
+    return 'Hola ' + nom(cli.nombre||c.clienteNom) + ' 👋🏼\n\n'
+      + 'Te escribo para confirmar el estado de tu póliza, porque la aseguradora todavía no ha '
+      + 'registrado el movimiento y quiero descartar que sea algo de tu lado.\n\n'
+      + '📋 *Referencia*\n'
+      + (pol.num  ? '• Póliza: ' + pol.num + '\n' : '')
+      + (c.aseg   ? '• Aseguradora: ' + c.aseg + '\n' : '')
+      + (pol.ramo ? '• Ramo: ' + pol.ramo + '\n' : '')
+      + (c.fecha  ? '• Fecha: ' + f(c.fecha) + '\n' : '')
+      + '\n¿Me confirmas si el pago a la aseguradora ya salió de tu parte? '
+      + 'Con eso reclamo yo lo que falte y tú no tienes que hacer nada más.'
+      + firma();
+  };
+
+  /* ---------- Correo a la aseguradora por comisiones pendientes ---------- */
+  window.jacMsgComisionAseg=function(aseg, filas){
+    filas=filas||[];
+    var total=filas.reduce(function(s,c){ return s+num(c.monto); },0);
+    var lineas=filas.map(function(c){
+      var o=(typeof window.jacOrigenCobro==='function')?window.jacOrigenCobro(c):{};
+      var pol=(o&&o.pol)||{};
+      return '• ' + (pol.num?('Póliza '+pol.num):'(sin número de póliza)')
+        + (o&&o.cli&&o.cli.nombre?(' — '+o.cli.nombre):'')
+        + (c.fecha?(' — '+f(c.fecha)):'')
+        + ' — ' + money(c.monto);
+    }).join('\n');
+
+    return 'Estimados señores de ' + (aseg||'la aseguradora') + ':\n\n'
+      + 'Reciban un cordial saludo de JAC Seguros.\n\n'
+      + 'Les escribo para solicitar la conciliación y el pago de las comisiones que se detallan '
+      + 'a continuación, correspondientes a pólizas intermediadas por esta corredora y que a la '
+      + 'fecha figuran pendientes en nuestros registros:\n\n'
+      + lineas + '\n\n'
+      + 'Total pendiente: ' + money(total) + ' (' + filas.length + ' registro'
+      + (filas.length===1?'':'s') + ').\n\n'
+      + 'Si alguno de estos montos ya fue liquidado, les agradezco indicarme la fecha y el '
+      + 'número de la transferencia para conciliarlo de inmediato en nuestro control. '
+      + 'Si falta algún documento de mi parte, con gusto lo remito el mismo día.\n\n'
+      + 'Quedo atenta a su respuesta.'
+      + firma();
+  };
+
+  /* ---------- Correos ---------- */
+  function abrirCorreo(email, nombre, asunto, cuerpo, tipo, id){
+    if(typeof window.openComposeEmail==='function'){
+      window.openComposeEmail(email, nombre, asunto, cuerpo, tipo||'', id||'');
+      return;
+    }
+    window.open('mailto:'+encodeURIComponent(email)
+      +'?subject='+encodeURIComponent(asunto)
+      +'&body='+encodeURIComponent(cuerpo));
+  }
+
+  /* Los mensajes de WhatsApp llevan *asteriscos* para negrita; en el
+     correo eso se lee como ruido. Se quitan al pasar al correo. */
+  function aCorreo(txt){
+    return String(txt||'').replace(/\*([^*\n]+)\*/g,'$1');
+  }
+
+  window.jacCorreoPago=function(pagId){
+    var p=((typeof S!=='undefined'&&S.pagos)||[]).filter(function(x){return x.id===pagId;})[0];
+    if(!p){ if(typeof toast==='function') toast('Pago no encontrado','err'); return; }
+    var o=(typeof window.jacOrigenCobro==='function')?window.jacOrigenCobro(p):{};
+    var cli=(o&&o.cli)||{}, pol=(o&&o.pol)||{};
+    if(!cli.email){ if(typeof toast==='function') toast('Ese cliente no tiene correo registrado','err'); return; }
+    var d=dias(p.fecha);
+    var asunto = (d!==null&&d>60)
+      ? 'Cuota pendiente de su póliza ' + (pol.num||'') + ' — JAC Seguros'
+      : 'Recordatorio de pago — póliza ' + (pol.num||'') + ' — JAC Seguros';
+    abrirCorreo(cli.email, cli.nombre||'', asunto, aCorreo(window.jacMsgPago(p,o)), 'cliente', cli.id||'');
+  };
+
+  window.jacCorreoComision=function(comId){
+    var c=((typeof S!=='undefined'&&S.comisiones)||[]).filter(function(x){return x.id===comId;})[0];
+    if(!c){ if(typeof toast==='function') toast('Comisión no encontrada','err'); return; }
+    var o=(typeof window.jacOrigenCobro==='function')?window.jacOrigenCobro(c):{};
+    var cli=(o&&o.cli)||{};
+    if(!cli.email){ if(typeof toast==='function') toast('Sin correo registrado','err'); return; }
+    abrirCorreo(cli.email, cli.nombre||'', 'Confirmación de su póliza — JAC Seguros',
+      aCorreo(window.jacMsgComision(c,o)), 'cliente', cli.id||'');
+  };
+
+  /* Un solo correo por aseguradora con TODO lo que le falta pagar */
+  window.jacCorreoComisionesAseg=function(aseg){
+    var pend=((typeof S!=='undefined'&&S.comisiones)||[])
+      .filter(function(c){ return c.estado!=='cobrada' && String(c.aseg||'')===String(aseg); });
+    if(!pend.length){ if(typeof toast==='function') toast('Nada pendiente con '+aseg); return; }
+    abrirCorreo('', aseg, 'Solicitud de conciliación y pago de comisiones — JAC Seguros',
+      aCorreo(window.jacMsgComisionAseg(aseg, pend)), '', '');
+  };
+
+  /* ---------- Pie con logo para los correos en HTML ---------- */
+  window.jacFirmaHTML=function(){
+    var logo=window.JAC_SSRP_LOGO||'';
+    var ssrp=window.JAC_SSRP||'Regulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.';
+    return '<div style="margin-top:22px;border-top:1px solid #E2E8F0;padding-top:14px;'
+      + 'font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#1E293B">'
+      + '<div style="font-size:14px;font-weight:700">JAC Seguros | Jely An Castro</div>'
+      + '<div style="font-size:12px;color:#475569">Corredora de seguros · Panamá</div>'
+      + '<div style="font-size:12px;color:#475569;margin-top:6px">'
+      +   '📞 +507 6292-6010<br>'
+      +   '✉️ jcastro@jacsegurospa.com<br>'
+      +   '✉️ jelyancorredora@gmail.com<br>'
+      +   '🌐 www.jacsegurospa.com'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;'
+      +   'background:#F1F5F9;border-left:3px solid #1E3A8A;border-radius:0 6px 6px 0;padding:8px 11px">'
+      +   (logo?'<img src="'+logo+'" alt="Superintendencia de Seguros y Reaseguros de Panamá" '
+      +     'height="34" style="height:34px;width:auto">':'')
+      +   '<span style="font-size:10px;color:#475569;line-height:1.45">'+ssrp+'</span>'
+      + '</div></div>';
+  };
+
+  /* Las plantillas guardadas también reciben las nuevas */
+  function sembrar(){
+    if(typeof S==='undefined' || !Array.isArray(S.plantillas)) return;
+    if(S.__plantillasCobro) return;
+    var base=[
+      {nombre:'Cobro de cuota — recordatorio', tipo:'ambos',
+       texto: window.jacMsgPago({monto:0,cuota:'{{cuota}}',fecha:'{{vence}}'},
+              {cli:{nombre:'{{nombre}}'}, pol:{num:'{{poliza}}',ramo:'{{ramo}}',aseg:'{{aseguradora}}'}})},
+      {nombre:'Comisión — confirmar con el cliente', tipo:'ambos',
+       texto: window.jacMsgComision({aseg:'{{aseguradora}}',fecha:'{{fecha}}'},
+              {cli:{nombre:'{{nombre}}'}, pol:{num:'{{poliza}}',ramo:'{{ramo}}'}})},
+      {nombre:'Comisiones — carta a la aseguradora', tipo:'email',
+       texto: window.jacMsgComisionAseg('{{aseguradora}}', [])}
+    ];
+    base.forEach(function(t){
+      if(!S.plantillas.some(function(p){ return p.nombre===t.nombre; })){
+        S.plantillas.push({id:'TPL'+Math.random().toString(36).slice(2,9), nombre:t.nombre, tipo:t.tipo, texto:t.texto});
+      }
+    });
+    S.__plantillasCobro=true;
+    try{ if(typeof save==='function') save(); }catch(e){}
+  }
+  var n=0;
+  var t=setInterval(function(){
+    n++;
+    if(n>50){ clearInterval(t); return; }
+    if(typeof S!=='undefined' && S.clientes){ clearInterval(t); try{ sembrar(); }catch(e){} }
+  }, 800);
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Comisiones y Pagos, cada uno en su sitio
+   ------------------------------------------------------------
+   Qué había:
+
+   · La página de Comisiones leía campos que no existen —
+     `p.aseguradora`, `p.comisionPct`, `p.numero`— cuando los
+     campos reales son `aseg`, `comPct` y `num`. Resultado: todo
+     salía en cero y todas las pólizas aparecían como "Sin aseg.".
+     Por eso el módulo parecía vacío aunque la cartera esté llena.
+
+   · Las comisiones por cobrar vivían como tareas automáticas,
+     mezcladas con el trabajo del día y sin decir de qué póliza
+     eran. Aquí tienen módulo propio.
+
+   · Los pagos no tenían antigüedad: no se veía qué lleva un mes
+     sin cobrarse y qué lleva cuatro.
+
+   Qué hace este bloque:
+
+   1. Reescribe la página de Comisiones con los campos correctos:
+      resumen, antigüedad a 30/60/90 y más de 90 días, detalle por
+      póliza y por aseguradora.
+   2. Añade la misma antigüedad al módulo de Pagos, con el botón
+      de marcar cobrado y los mensajes listos.
+   3. Cada línea dice de qué póliza y de qué cliente es.
+   4. `jacComisionesDesdeTareas()` saca las comisiones de Tareas y
+      las pasa al módulo, sin perder nada: lo que no se puede
+      convertir se informa y se queda como está.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* ---------------- utilidades ---------------- */
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function C(){ return (typeof S!=='undefined'&&S.clientes)||[]; }
+  function CO(){ if(typeof S!=='undefined'&&!S.comisiones) S.comisiones=[]; return (typeof S!=='undefined'&&S.comisiones)||[]; }
+  function PG(){ if(typeof S!=='undefined'&&!S.pagos) S.pagos=[]; return (typeof S!=='undefined'&&S.pagos)||[]; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(n){ return (typeof fmtM==='function')?fmtM(n||0):('$'+(Number(n)||0).toFixed(2)); }
+  function num(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
+  function hoyISO(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+  function dias(f){
+    if(!f) return null;
+    var d=new Date(String(f).slice(0,10)+'T00:00:00');
+    if(isNaN(d.getTime())) return null;
+    return Math.floor((new Date(hoyISO()+'T00:00:00')-d)/86400000);
+  }
+  function guardar(){
+    try{ if(typeof save==='function') save(); }catch(x){}
+    try{ if(typeof window.jacRepintarPronto==='function') window.jacRepintarPronto(); }catch(x){}
+  }
+  function aviso(t){ try{ if(typeof toast==='function') toast(t); }catch(x){} }
+  function normNum(x){
+    return String(x||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,'');
+  }
+
+  /* ---- de qué póliza y de qué cliente es esta línea ---- */
+  function polPorNumero(txt){
+    if(!txt) return null;
+    var cand=String(txt).match(/[0-9][0-9A-Za-z._\-\/]{5,}/g)||[];
+    for(var i=0;i<cand.length;i++){
+      var n=normNum(cand[i]); if(n.length<6) continue;
+      var A=P();
+      for(var j=0;j<A.length;j++){
+        var pn=normNum(A[j].num);
+        if(pn && (pn===n || (pn.length>=8&&n.length>=8&&(pn.indexOf(n)===0||n.indexOf(pn)===0)))) return A[j];
+      }
+    }
+    return null;
+  }
+  function origen(r){
+    if(!r) return {};
+    var A=P(), L=C(), pol=null, cli=null, i;
+    if(r.polizaId) for(i=0;i<A.length;i++) if(A[i].id===r.polizaId){ pol=A[i]; break; }
+    if(!pol && r.numeroPol) pol=polPorNumero(r.numeroPol);
+    if(!pol) pol=polPorNumero(r.titulo)||polPorNumero(r.desc)||polPorNumero(r.notas);
+    var cid=(pol&&pol.clienteId)||r.clienteId;
+    if(cid) for(i=0;i<L.length;i++) if(L[i].id===cid){ cli=L[i]; break; }
+    if(!cli){
+      var nom=r.clienteNom||r.cliente||(pol&&pol.nombreCliente);
+      if(nom){
+        for(i=0;i<L.length;i++) if(String(L[i].nombre||'').toLowerCase()===String(nom).toLowerCase()){ cli=L[i]; break; }
+        if(!cli) cli={nombre:nom};
+      }
+    }
+    return {pol:pol, cli:cli};
+  }
+  window.jacOrigenCobro=origen;
+
+  function lineaOrigen(o){
+    var t=[];
+    if(o.pol) t.push('N° <b>'+e(o.pol.num||'—')+'</b>');
+    if(o.cli&&o.cli.nombre) t.push(e(String(o.cli.nombre).split(' ').slice(0,3).join(' ')));
+    if(o.pol&&o.pol.ramo) t.push(e(o.pol.ramo));
+    return t.length? t.join(' · ') : '<span style="color:#CBD5E1">sin póliza vinculada</span>';
+  }
+
+  /* ---------------- antigüedad ---------------- */
+  var TRAMOS=[
+    {k:'t30',  et:'0 a 30 días',   min:-99999, max:30,  col:'#0891B2'},
+    {k:'t60',  et:'31 a 60 días',  min:31,     max:60,  col:'#D97706'},
+    {k:'t90',  et:'61 a 90 días',  min:61,     max:90,  col:'#EA580C'},
+    {k:'t90m', et:'más de 90 días',min:91,     max:99999,col:'#B91C1C'}
+  ];
+  function tramoDe(d){
+    if(d===null) return 't30';
+    for(var i=0;i<TRAMOS.length;i++) if(d>=TRAMOS[i].min && d<=TRAMOS[i].max) return TRAMOS[i].k;
+    return 't90m';
+  }
+  function agrupar(filas, campoFecha, campoMonto){
+    var g={}; TRAMOS.forEach(function(t){ g[t.k]={filas:[], total:0}; });
+    filas.forEach(function(f){
+      var d=dias(f[campoFecha]);
+      var k=tramoDe(d);
+      f.__dias=d;
+      g[k].filas.push(f);
+      g[k].total+=num(f[campoMonto]);
+    });
+    return g;
+  }
+  function tarjetasTramo(g, activo, fn){
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px">'
+      +TRAMOS.map(function(t){
+        var d=g[t.k], on=(activo===t.k);
+        return '<button type="button" onclick="'+fn+'(\''+t.k+'\')" '
+          +'style="text-align:left;border:1px solid '+(on?t.col:'#E2E8F0')+';'
+          +'background:'+(on?t.col+'12':'#fff')+';border-radius:11px;padding:11px 12px;cursor:pointer;'
+          +'box-shadow:'+(on?'0 0 0 2px '+t.col+'33':'none')+'">'
+          +'<div style="font-size:10px;font-weight:700;color:'+t.col+';text-transform:uppercase;letter-spacing:.4px">'+t.et+'</div>'
+          +'<div style="font-size:19px;font-weight:800;color:#1E293B;margin-top:3px">'+money(d.total)+'</div>'
+          +'<div style="font-size:10px;color:#94A3B8">'+d.filas.length+' registro'+(d.filas.length===1?'':'s')+'</div>'
+          +'</button>';
+      }).join('')
+      +'</div>';
+  }
+
+  /* ================= COMISIONES ================= */
+  window._jacComVista='cobrar';
+  window._jacComTramo='';
+
+  window.jacComVista=function(v){ window._jacComVista=v; window._jacComTramo=''; window.renderCom(); };
+  window.jacComTramo=function(k){ window._jacComTramo=(window._jacComTramo===k?'':k); window.renderCom(); };
+
+  window.jacComCobrar=function(id){
+    var c=CO().filter(function(x){return x.id===id;})[0];
+    if(!c) return;
+    c.estado='cobrada'; c.fechaCobro=hoyISO();
+    guardar(); window.renderCom(); aviso('✓ Comisión cobrada');
+  };
+  window.jacComReabrir=function(id){
+    var c=CO().filter(function(x){return x.id===id;})[0];
+    if(!c) return;
+    c.estado='pendiente'; delete c.fechaCobro;
+    guardar(); window.renderCom(); aviso('Vuelve a por cobrar');
+  };
+  window.jacComCobrarTramo=function(k){
+    var pend=CO().filter(function(c){ return c.estado!=='cobrada'; });
+    var g=agrupar(pend,'fecha','monto');
+    var lote=g[k]?g[k].filas:[];
+    if(!lote.length){ aviso('Ese tramo está vacío'); return; }
+    var t=TRAMOS.filter(function(x){return x.k===k;})[0];
+    function hacer(){
+      lote.forEach(function(c){ c.estado='cobrada'; c.fechaCobro=hoyISO(); });
+      guardar(); window.renderCom(); aviso('✓ '+lote.length+' comisiones cobradas');
+    }
+    var msg='¿Marcar como cobradas las '+lote.length+' comisiones de '+t.et+' ('+money(g[k].total)+')?';
+    if(typeof confirm2==='function') confirm2(msg, hacer); else if(confirm(msg)) hacer();
+  };
+  window.jacComEliminar=function(id){
+    function hacer(){ S.comisiones=CO().filter(function(x){return x.id!==id;}); guardar(); window.renderCom(); aviso('Eliminada'); }
+    if(typeof confirm2==='function') confirm2('¿Eliminar esta comisión?', hacer); else if(confirm('¿Eliminar?')) hacer();
+  };
+
+  function filaCom(c){
+    var o=origen(c);
+    var d=c.__dias;
+    var col = d===null?'#94A3B8' : d>90?'#B91C1C' : d>60?'#EA580C' : d>30?'#D97706':'#0891B2';
+    var cobrada=(c.estado==='cobrada');
+    var wa='', em='';
+    if(o.cli){
+      var tel=String(o.cli.cel||o.cli.tel||'').replace(/\D/g,'');
+      if(tel) wa='<a href="'+(typeof waL==='function'?waL(tel, window.jacMsgComision(c,o)):'#')+'" target="_blank" '
+        +'class="btn bsm" style="background:#25D366;color:#fff;border-color:#25D366">&#128172;</a>';
+      if(o.cli.email) em='<button class="btn bsm" style="background:#1D4ED8;color:#fff;border-color:#1D4ED8" '
+        +'onclick="jacCorreoComision(\''+e(c.id)+'\')">&#128231;</button>';
+    }
+    return '<tr style="border-top:1px solid #EEF2F8;'+(cobrada?'background:#F8FAFC':'')+'">'
+      +'<td style="padding:8px 10px"><b style="color:'+((typeof ac==='function')?ac(c.aseg):'#1E293B')+'">'+e(c.aseg||'—')+'</b>'
+        +'<div style="font-size:10px;color:#64748B;margin-top:2px">'+lineaOrigen(o)+'</div></td>'
+      +'<td style="padding:8px 10px;font-size:11px;white-space:nowrap">'+(c.fecha?((typeof fmt==='function')?fmt(c.fecha):c.fecha):(c.mes||'—'))+'</td>'
+      +'<td style="padding:8px 10px;font-size:11px;text-align:center;color:'+col+';font-weight:700;white-space:nowrap">'
+        +(d===null?'—':(d<0?'en '+(-d)+'d':d+'d'))+'</td>'
+      +'<td style="padding:8px 10px;text-align:center;font-size:11px">'+(c.pct?c.pct+'%':'—')+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-weight:800;color:'+(cobrada?'#15803D':'#B45309')+'">'+money(c.monto)+'</td>'
+      +'<td style="padding:6px 8px;white-space:nowrap"><div class="ab" style="display:flex;gap:4px;flex-wrap:wrap">'
+        +(cobrada
+          ? '<button class="btn bsm" onclick="jacComReabrir(\''+e(c.id)+'\')" title="Volver a por cobrar">&#8630;</button>'
+          : '<button class="btn bsm" onclick="jacComCobrar(\''+e(c.id)+'\')" style="background:#D1FAE5;color:#15803D;border-color:#86EFAC;font-weight:700">&#9989; Cobrada</button>')
+        +wa+em
+        +'<button class="btn bsm bic" onclick="editCom(\''+e(c.id)+'\')" title="Editar">&#9999;&#65039;</button>'
+        +'<button class="btn bsm bic" onclick="jacComEliminar(\''+e(c.id)+'\')" style="color:#DC2626" title="Eliminar">&#128465;</button>'
+      +'</div></td></tr>';
+  }
+
+  function tabla(filas, vacio){
+    if(!filas.length) return '<div style="padding:26px;text-align:center;color:#94A3B8;font-size:12px">'+vacio+'</div>';
+    return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#fff;'
+      +'border:1px solid #EEF2F8;border-radius:11px;overflow:hidden;min-width:640px">'
+      +'<thead><tr style="background:#F8FAFC">'
+      +['Aseguradora / póliza','Fecha','Antigüedad','%','Monto','Acciones']
+        .map(function(h,i){ return '<th style="padding:9px 10px;text-align:'+(i===4?'right':(i===2||i===3?'center':'left'))
+          +';font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase;letter-spacing:.4px">'+h+'</th>'; }).join('')
+      +'</tr></thead><tbody>'+filas.join('')+'</tbody></table></div>';
+  }
+
+  window.renderCom=function(vista){
+    if(typeof vista==='string' && vista) window._jacComVista=(vista==='pol'||vista==='aseg')?vista:window._jacComVista;
+    var v=window._jacComVista||'cobrar';
+    var kpi=document.getElementById('com-kpi'), body=document.getElementById('com-body');
+    if(!body) return;
+    /* Los dos botones viejos (Por Poliza / Por Aseguradora) quedan
+       dentro de las pestañas nuevas: se ocultan para no repetirlos. */
+    try{
+      var vb=document.getElementById('com-bpol');
+      if(vb && vb.parentNode) vb.parentNode.style.display='none';
+    }catch(x){}
+
+    var vig=P().filter(function(p){
+      var est=String(p.estado||'').toLowerCase();
+      return est!=='cancelada' && est!=='renovada';
+    });
+    var carteraAnual=vig.reduce(function(s,p){ return s+num(p.comision); },0);
+    var pend=CO().filter(function(c){ return c.estado!=='cobrada'; });
+    var cob =CO().filter(function(c){ return c.estado==='cobrada'; });
+    var tPend=pend.reduce(function(s,c){ return s+num(c.monto); },0);
+    var tCob =cob.reduce(function(s,c){ return s+num(c.monto); },0);
+    var mesAct=hoyISO().slice(0,7);
+    var tMes=cob.filter(function(c){ return String(c.fechaCobro||c.fecha||'').slice(0,7)===mesAct; })
+                .reduce(function(s,c){ return s+num(c.monto); },0);
+
+    if(kpi){
+      var tarjeta=function(et,val,col,sub){
+        return '<div style="background:#fff;border:1px solid #EEF2F8;border-radius:11px;padding:14px">'
+          +'<div style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px">'+et+'</div>'
+          +'<div style="font-size:21px;font-weight:800;color:'+col+';margin-top:4px">'+val+'</div>'
+          +(sub?'<div style="font-size:10px;color:#94A3B8;margin-top:2px">'+sub+'</div>':'')+'</div>';
+      };
+      kpi.style.gridTemplateColumns='repeat(auto-fit,minmax(150px,1fr))';
+      kpi.innerHTML=tarjeta('Mi comisión de cartera',money(carteraAnual),'#1E293B',vig.length+' pólizas activas')
+        +tarjeta('Por cobrar',money(tPend),'#B45309',pend.length+' registros')
+        +tarjeta('Cobradas',money(tCob),'#15803D',cob.length+' registros')
+        +tarjeta('Cobrado este mes',money(tMes),'#7C3AED','');
+    }
+
+    var tabs=[['cobrar','⏳ Por cobrar'],['cobradas','✅ Cobradas'],['pol','📋 Por póliza'],['aseg','🏛 Por aseguradora']];
+    var h='<div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px">'
+      +tabs.map(function(t){
+        var on=(v===t[0]);
+        return '<button type="button" onclick="jacComVista(\''+t[0]+'\')" style="flex:0 0 auto;padding:7px 13px;'
+          +'border:1px solid '+(on?'#1E3A8A':'#CBD5E1')+';border-radius:999px;cursor:pointer;font-size:12px;font-weight:600;'
+          +'background:'+(on?'#1E3A8A':'#fff')+';color:'+(on?'#fff':'#334155')+'">'+t[1]+'</button>';
+      }).join('')+'</div>';
+
+    if(v==='cobrar'||v==='cobradas'){
+      var base=(v==='cobrar')?pend:cob;
+      var campo=(v==='cobrar')?'fecha':'fechaCobro';
+      var g=agrupar(base, (v==='cobrar')?'fecha':(base.some(function(c){return c.fechaCobro;})?'fechaCobro':'fecha'), 'monto');
+      h+=tarjetasTramo(g, window._jacComTramo, 'jacComTramo');
+      var lista = window._jacComTramo ? g[window._jacComTramo].filas : base.slice();
+      lista.sort(function(a,b){ return (b.__dias||0)-(a.__dias||0); });
+      if(v==='cobrar' && window._jacComTramo){
+        h+='<div style="margin-bottom:9px"><button class="btn bsm" onclick="jacComCobrarTramo(\''+window._jacComTramo+'\')" '
+          +'style="background:#15803D;color:#fff;border-color:#15803D;font-weight:700">✅ Marcar todo el tramo como cobrado</button>'
+          +'<span style="font-size:11px;color:#64748B;margin-left:8px">'+lista.length+' registros seleccionados</span></div>';
+      }
+      h+=tabla(lista.map(filaCom), v==='cobrar'?'Nada por cobrar ✓':'Todavía no hay comisiones cobradas');
+    }
+    else if(v==='pol'){
+      var filas=vig.map(function(p){
+        var cl=(typeof GC==='function')?GC(p.clienteId):null;
+        return {p:p, nom:(cl&&cl.nombre)||p.nombreCliente||'—', com:num(p.comision), prima:num(p.prima)};
+      }).sort(function(a,b){ return b.com-a.com; });
+      var tPrima=filas.reduce(function(s,r){return s+r.prima;},0);
+      var tCom=filas.reduce(function(s,r){return s+r.com;},0);
+      h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #EEF2F8;border-radius:11px;overflow:hidden;min-width:720px">'
+        +'<thead><tr style="background:#F8FAFC">'
+        +['Cliente','Póliza','Aseguradora','Ramo','Prima','% com.','Part.','Mi comisión']
+          .map(function(x,i){return '<th style="padding:9px 10px;text-align:'+(i>=4?'right':'left')+';font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase">'+x+'</th>';}).join('')
+        +'</tr></thead><tbody>'
+        +filas.map(function(r){
+          return '<tr style="border-top:1px solid #EEF2F8">'
+            +'<td style="padding:8px 10px;font-size:12px;font-weight:600">'+e(String(r.nom).split(' ').slice(0,3).join(' '))+'</td>'
+            +'<td style="padding:8px 10px;font-size:11px;font-family:monospace">'+e(r.p.num||'—')+'</td>'
+            +'<td style="padding:8px 10px;font-size:11px;color:#64748B">'+e(r.p.aseg||'—')+'</td>'
+            +'<td style="padding:8px 10px;font-size:11px">'+e(r.p.ramo||'—')+'</td>'
+            +'<td style="padding:8px 10px;font-size:12px;text-align:right">'+money(r.prima)+'</td>'
+            +'<td style="padding:8px 10px;font-size:12px;text-align:right">'+(num(r.p.comPct)?num(r.p.comPct)+'%':'—')+'</td>'
+            +'<td style="padding:8px 10px;font-size:12px;text-align:right">'+(num(r.p.participacion)||100)+'%</td>'
+            +'<td style="padding:8px 10px;font-size:12px;text-align:right;font-weight:700;color:#15803D">'+money(r.com)+'</td>'
+            +'</tr>';
+        }).join('')
+        +'<tr style="background:#FAFBFD;border-top:2px solid #E2E8F0">'
+        +'<td colspan="4" style="padding:10px;font-weight:700;color:#64748B;font-size:11px">TOTAL '+filas.length+' PÓLIZAS ACTIVAS</td>'
+        +'<td style="padding:10px;text-align:right;font-weight:800">'+money(tPrima)+'</td><td colspan="2"></td>'
+        +'<td style="padding:10px;text-align:right;font-weight:800;color:#15803D">'+money(tCom)+'</td></tr>'
+        +'</tbody></table></div>';
+    }
+    else {
+      var porA={};
+      vig.forEach(function(p){
+        var k=p.aseg||'Sin aseguradora';
+        if(!porA[k]) porA[k]={aseg:k,n:0,prima:0,com:0};
+        porA[k].n++; porA[k].prima+=num(p.prima); porA[k].com+=num(p.comision);
+      });
+      var arr=Object.keys(porA).map(function(k){return porA[k];}).sort(function(a,b){return b.com-a.com;});
+      h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #EEF2F8;border-radius:11px;overflow:hidden;min-width:520px">'
+        +'<thead><tr style="background:#F8FAFC">'
+        +['Aseguradora','Pólizas','Prima','Mi comisión','% efectivo']
+          .map(function(x,i){return '<th style="padding:9px 10px;text-align:'+(i?'right':'left')+';font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase">'+x+'</th>';}).join('')
+        +'</tr></thead><tbody>'
+        +arr.map(function(a){
+          var pc=a.prima?((a.com/a.prima)*100):0;
+          return '<tr style="border-top:1px solid #EEF2F8">'
+            +'<td style="padding:9px 10px;font-size:12px;font-weight:600">'+e(a.aseg)+'</td>'
+            +'<td style="padding:9px 10px;font-size:12px;text-align:right">'+a.n+'</td>'
+            +'<td style="padding:9px 10px;font-size:12px;text-align:right">'+money(a.prima)+'</td>'
+            +'<td style="padding:9px 10px;font-size:13px;text-align:right;font-weight:700;color:#15803D">'+money(a.com)+'</td>'
+            +'<td style="padding:9px 10px;font-size:12px;text-align:right;color:#64748B">'+pc.toFixed(1)+'%</td>'
+            +'</tr>';
+        }).join('')+'</tbody></table></div>';
+    }
+
+    h+='<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'
+      +'<button class="btn bsm" onclick="OCom()" style="background:#1E3A8A;color:#fff;border-color:#1E3A8A">+ Registrar comisión</button>'
+      +'<button class="btn bsm" onclick="jacVerComisionesDeTareas()">🔎 Comisiones que aún están en Tareas</button>'
+      +'</div>';
+
+    body.innerHTML=h;
+  };
+
+  /* ================= PAGOS: antigüedad ================= */
+  window._jacPagTramo='';
+  window.jacPagTramo=function(k){ window._jacPagTramo=(window._jacPagTramo===k?'':k); window.jacPagosPanel(); };
+
+  window.jacPagPagado=function(id){
+    var p=PG().filter(function(x){return x.id===id;})[0]; if(!p) return;
+    p.estado='Pagado'; p.fechaPago=hoyISO();
+    guardar(); window.jacPagosPanel(); try{ if(typeof RPag==='function') RPag(); }catch(x){}
+    aviso('✓ Pago registrado');
+  };
+  window.jacPagPendiente=function(id){
+    var p=PG().filter(function(x){return x.id===id;})[0]; if(!p) return;
+    p.estado='Pendiente'; delete p.fechaPago;
+    guardar(); window.jacPagosPanel(); try{ if(typeof RPag==='function') RPag(); }catch(x){}
+  };
+  window.jacPagPagarTramo=function(k){
+    var pend=PG().filter(function(p){ return String(p.estado||'Pendiente')!=='Pagado'; });
+    var g=agrupar(pend,'fecha','monto');
+    var lote=g[k]?g[k].filas:[];
+    if(!lote.length){ aviso('Ese tramo está vacío'); return; }
+    var t=TRAMOS.filter(function(x){return x.k===k;})[0];
+    function hacer(){
+      lote.forEach(function(p){ p.estado='Pagado'; p.fechaPago=hoyISO(); });
+      guardar(); window.jacPagosPanel(); try{ if(typeof RPag==='function') RPag(); }catch(x){}
+      aviso('✓ '+lote.length+' pagos marcados');
+    }
+    var m='¿Marcar como pagados los '+lote.length+' cobros de '+t.et+' ('+money(g[k].total)+')?';
+    if(typeof confirm2==='function') confirm2(m,hacer); else if(confirm(m)) hacer();
+  };
+
+  function filaPag(p){
+    var o=origen(p);
+    var d=p.__dias;
+    var col = d===null?'#94A3B8' : d>90?'#B91C1C' : d>60?'#EA580C' : d>30?'#D97706':'#0891B2';
+    var wa='', em='';
+    if(o.cli){
+      var tel=String(o.cli.cel||o.cli.tel||'').replace(/\D/g,'');
+      if(tel) wa='<a href="'+(typeof waL==='function'?waL(tel, window.jacMsgPago(p,o)):'#')+'" target="_blank" class="btn bsm" '
+        +'style="background:#25D366;color:#fff;border-color:#25D366">&#128172;</a>';
+      if(o.cli.email) em='<button class="btn bsm" style="background:#1D4ED8;color:#fff;border-color:#1D4ED8" '
+        +'onclick="jacCorreoPago(\''+e(p.id)+'\')">&#128231;</button>';
+    }
+    return '<tr style="border-top:1px solid #EEF2F8">'
+      +'<td style="padding:8px 10px"><b>'+e((o.cli&&o.cli.nombre)||p.cliente||'—')+'</b>'
+        +'<div style="font-size:10px;color:#64748B;margin-top:2px">'+lineaOrigen(o)+(p.cuota?' · cuota '+e(p.cuota):'')+'</div></td>'
+      +'<td style="padding:8px 10px;font-size:11px;white-space:nowrap">'+((typeof fmt==='function')?fmt(p.fecha):e(p.fecha))+'</td>'
+      +'<td style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700;color:'+col+';white-space:nowrap">'
+        +(d===null?'—':(d<0?'en '+(-d)+'d':d+'d'))+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-weight:800;color:#B45309">'+money(p.monto)+'</td>'
+      +'<td style="padding:6px 8px;white-space:nowrap"><div style="display:flex;gap:4px;flex-wrap:wrap">'
+        +'<button class="btn bsm" onclick="jacPagPagado(\''+e(p.id)+'\')" style="background:#D1FAE5;color:#15803D;border-color:#86EFAC;font-weight:700">&#9989; Pagado</button>'
+        +wa+em
+        +'<button class="btn bsm bic" onclick="OPag(\''+e(p.id)+'\')" title="Editar">&#9999;&#65039;</button>'
+        +'<button class="btn bsm bic" onclick="delPag(\''+e(p.id)+'\')" style="color:#DC2626" title="Eliminar">&#128465;</button>'
+      +'</div></td></tr>';
+  }
+
+  window.jacPagosPanel=function(){
+    var pg=document.getElementById('pg-pag');
+    if(!pg) return;
+    var caja=document.getElementById('jac-pag-antig');
+    if(!caja){
+      caja=document.createElement('div');
+      caja.id='jac-pag-antig';
+      caja.className='card';
+      caja.style.marginBottom='10px';
+      var sg=document.getElementById('pgsg');
+      if(sg && sg.parentNode) sg.parentNode.insertBefore(caja, sg.nextSibling);
+      else pg.appendChild(caja);
+    }
+    var pend=PG().filter(function(p){ return String(p.estado||'Pendiente')!=='Pagado'; });
+    var g=agrupar(pend,'fecha','monto');
+    var lista = window._jacPagTramo ? g[window._jacPagTramo].filas : pend.slice();
+    lista.sort(function(a,b){ return (b.__dias||0)-(a.__dias||0); });
+    var total=pend.reduce(function(s,p){return s+num(p.monto);},0);
+
+    var h='<div class="ch"><h3>⏳ Por cobrar al cliente</h3>'
+      +'<small>'+pend.length+' cobros · '+money(total)+' · antigüedad hasta 90 días y más</small></div>'
+      +'<div style="padding:12px">'
+      +tarjetasTramo(g, window._jacPagTramo, 'jacPagTramo');
+    if(window._jacPagTramo){
+      h+='<div style="margin-bottom:9px"><button class="btn bsm" onclick="jacPagPagarTramo(\''+window._jacPagTramo+'\')" '
+        +'style="background:#15803D;color:#fff;border-color:#15803D;font-weight:700">✅ Marcar todo el tramo como pagado</button>'
+        +'<span style="font-size:11px;color:#64748B;margin-left:8px">'+lista.length+' registros</span></div>';
+    }
+    if(!lista.length){
+      h+='<div style="padding:24px;text-align:center;color:#94A3B8;font-size:12px">Nada pendiente de cobro 🎉</div>';
+    } else {
+      h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:600px">'
+        +'<thead><tr style="background:#F8FAFC">'
+        +['Cliente / póliza','Vence','Antigüedad','Monto','Acciones']
+          .map(function(x,i){return '<th style="padding:9px 10px;text-align:'+(i===3?'right':(i===2?'center':'left'))
+            +';font-size:10px;color:#94A3B8;font-weight:700;text-transform:uppercase">'+x+'</th>';}).join('')
+        +'</tr></thead><tbody>'+lista.map(filaPag).join('')+'</tbody></table></div>';
+    }
+    h+='</div>';
+    caja.innerHTML=h;
+  };
+
+  /* ================= sacar las comisiones de Tareas ================= */
+  function esAutoCom(t){
+    return t && (t._autoTipo==='comision' || /^auto_comision/i.test(String(t.id||'')));
+  }
+  function montoDe(txt){
+    var m=String(txt||'').match(/(?:B\/\.|\$)\s*([0-9][0-9.,]*)/);
+    if(!m) return 0;
+    return num(String(m[1]).replace(/,/g,''));
+  }
+  function asegDe(txt){
+    var lista=['ASSA','INTERNACIONAL','SURA','MAPFRE','FEDPA','ANCON','ANCÓN','ACERTA','REGIONAL',
+               'PALIG','UNIVIVIR','GENERALI','CHUBB','VUMI','BLUECROSS','BLUE CROSS','WW MEDICAL','IS','ISEGUROS'];
+    var U=String(txt||'').toUpperCase();
+    for(var i=0;i<lista.length;i++) if(U.indexOf(lista[i])>=0) return lista[i];
+    return '';
+  }
+
+  window.jacVerComisionesDeTareas=function(){
+    var r=window.jacComisionesDesdeTareas({soloVer:true});
+    var h='<b>Comisiones que todavía viven como tareas: '+r.candidatas+'</b><br>'
+      +'<div style="font-size:11px;color:#64748B;margin:5px 0">'
+      +'Convertibles a comisión: <b>'+r.convertibles+'</b> · sin monto legible: <b>'+(r.candidatas-r.convertibles)+'</b></div>';
+    if(r.muestra.length){
+      h+='<div style="max-height:220px;overflow:auto;font-size:11px;border:1px solid #E2E8F0;border-radius:8px;padding:8px">';
+      r.muestra.forEach(function(m){
+        h+='<div style="padding:3px 0;border-bottom:1px solid #F1F5F9">'+e(m.tit)
+          +' — <b>'+money(m.monto)+'</b> · '+e(m.aseg||'sin aseguradora')+' · '+e(m.origen)+'</div>';
+      });
+      h+='</div>';
+    }
+    h+='<div style="margin-top:10px"><button class="btn bsm" onclick="jacPasarComisiones()" '
+      +'style="background:#1E3A8A;color:#fff;border-color:#1E3A8A;font-weight:700">Pasarlas al módulo de Comisiones</button></div>';
+    if(typeof openDP==='function') openDP(h,'Comisiones dentro de Tareas');
+    else alert('Convertibles: '+r.convertibles+' de '+r.candidatas);
+  };
+
+  window.jacPasarComisiones=function(){
+    var r=window.jacComisionesDesdeTareas({});
+    aviso('✓ '+r.creadas+' comisiones creadas · '+r.tareasQuitadas+' tareas retiradas');
+    try{ if(typeof closeDP==='function') closeDP(); }catch(x){}
+    window.renderCom();
+  };
+
+  window.jacComisionesDesdeTareas=function(opts){
+    opts=opts||{};
+    var T=(typeof S!=='undefined'&&S.tareas)||[];
+    var cand=T.filter(esAutoCom);
+    var res={candidatas:cand.length, convertibles:0, creadas:0, tareasQuitadas:0, muestra:[]};
+
+    /* lo que ya está en el módulo, para no duplicar */
+    var yaHay={};
+    CO().forEach(function(c){ if(c._tareaId) yaHay[c._tareaId]=1; });
+
+    var nuevas=[], quitar={};
+    cand.forEach(function(t){
+      var txt=(t.titulo||'')+' '+(t.desc||'');
+      var monto=montoDe(txt) || num(t.monto);
+      var o=origen({polizaId:t.polizaId||t._autoRef, titulo:t.titulo, desc:t.desc});
+      var aseg=asegDe(txt) || (o.pol&&o.pol.aseg) || '';
+      if(monto>0){
+        res.convertibles++;
+        if(res.muestra.length<25) res.muestra.push({
+          tit:String(t.titulo||'').slice(0,58), monto:monto, aseg:aseg,
+          origen: o.pol?('N° '+(o.pol.num||'—')):'sin póliza'});
+        if(!opts.soloVer && !yaHay[t.id]){
+          nuevas.push({
+            id:'COM'+Math.random().toString(36).slice(2,10),
+            aseg:aseg||'—',
+            fecha:t.fechaLimite||t.fechaCreacion||hoyISO(),
+            ramo:(o.pol&&o.pol.ramo)||'',
+            pct:(o.pol&&num(o.pol.comPct))||null,
+            monto:monto,
+            estado:'pendiente',
+            polizaId:(o.pol&&o.pol.id)||'',
+            clienteNom:(o.cli&&o.cli.nombre)||'',
+            _tareaId:t.id, _origen:'tarea automática'
+          });
+          quitar[t.id]=1;
+        }
+      } else if(res.muestra.length<25){
+        res.muestra.push({tit:String(t.titulo||'').slice(0,58), monto:0, aseg:aseg, origen:'sin monto legible'});
+      }
+    });
+
+    if(!opts.soloVer && nuevas.length){
+      S.comisiones=CO().concat(nuevas);
+      S.tareas=T.filter(function(t){ return !quitar[t.id]; });
+      res.creadas=nuevas.length;
+      res.tareasQuitadas=Object.keys(quitar).length;
+      guardar();
+      try{ if(typeof RTar==='function') RTar(); }catch(x){}
+    }
+    return res;
+  };
+
+  /* ---- repintar al abrir la página y tras cada sincronización ---- */
+  function alAbrir(){
+    if(typeof window.SH!=='function' || window.__jacSHCobros) return;
+    window.__jacSHCobros=true;
+    var _sh=window.SH;
+    window.SH=function(id){
+      var r=_sh.apply(this, arguments);
+      try{
+        if(id==='com') setTimeout(window.renderCom, 60);
+        if(id==='pag') setTimeout(window.jacPagosPanel, 60);
+      }catch(x){}
+      return r;
+    };
+  }
+  /* RCom() dibuja en la pagina vieja de Comisiones, que ya no se ve.
+     Se le engancha el render nuevo para que el repintado general
+     tras cada sincronizacion tambien actualice esta pagina. */
+  function envolverRCom(){
+    if(typeof window.RCom!=='function' || window.__jacRComEnv) return;
+    window.__jacRComEnv=true;
+    var _r=window.RCom;
+    window.RCom=function(){
+      var r; try{ r=_r.apply(this, arguments); }catch(x){}
+      try{ window.renderCom(); }catch(x){}
+      return r;
+    };
+  }
+  setTimeout(envolverRCom, 2500);
+  setTimeout(envolverRCom, 8000);
+
+  setTimeout(alAbrir, 2000);
+  setTimeout(alAbrir, 7000);
+  setInterval(function(){
+    try{
+      var pg=document.getElementById('pg-pag');
+      if(pg && pg.classList.contains('on')) window.jacPagosPanel();
+    }catch(x){}
+  }, 4000);
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Tareas: gancho, botones y despliegue
+   ------------------------------------------------------------
+   Tres cosas:
+
+   1. Cada tarea lleva su casilla de completado, su lápiz para
+      editar y su papelera para eliminar — en la lista, en el
+      tablero y en la agenda. Antes los botones estaban solo en
+      algunas vistas y en otras no aparecía ninguno.
+
+   2. Un desplegable con cuatro salidas: Reprogramado (pide la
+      fecha), Completado, Pasar al siguiente estado y Pasar al
+      siguiente mes. Es lo que se hace de verdad con una tarea
+      cuando no se puede cerrar hoy.
+
+   3. Los cobros dicen de quién son. Las tareas automáticas de
+      comisión traían solo un título con la aseguradora y un
+      monto: no se sabía a qué póliza ni a qué cliente
+      correspondía el cobro. Ahora cada una muestra su número de
+      póliza y el nombre del cliente, deducidos del propio
+      registro y, si hace falta, del número que viene escrito en
+      el título.
+
+   Los botones no dependen del `onclick` escrito en el HTML: van
+   por delegación desde el contenedor, así que siguen respondiendo
+   aunque la tabla se vuelva a dibujar.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var DONE={'Completado':1,'Realizado':1,'Finalizado':1,'Hecho':1,'Cancelada':1,'Eliminada':1};
+
+  function hoyISO(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+  function T(){ return (typeof S!=='undefined'&&S.tareas)||[]; }
+  function buscar(id){ var a=T(); for(var i=0;i<a.length;i++) if(a[i].id===id) return a[i]; return null; }
+  function esc2(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function guardar(){
+    try{ if(typeof save==='function') save(); }catch(e){}
+    try{ if(typeof RTar==='function') RTar(); }catch(e){}
+    try{ if(typeof calRenderDayTasks==='function') calRenderDayTasks(); }catch(e){}
+    try{ if(typeof calRenderAllTareas==='function') calRenderAllTareas(); }catch(e){}
+    try{ if(typeof window.jacRepintarPronto==='function') window.jacRepintarPronto(); }catch(e){}
+  }
+  function aviso(t){ try{ if(typeof toast==='function') toast(t); }catch(e){} }
+
+  function sumarMeses(iso,m){
+    var p=String(iso||hoyISO()).split('-');
+    var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]||1));
+    var dia=d.getUTCDate();
+    d.setUTCMonth(d.getUTCMonth()+m);
+    if(d.getUTCDate()!==dia) d.setUTCDate(0);
+    return d.toISOString().slice(0,10);
+  }
+
+  /* ---------- De quién es este cobro ---------- */
+  /* Las tareas automáticas de comisión no guardaban el vínculo con
+     la póliza. Se busca por todos los caminos posibles, en orden de
+     confianza, y lo que se encuentra se GRABA en la tarea para no
+     tener que deducirlo otra vez. */
+  function pols(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function clis(){ return (typeof S!=='undefined'&&S.clientes)||[]; }
+
+  function normNum(x){
+    return String(x||'').toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/[^A-Z0-9]/g,'');
+  }
+
+  function polPorNumero(txt){
+    if(!txt) return null;
+    var cand=String(txt).match(/[0-9][0-9A-Za-z._\-\/]{5,}/g)||[];
+    for(var i=0;i<cand.length;i++){
+      var n=normNum(cand[i]);
+      if(n.length<6) continue;
+      var P=pols();
+      for(var j=0;j<P.length;j++){
+        var pn=normNum(P[j].num);
+        if(pn && (pn===n || (pn.length>=8 && n.length>=8 && (pn.indexOf(n)===0||n.indexOf(pn)===0)))) return P[j];
+      }
+    }
+    return null;
+  }
+
+  function origen(t){
+    if(!t) return {};
+    if(t.__ori) return t.__ori;
+    var P=pols(), C=clis(), pol=null, cli=null, i;
+
+    if(t.polizaId) for(i=0;i<P.length;i++) if(P[i].id===t.polizaId){ pol=P[i]; break; }
+    if(!pol && t.tipoRel==='poliza' && t.relId) for(i=0;i<P.length;i++) if(P[i].id===t.relId){ pol=P[i]; break; }
+    if(!pol && t._autoRef) for(i=0;i<P.length;i++) if(P[i].id===t._autoRef){ pol=P[i]; break; }
+    if(!pol) pol=polPorNumero(t.titulo)||polPorNumero(t.desc);
+
+    var cid = (pol&&pol.clienteId) || t.clienteId || (t.tipoRel==='cliente'?t.relId:'') || (t._autoTipo==='cliente'?t._autoRef:'');
+    if(cid) for(i=0;i<C.length;i++) if(C[i].id===cid){ cli=C[i]; break; }
+    if(!cli && pol && pol.nombreCliente) cli={nombre:pol.nombreCliente};
+
+    var o={pol:pol, cli:cli};
+    t.__ori=o;
+    /* si se dedujo la póliza, se deja anotada para la próxima vez */
+    if(pol && !t.polizaId){ t.polizaId=pol.id; }
+    return o;
+  }
+  window.jacOrigenTarea=origen;
+
+  function etiquetaOrigen(t){
+    var o=origen(t);
+    if(!o.pol && !o.cli) return '';
+    var partes=[];
+    if(o.pol){
+      partes.push('<b style="color:#1D4ED8">N° '+esc2(o.pol.num||'sin número')+'</b>');
+      if(o.pol.aseg) partes.push(esc2(o.pol.aseg));
+      if(o.pol.ramo) partes.push(esc2(o.pol.ramo));
+    }
+    if(o.cli && o.cli.nombre) partes.push('<b>'+esc2(String(o.cli.nombre).split(' ').slice(0,3).join(' '))+'</b>');
+    return '<div class="jac-tar-origen" style="font-size:10px;color:#475569;margin-top:3px;'
+      +'background:#F1F5F9;border-left:2px solid #6366F1;padding:3px 7px;border-radius:0 5px 5px 0;'
+      +'display:inline-block;max-width:100%">'+partes.join(' · ')+'</div>';
+  }
+
+  /* ---------- Las acciones ---------- */
+  window.jacTarCompletar=function(id,marcado){
+    var t=buscar(id); if(!t) return;
+    if(marcado===undefined) marcado=!DONE[t.etapaTarea];
+    if(marcado){ t.etapaTarea='Completado'; t.estado='completada'; t.fechaCompletada=hoyISO(); }
+    else { t.etapaTarea='Por Hacer'; t.estado='pendiente'; delete t.fechaCompletada; }
+    guardar(); aviso(marcado?'✓ Tarea completada':'Tarea reabierta');
+  };
+
+  window.jacTarEliminar=function(id){
+    var t=buscar(id); if(!t) return;
+    var tit=String(t.titulo||'esta tarea').slice(0,50);
+    function borrar(){
+      S.tareas=T().filter(function(x){ return x.id!==id; });
+      guardar(); aviso('Tarea eliminada');
+    }
+    if(typeof confirm2==='function') confirm2('¿Eliminar «'+tit+'»?', borrar);
+    else if(confirm('¿Eliminar «'+tit+'»?')) borrar();
+  };
+
+  window.jacTarEditar=function(id){
+    if(typeof OT_open==='function') OT_open(id);
+    else if(typeof OT==='function') OT(id);
+  };
+
+  window.jacTarReprogramar=function(id){
+    var t=buscar(id); if(!t) return;
+    var inp=document.createElement('input');
+    inp.type='date'; inp.value=t.fechaLimite||hoyISO();
+    inp.style.cssText='position:fixed;top:-200px;left:0;opacity:0';
+    document.body.appendChild(inp);
+    var cerrar=function(){ if(document.body.contains(inp)) document.body.removeChild(inp); };
+    inp.addEventListener('change', function(){
+      if(inp.value){
+        t.fechaLimite=inp.value;
+        t.etapaTarea='Reprogramada'; t.estado='pendiente';
+        t.reprogramaciones=(t.reprogramaciones||0)+1;
+        guardar(); aviso('📅 Reprogramada al '+inp.value);
+      }
+      cerrar();
+    });
+    inp.addEventListener('blur', function(){ setTimeout(cerrar, 400); });
+    if(inp.showPicker){ try{ inp.showPicker(); }catch(e){ inp.focus(); inp.click(); } }
+    else { inp.focus(); inp.click(); }
+  };
+
+  window.jacTarSiguienteEstado=function(id){
+    var t=buscar(id); if(!t) return;
+    var orden={'Por Hacer':'En Proceso','Normal':'En Proceso','Reprogramada':'En Proceso',
+               'En Proceso':'En Seguimiento','En Seguimiento':'Completado',
+               'Delegado':'Completado','Reenviado':'Completado'};
+    var n=orden[t.etapaTarea]||'Completado';
+    t.etapaTarea=n;
+    t.estado=DONE[n]?'completada':'pendiente';
+    if(DONE[n]) t.fechaCompletada=hoyISO();
+    guardar(); aviso('→ '+n);
+  };
+
+  window.jacTarSiguienteMes=function(id){
+    var t=buscar(id); if(!t) return;
+    var base=t.fechaLimite||hoyISO();
+    t.fechaLimite=sumarMeses(base,1);
+    t.etapaTarea='Reprogramada'; t.estado='pendiente';
+    guardar(); aviso('📅 Pasada al '+t.fechaLimite);
+  };
+
+  window.jacTarDespliegue=function(id,valor,sel){
+    if(sel) sel.selectedIndex=0;
+    if(valor==='reprog')      window.jacTarReprogramar(id);
+    else if(valor==='comp')   window.jacTarCompletar(id,true);
+    else if(valor==='sigest') window.jacTarSiguienteEstado(id);
+    else if(valor==='sigmes') window.jacTarSiguienteMes(id);
+  };
+
+  /* ---------- Pintar los controles ---------- */
+  var BOTON='border:1px solid #CBD5E1;background:#fff;border-radius:7px;padding:4px 8px;'
+           +'font-size:12px;cursor:pointer;line-height:1;min-height:30px';
+
+  function controles(t){
+    var hecho=!!DONE[t.etapaTarea];
+    return '<div class="jac-tar-acc" data-tid="'+esc2(t.id)+'" '
+      +'style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px">'
+      +'<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;'
+        +'color:'+(hecho?'#15803D':'#64748B')+';font-weight:600">'
+        +'<input type="checkbox" data-jac="chk" '+(hecho?'checked':'')+' '
+        +'style="width:17px;height:17px;accent-color:#16A34A;cursor:pointer">'
+        +(hecho?'Hecha':'Completar')
+      +'</label>'
+      +'<button type="button" data-jac="edit" title="Editar" style="'+BOTON+'">&#9999;&#65039;</button>'
+      +'<button type="button" data-jac="del" title="Eliminar" style="'+BOTON+';color:#DC2626">&#128465;</button>'
+      +'<select data-jac="menu" style="'+BOTON+';font-weight:600;padding:4px 6px">'
+        +'<option value="">Acción…</option>'
+        +'<option value="reprog">📅 Reprogramado</option>'
+        +'<option value="comp">✅ Completado</option>'
+        +'<option value="sigest">➡️ Pasar al siguiente estado</option>'
+        +'<option value="sigmes">🗓 Pasar al siguiente mes</option>'
+      +'</select>'
+      +'</div>';
+  }
+
+  function idDeNodo(n){
+    if(n.getAttribute && n.getAttribute('data-jac-tid')) return n.getAttribute('data-jac-tid');
+    var h=(n.getAttribute&&n.getAttribute('onclick'))||n.innerHTML||'';
+    var m=h.match(/(?:OT_open|OT|DTar|calTaskDone|jacTarEditar)\(\s*['"]([^'"]+)['"]/);
+    if(m) return m[1];
+    m=h.match(/(auto_comision[\w\-]*)/);
+    return m?m[1]:null;
+  }
+
+  function decorar(){
+    try{
+      var zonas=['#tar-view','#cal-day-tasks','#cal-all-tareas','#cal-pane-tareas','#pg-tar'];
+      zonas.forEach(function(z){
+        var cont=document.querySelector(z);
+        if(!cont) return;
+        enganchar(cont);
+        var nodos=cont.querySelectorAll('tbody tr, .tcard, [data-jac-tid]');
+        for(var i=0;i<nodos.length;i++){
+          var n=nodos[i];
+          if(n.querySelector && n.querySelector('.jac-tar-acc')) { continue; }
+          var id=idDeNodo(n);
+          if(!id) continue;
+          var t=buscar(id);
+          if(!t) continue;
+          n.setAttribute('data-jac-tid', id);
+          var destino = (n.tagName==='TR') ? n.lastElementChild : n;
+          if(!destino) continue;
+          var extra = etiquetaOrigen(t);
+          if(extra && !(n.querySelector&&n.querySelector('.jac-tar-origen'))){
+            var primera = (n.tagName==='TR') ? (n.children[1]||n.firstElementChild) : n;
+            if(primera) primera.insertAdjacentHTML('beforeend', extra);
+          }
+          destino.insertAdjacentHTML('beforeend', controles(t));
+        }
+      });
+    }catch(e){}
+  }
+
+  /* Un solo escuchador por contenedor: sobrevive a cada repintado */
+  function enganchar(cont){
+    if(cont.__jacTarEng) return;
+    cont.__jacTarEng=1;
+    cont.addEventListener('click', function(ev){
+      var b=ev.target.closest && ev.target.closest('[data-jac]');
+      if(!b) return;
+      var caja=b.closest('.jac-tar-acc');
+      if(!caja) return;
+      var id=caja.getAttribute('data-tid');
+      var q=b.getAttribute('data-jac');
+      if(q==='edit'){ ev.preventDefault(); ev.stopPropagation(); window.jacTarEditar(id); }
+      else if(q==='del'){ ev.preventDefault(); ev.stopPropagation(); window.jacTarEliminar(id); }
+      else if(q==='chk'){ ev.stopPropagation(); window.jacTarCompletar(id, b.checked); }
+    }, true);
+    cont.addEventListener('change', function(ev){
+      var sel=ev.target;
+      if(!sel.getAttribute || sel.getAttribute('data-jac')!=='menu') return;
+      var caja=sel.closest('.jac-tar-acc'); if(!caja) return;
+      ev.stopPropagation();
+      window.jacTarDespliegue(caja.getAttribute('data-tid'), sel.value, sel);
+    }, true);
+  }
+
+  setTimeout(decorar, 1500);
+  setInterval(decorar, 1800);
+  window.jacDecorarTareas=decorar;
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — La agenda, en vivo
+   ------------------------------------------------------------
+   Lo que estaba pasando: la agenda no se sincronizaba con nada.
+   Eventos, notas, metas, diario y reuniones se guardaban en
+   `S.calEventos`, `S.calNotas`, `S.calMetas`, `S.calDiarios` y
+   `S.calReuniones`, y ninguna de esas cinco estaba en la lista
+   de catálogos que sube a la nube. Se guardaban en este
+   navegador y ahí se quedaban: por eso en el otro ordenador la
+   agenda aparecía vacía o con lo de hace semanas.
+
+   Ya están en la lista (arriba, en CATALOGOS). Este bloque cubre
+   el resto:
+
+   1. Repinta la agenda en cuanto baja algo de la nube, sin que
+      haya que cambiar de pestaña.
+   2. Vigila la conexión en vivo. Si el canal se cae, reconecta;
+      y mientras no haya canal, baja cada 45 segundos para que
+      la agenda nunca se quede atrás.
+   3. Un punto de color en la agenda dice en qué estado está:
+      verde en vivo, ámbar reconectando, gris sin conexión.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var CLAVES=['calEventos','calNotas','calMetas','calDiarios','calReuniones'];
+
+  function agendaAbierta(){
+    var p=document.getElementById('pg-cal');
+    return !!(p && p.classList.contains('on'));
+  }
+
+  /* ---- 1. Repintar la agenda tras cada bajada ---- */
+  function repintarAgenda(){
+    if(!agendaAbierta()) return;
+    try{ if(typeof renderCal==='function') renderCal(); }catch(e){}
+    try{ if(typeof calRenderCurrentPane==='function') calRenderCurrentPane(); }catch(e){}
+  }
+  window.jacRepintarAgenda=repintarAgenda;
+
+  function envolverSinc(){
+    if(typeof window.sincronizar!=='function' || window.__jacAgendaEnvuelta) return;
+    window.__jacAgendaEnvuelta=true;
+    var _s=window.sincronizar;
+    window.sincronizar=async function(){
+      var r=await _s.apply(this, arguments);
+      setTimeout(repintarAgenda, 300);
+      return r;
+    };
+  }
+  setTimeout(envolverSinc, 2500);
+  setTimeout(envolverSinc, 9000);
+
+  /* Guardar desde la agenda ya sube solo (save difiere el volcado
+     dos segundos). Aquí únicamente se repinta al instante para que
+     lo que acabas de escribir aparezca sin recargar. */
+  function envolverSave(){
+    if(typeof window.save!=='function' || window.__jacAgendaSave) return;
+    window.__jacAgendaSave=true;
+    var _sv=window.save;
+    window.save=function(){
+      var r=_sv.apply(this, arguments);
+      if(agendaAbierta()) setTimeout(repintarAgenda, 150);
+      return r;
+    };
+  }
+  setTimeout(envolverSave, 3000);
+
+  /* ---- 2. Vigilante de la conexión en vivo ---- */
+  var _ultimoRespaldo=0;
+
+  async function respaldo(){
+    /* Sin canal en vivo se baja a mano. Cada 45 s alcanza para que
+       nada se sienta viejo y no castiga la conexión. */
+    if(Date.now()-_ultimoRespaldo < 45000) return;
+    _ultimoRespaldo=Date.now();
+    try{ if(typeof window.sincronizar==='function') await window.sincronizar(); }catch(e){}
+  }
+
+  function estadoCanal(){
+    var e=window.__jacRealtime||'';
+    if(e==='SUBSCRIBED') return 'vivo';
+    if(!navigator.onLine) return 'sin-red';
+    return 'reconectando';
+  }
+
+  function reconectar(){
+    /* El canal principal se recrea solo tras un error, pero si el
+       navegador durmió el socket puede quedarse cerrado sin avisar.
+       Este canal propio es la segunda cuerda: mientras viva, la
+       agenda se entera igual de los cambios. */
+    if(!window.db || !window.db.channel || window.__jacCanalAgenda) return;
+    try{
+      var c=window.db.channel('jac_agenda_viva');
+      c.on('postgres_changes',{event:'*',schema:'public',table:'crm_meta'},function(){
+        if(typeof window.sincronizar==='function'){
+          clearTimeout(window.__jacAgendaDeb);
+          window.__jacAgendaDeb=setTimeout(function(){ window.sincronizar(); }, 1200);
+        }
+      });
+      c.subscribe(function(est){
+        window.__jacRealtimeAgenda=est;
+        if(est==='CHANNEL_ERROR'||est==='TIMED_OUT'||est==='CLOSED'){
+          try{ window.db.removeChannel(c); }catch(e){}
+          window.__jacCanalAgenda=null;
+          setTimeout(reconectar, 20000);
+        }
+      });
+      window.__jacCanalAgenda=c;
+    }catch(e){ window.__jacCanalAgenda=null; }
+  }
+  setTimeout(reconectar, 9000);
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='visible'){
+      setTimeout(reconectar, 800);
+      setTimeout(function(){ respaldo(); repintarAgenda(); }, 1500);
+    }
+  });
+  window.addEventListener('online', function(){ setTimeout(reconectar, 1200); });
+
+  setInterval(function(){
+    var vivo = (estadoCanal()==='vivo') || (window.__jacRealtimeAgenda==='SUBSCRIBED');
+    if(!vivo){ reconectar(); respaldo(); }
+    pintarPunto();
+  }, 20000);
+
+  /* ---- 3. El punto de estado dentro de la agenda ---- */
+  function pintarPunto(){
+    try{
+      var host=document.getElementById('cal-month-year');
+      if(!host) return;
+      var el=document.getElementById('jac-agenda-estado');
+      if(!el){
+        el=document.createElement('div');
+        el.id='jac-agenda-estado';
+        el.style.cssText='display:flex;align-items:center;gap:5px;margin-top:6px;font-size:10px;font-weight:600';
+        host.parentNode.insertBefore(el, host.nextSibling);
+      }
+      var e=estadoCanal();
+      var vivo = (e==='vivo' || window.__jacRealtimeAgenda==='SUBSCRIBED');
+      var col = vivo ? '#16A34A' : (e==='sin-red' ? '#94A3B8' : '#D97706');
+      var txt = vivo ? 'Agenda en vivo' : (e==='sin-red' ? 'Sin internet — se guarda aquí' : 'Reconectando…');
+      el.innerHTML='<span style="width:7px;height:7px;border-radius:50%;background:'+col+';display:inline-block'
+        +(vivo?';box-shadow:0 0 0 3px '+col+'22':'')+'"></span>'
+        +'<span style="color:'+col+'">'+txt+'</span>';
+    }catch(e){}
+  }
+  setTimeout(pintarPunto, 4000);
+  setInterval(pintarPunto, 8000);
+
+  /* ---- Diagnóstico ---- */
+  window.jacAgendaEstado=function(){
+    var r={canalPrincipal:window.__jacRealtime||'sin conectar',
+           canalAgenda:window.__jacRealtimeAgenda||'sin conectar',
+           enLinea:navigator.onLine, agendaAbierta:agendaAbierta(), contenido:{}};
+    CLAVES.forEach(function(k){
+      var v=(typeof S!=='undefined')?S[k]:null;
+      r.contenido[k]=Array.isArray(v)?v.length:(v?Object.keys(v).length:0);
+    });
+    return r;
+  };
+})();
+</script>
+
+<style id="jac-agenda-responsive">
+/* ============================================================
+   JAC CRM — La agenda, bien puesta en cualquier pantalla
+   ------------------------------------------------------------
+   La agenda se dibujó para un monitor grande y con medidas fijas:
+   una columna de 260px, una franja decorativa de 32px imitando la
+   espiral de una libreta, nueve pestañas en una sola fila y un
+   alto de `100vh - 58px`. En un portátil las pestañas se
+   apretaban hasta ser ilegibles; en tablet la columna se comía
+   media pantalla; en el celular el calendario salía cortado por
+   el costado y la espiral ocupaba espacio sin decir nada.
+
+   Aquí se ordena por tamaño:
+
+   · Escritorio (≥1100): columna de 240px, pestañas que se
+     deslizan si no caben, alto real de la ventana.
+   · Tablet (769–1099): columna de 200px, sin espiral, número del
+     día más pequeño, paneles con menos aire perdido.
+   · Celular (≤768): una sola columna. Arriba una franja compacta
+     con el día y los botones de crear; debajo, las pestañas
+     deslizables y el panel a lo ancho. La espiral desaparece.
+
+   Nada de esto toca el HTML de la agenda: son reglas que ganan
+   por especificidad y por ir al final del documento.
+   ============================================================ */
+
+/* --- El alto: 100vh miente en el celular (la barra del navegador
+       aparece y desaparece). --vh lo calcula el bloque de abajo. --- */
+#pg-cal > div{
+  height: calc(var(--vh, 1vh) * 100 - 58px);
+  max-height: calc(var(--vh, 1vh) * 100 - 58px);
+}
+
+/* Las pestañas nunca deben amontonarse, en ningún tamaño */
+#pg-cal .cal-tabs-row{
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap !important; scrollbar-width: none;
+}
+#pg-cal .cal-tabs-row::-webkit-scrollbar{ height: 0 }
+#pg-cal .cal-tabs-row > button{
+  flex: 0 0 auto !important; white-space: nowrap; min-width: 78px;
+}
+
+/* ================= ESCRITORIO GRANDE (≥1100) ================= */
+@media (min-width: 1100px){
+  #pg-cal .cal-lado{ width: 240px !important }
+  #pg-cal .cal-espiral{ width: 26px !important }
+  #cal-day-num{ font-size: 66px !important; letter-spacing: -3px !important }
+}
+
+/* ================= TABLET (769–1099) ================= */
+@media (min-width: 769px) and (max-width: 1099px){
+  #pg-cal .cal-lado{ width: 196px !important }
+  #pg-cal .cal-espiral{ display: none !important }
+  #cal-day-num{ font-size: 48px !important; letter-spacing: -2px !important }
+  #cal-day-name{ font-size: 15px !important }
+  #pg-cal .cal-tabs-row > button{ font-size: 10px !important; padding: 9px 4px !important; min-width: 68px }
+  [id^="cal-pane-"]{ padding: 12px !important }
+  #cal-notas-list{ grid-template-columns: 1fr 1fr !important }
+}
+
+/* ================= CELULAR (≤768) ================= */
+@media (max-width: 768px){
+  #pg-cal{ padding: 0 !important }
+  #pg-cal > div{
+    flex-direction: column !important;
+    height: auto !important; max-height: none !important;
+    min-height: calc(var(--vh, 1vh) * 100 - 58px);
+    border-radius: 0 !important; overflow: visible !important;
+  }
+
+  /* La espiral decorativa no aporta nada en un celular */
+  #pg-cal .cal-espiral{ display: none !important }
+
+  /* La columna lateral pasa a ser una franja compacta arriba */
+  #pg-cal .cal-lado{
+    width: 100% !important; flex: 0 0 auto !important;
+    border-right: 0 !important; border-bottom: 2px solid #C8B89A !important;
+    max-height: none !important; overflow: visible !important;
+  }
+  /* Día, nombre y mes en una sola línea, no en tres pisos */
+  #pg-cal .cal-lado > div:first-child{ padding: 12px 14px 10px !important }
+  #cal-day-num{
+    font-size: 40px !important; letter-spacing: -2px !important;
+    display: inline-block; vertical-align: middle; margin-right: 10px;
+  }
+  #cal-day-name{ display: inline-block; font-size: 15px !important; margin-top: 0 !important; vertical-align: middle }
+  #cal-month-year{ display: inline-block; font-size: 12px !important; margin: 0 0 0 8px !important; vertical-align: middle }
+  #jac-agenda-estado{ display: inline-flex !important; margin: 0 0 0 10px !important; vertical-align: middle }
+
+  /* Las tareas del día y los mini calendarios, plegables por altura */
+  #cal-day-tasks{ max-height: 34vh; overflow-y: auto !important; padding: 0 14px 10px !important }
+  #cal-mini1, #cal-mini2{ display: inline-block; width: 48%; vertical-align: top }
+
+  /* Pestañas: deslizables y pegadas arriba al bajar */
+  #pg-cal .cal-tabs-row{
+    position: sticky; top: 0; z-index: 5;
+  }
+  #pg-cal .cal-tabs-row > button{
+    font-size: 11px !important; padding: 11px 10px !important; min-width: 84px;
+  }
+
+  /* El panel ocupa todo el ancho y respira */
+  #pg-cal .cal-panel{ overflow: visible !important }
+  [id^="cal-pane-"]{ padding: 12px !important }
+  #cal-notas-list{ grid-template-columns: 1fr !important }
+
+  /* Rejilla del mes: días cuadrados de verdad */
+  #cal-body [style*="grid-template-columns"]{ gap: 3px !important }
+  #cal-grid > div{ min-height: 46px !important; font-size: 11px !important; padding: 3px !important }
+
+  /* Semana: se desliza en lugar de estirar la página */
+  #cal-week-body{ overflow-x: auto; -webkit-overflow-scrolling: touch }
+
+  /* Modal de la agenda a pantalla completa por abajo */
+  #cal-modal > div{
+    width: 100% !important; max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    margin: auto 0 0 !important; max-height: 92vh;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom)) !important;
+  }
+  #cal-modal{ align-items: flex-end !important }
+
+  /* Espacio para la barra inferior del CRM */
+  #pg-cal{ padding-bottom: calc(66px + env(safe-area-inset-bottom)) !important }
+}
+
+/* ================= CELULAR ANGOSTO (≤400) ================= */
+@media (max-width: 400px){
+  #cal-day-num{ font-size: 34px !important }
+  #cal-day-name{ font-size: 13px !important }
+  #pg-cal .cal-tabs-row > button{ min-width: 74px; font-size: 10px !important }
+  #cal-grid > div{ min-height: 40px !important; font-size: 10px !important }
+  #cal-mini1, #cal-mini2{ width: 100%; display: block }
+}
+
+/* ================= CELULAR ACOSTADO ================= */
+@media (max-width: 900px) and (orientation: landscape){
+  #pg-cal > div{ flex-direction: row !important; height: calc(var(--vh,1vh) * 100 - 58px) !important }
+  #pg-cal .cal-lado{ width: 210px !important; border-bottom: 0 !important; border-right: 2px solid #C8B89A !important }
+  #cal-day-num{ display: block; font-size: 42px !important; margin-right: 0 }
+  #cal-day-name, #cal-month-year{ display: block; margin-left: 0 !important }
+  #cal-day-tasks{ max-height: none }
+}
+</style>
+
+<script>
+/* ============================================================
+   Las clases que el CSS de arriba necesita
+   ------------------------------------------------------------
+   La agenda no tiene clases: está armada con estilos escritos a
+   mano en cada div. En vez de reescribir ese HTML —que es largo y
+   se usa en veinte sitios— aquí se etiquetan los tres bloques
+   por su forma, una sola vez, y el CSS ya tiene de dónde agarrar.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function etiquetar(){
+    var pg=document.getElementById('pg-cal');
+    if(!pg || pg.__jacEtiquetada) return;
+    var cont=pg.firstElementChild;
+    if(!cont) return;
+    var hijos=cont.children;
+    if(hijos.length<3) return;
+
+    /* 1) columna del día  2) espiral decorativa  3) panel con pestañas */
+    hijos[0].classList.add('cal-lado');
+    hijos[1].classList.add('cal-espiral');
+    hijos[2].classList.add('cal-panel');
+
+    /* la fila de pestañas es el primer hijo del panel */
+    var fila=hijos[2].firstElementChild;
+    if(fila) fila.classList.add('cal-tabs-row');
+
+    pg.__jacEtiquetada=true;
+  }
+  setTimeout(etiquetar, 600);
+  setTimeout(etiquetar, 2500);
+  setInterval(etiquetar, 5000);
+
+  /* La altura real de la ventana, para que el calendario no quede
+     cortado por la barra del navegador en el celular. */
+  function altura(){
+    try{ document.documentElement.style.setProperty('--vh', (window.innerHeight*0.01)+'px'); }catch(e){}
+  }
+  altura();
+  window.addEventListener('resize', altura);
+  window.addEventListener('orientationchange', function(){ setTimeout(altura, 250); });
+
+  /* calFixSize() fijaba el alto en píxeles con JavaScript y peleaba
+     con las reglas de arriba: en el celular dejaba la agenda con la
+     altura del escritorio. Debajo de 769px se deja mandar al CSS. */
+  function domarFixSize(){
+    if(typeof window.calFixSize!=='function' || window.__jacFixSizeDomado) return;
+    window.__jacFixSizeDomado=true;
+    var _f=window.calFixSize;
+    window.calFixSize=function(){
+      if(window.innerWidth<=768){
+        try{
+          var el=document.getElementById('pg-cal');
+          var inner=el&&el.querySelector('div>div');
+          if(inner) inner.style.height='';
+        }catch(e){}
+        return;
+      }
+      return _f.apply(this, arguments);
+    };
+  }
+  setTimeout(domarFixSize, 1200);
+  setTimeout(domarFixSize, 5000);
+
+  window.jacAgendaMedida=function(){
+    return { ancho:window.innerWidth,
+             modo: window.innerWidth<=400?'celular angosto'
+                 : window.innerWidth<=768?'celular'
+                 : window.innerWidth<=1099?'tablet':'escritorio',
+             etiquetada: !!(document.querySelector('#pg-cal .cal-lado')),
+             desbordaDeLado: document.documentElement.scrollWidth > document.documentElement.clientWidth+2 };
   };
 })();
 </script>
