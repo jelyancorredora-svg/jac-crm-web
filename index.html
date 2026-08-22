@@ -15098,7 +15098,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-22-X';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-22-Y';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -17072,7 +17072,14 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   'use strict';
 
   function esAuto(t){
-    return t && (t._autoTipo==='comision' || /^auto_comision/i.test(String(t.id||'')));
+    if(!t) return false;
+    if(t._autoTipo==='comision') return true;
+    if(/^auto_comision/i.test(String(t.id||''))) return true;
+    /* Algunas viejas no traen la marca: se reconocen por el texto.
+       Sin esto la pestana "Automaticas" salia vacia aunque hubiera
+       cientos de recordatorios de cobro en la lista. */
+    var s=String((t.titulo||'')+' '+(t.tipo||'')).toLowerCase();
+    return /comisi[o\u00f3]n/.test(s) && /(cobr|pendiente|recordat)/.test(s);
   }
   function hoy(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
   function diasDesde(f){
@@ -17126,9 +17133,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     try{
       /* Antes esto buscaba dentro de #pg-tar, que esta VACIO: las tareas
          se dibujan en #tar-view, dentro de la Agenda. Por eso los tres
-         botones no hacian absolutamente nada. Ahora se recorren los
-         contenedores reales y se identifica cada fila por el id que el
-         propio CRM imprime en el onclick. */
+         botones no hacian absolutamente nada. */
       var T=(typeof S!=='undefined'&&S.tareas)||[], mapa={};
       T.forEach(function(t){ mapa[t.id]=esAuto(t); });
 
@@ -17157,7 +17162,41 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
         }
       });
       window.__jacFiltroTareas={vista:VISTA, filasTocadas:vistos};
+      avisoVacio(vistos);
     }catch(e){}
+  }
+
+  /* Si la vista elegida no deja nada visible, decir por que en vez
+     de dejar el panel en blanco. */
+  function avisoVacio(vistos){
+    var cont=document.getElementById('tar-view');
+    if(!cont) return;
+    var el=document.getElementById('jac-tar-vacio');
+    var T=(typeof S!=='undefined'&&S.tareas)||[];
+    var nAuto=T.filter(esAuto).length, nMias=T.length-nAuto;
+    var falta = (VISTA==='auto' && !nAuto) || (VISTA==='mias' && !nMias) || (VISTA==='todas' && !T.length);
+    if(!falta){ if(el) el.remove(); return; }
+    if(!el){
+      el=document.createElement('div');
+      el.id='jac-tar-vacio';
+      el.style.cssText='padding:22px;text-align:center;color:#64748B;font-size:13px;line-height:1.7;'
+        +'background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:12px;margin:10px 0';
+      cont.insertBefore(el, cont.firstChild);
+    }
+    if(VISTA==='auto'){
+      el.innerHTML='No hay tareas autom\u00e1ticas de comisi\u00f3n en la lista.<br>'
+        +'<span style="font-size:12px">Puede que ya se archivaran, o que se pasaran al m\u00f3dulo de Comisiones.</span><br>'
+        +'<button onclick="jacRestaurarTareas().then(function(r){alert(\'Restauradas: \'+(r.restauradas||0));if(typeof RTar===\'function\')RTar();})" '
+        +'style="margin-top:9px;padding:6px 13px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:12px">'
+        +'Restaurar las archivadas</button> '
+        +'<button onclick="SH(\'com\');renderCom()" '
+        +'style="margin-top:9px;padding:6px 13px;border-radius:8px;border:none;background:#1E3A8A;color:#fff;cursor:pointer;font-size:12px">'
+        +'Ver el m\u00f3dulo de Comisiones</button>';
+    } else if(VISTA==='mias'){
+      el.innerHTML='No tienes tareas propias en la lista \u2014 todas las que hay son autom\u00e1ticas.';
+    } else {
+      el.innerHTML='La lista de tareas est\u00e1 vac\u00eda.';
+    }
   }
 
   function ponerFiltro(){
@@ -17169,11 +17208,11 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     d.style.cssText='display:flex;gap:6px;margin:8px 0;flex-wrap:wrap';
     var bs='padding:5px 12px;border:1px solid #CBD5E1;border-radius:999px;background:#fff;'
           +'color:#334155;font-size:12px;font-weight:600;cursor:pointer';
-    var T=(typeof S!=='undefined'&&S.tareas)||[];
-    var nAuto=T.filter(esAuto).length, nMias=T.length-nAuto;
-    d.innerHTML='<button data-v="mias"  style="'+bs+'">Mis tareas ('+nMias+')</button>'
-               +'<button data-v="auto"  style="'+bs+'">Automáticas ('+nAuto+')</button>'
-               +'<button data-v="todas" style="'+bs+'">Todas ('+T.length+')</button>';
+    var T0=(typeof S!=='undefined'&&S.tareas)||[];
+    var nA=T0.filter(esAuto).length, nM=T0.length-nA;
+    d.innerHTML='<button data-v="mias"  style="'+bs+'">Mis tareas ('+nM+')</button>'
+               +'<button data-v="auto"  style="'+bs+'">Automáticas ('+nA+')</button>'
+               +'<button data-v="todas" style="'+bs+'">Todas ('+T0.length+')</button>';
     cont.parentNode.insertBefore(d, cont.nextSibling);
     d.querySelectorAll('button').forEach(function(b){
       b.onclick=function(){ window.jacVistaTareas(b.dataset.v); };
@@ -17248,57 +17287,147 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 
 <script>
 /* ============================================================
-   JAC CRM — Cartera CAPITAL CARE, con los datos del reporte
+   JAC CRM — Cartera CAPITAL CARE, auditada de punta a punta
    ------------------------------------------------------------
-   Aquí dentro van las 76 filas del reporte de cartera de
-   CAPITAL CARE & CO, tal como vienen: número de póliza,
-   vigencia, prima, porcentaje y comisión, aseguradora y ramo.
-   No se leen de la nube ni dependen de que otro módulo esté
-   cargado: están escritas en el propio archivo, así que el
-   botón funciona siempre.
+   Volví a abrir los Excel originales y encontré dos cosas que la
+   primera vuelta se dejó fuera:
 
-   Dos cosas que conviene tener claras:
+   1. No eran 76 pólizas, son 79. El reporte "por unidad" trae
+      tres que no están en el reporte general: ITZEL WRIGHT y
+      PATRICIA MARTEZ (SURA) y XIOMARA PHILLIPS (Internacional).
 
-   · CAPITAL CARE no es una aseguradora, es la agencia. Esas 76
-     pólizas son de ocho compañías distintas — Internacional,
-     ASSA, SURA, FEDPA, MAPFRE, Ancón, ACERTA y La Regional.
-     Por eso "las vencidas de Capital Care" y "las vencidas de
-     ASSA" se pisan: son la misma cartera mirada de dos formas.
+   2. El Excel traía mucho más que números y fechas. Trae el
+      ASEGURADO, la CÉDULA de las 79, el correo de 49, el celular
+      de 58, el ramo, la suma asegurada y la descripción de la
+      unidad. Yo solo había usado el número de póliza — por eso
+      las que en el CRM tienen el número escrito distinto nunca
+      se encontraban y nunca quedaban marcadas como Capital Care.
 
-   · De las 76, veintiuna traen en el reporte una fecha de fin
-     que ya pasó. No es que estén vencidas: es que el reporte se
-     sacó antes de la renovación. A esas se les adelanta la
-     vigencia período a período — usando la misma duración que
-     tenían, no una anual supuesta — hasta que caiga en el
-     futuro, y quedan Vigente. Lo adelantado se anota en
-     `extra.renovacionEstimada` por si hay que revisarlo.
+   Ahora la búsqueda va en cascada y no se rinde en el primer
+   intento: número exacto → número sin el sufijo de ciclo →
+   número contenido → CÉDULA + compañía → nombre + compañía →
+   nombre + ramo. La cédula es la llave fuerte: la traen las 79.
 
-   El botón informa siempre tres números: cuántas encontró,
-   cuántas corrigió y cuáles no están en el CRM — con nombre y
-   número, para poder crearlas.
+   A cada póliza que encuentra le escribe `lider` = CAPITAL CARE
+   & CO, y le completa al cliente la cédula, el correo y el
+   celular si los tenía en blanco. Las que no existen se pueden
+   crear con su cliente incluido.
    ============================================================ */
 (function(){
   'use strict';
 
-  /* [num, inicio, fin, prima, total, comPct, comision, aseguradora, ramo, formaPago, cuotas] */
-  var CC = [["03G50509","2025-02-10","2026-02-10",113.4,115.5,20.0,22.0,"ASSA","INCENDIO","MENSUAL",10.0],["02B3408559","2025-03-26","2026-03-26",437.95,430.14,20.0,81.16,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["02B3423338","2025-08-30","2026-08-30",920.77,904.04,20.0,170.57,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["030-001-000773693","2026-02-23","2027-02-23",486.12,515.29,20.0,97.22,"Internacional","AUTOMÓVIL","ANUAL",1.0],["030-001-000773675","2026-01-14","2027-01-14",448.92,475.86,20.0,89.78,"Internacional","AUTOMÓVIL","ANUAL",1.0],["030-012-000021492","2026-03-26","2027-03-26",1212.15,1284.88,20.0,242.43,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["02-92-1054443-2","2026-01-13","2027-01-13",164.73,174.61,20.0,32.95,"SURA","AUTOMÓVIL","MENSUAL",3.0],["02B3425396","2025-10-04","2026-10-04",567.51,575.29,20.0,108.55,"ASSA","AUTOMÓVIL","MENSUAL",10.0],["030-001-000653812","2025-11-23","2026-11-23",466.14,494.11,20.0,93.23,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000762087","2026-03-31","2027-03-31",811.37,860.05,20.0,162.27,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-012-000019308","2026-01-19","2027-01-19",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000773605","2025-06-03","2026-06-03",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1970094-0","2025-07-18","2026-07-18",117.92,152.17,20.0,28.71,"FEDPA","AUTOMÓVIL","MENSUAL",2.0],["02-93-1159210-1","2025-10-19","2026-10-19",570.0,604.2,20.0,114.0,"SURA","AUTOMÓVIL","MENSUAL",10.0],["01-82-1165813-1","2025-11-15","2026-11-15",75.6,79.38,20.0,15.12,"SURA","INCENDIO","MENSUAL",6.0],["030-001-000773687","2026-02-09","2027-02-09",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["02B3408498","2025-03-25","2026-03-25",1256.95,1231.88,20.0,232.43,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["02BR2908859","2024-12-31","2025-12-31",150.94,160.0,20.0,30.19,"ASSA","AUTOMÓVIL","MENSUAL",1.0],["04-05-2113514-0","2026-02-05","2027-02-05",122.65,130.01,20.0,24.53,"FEDPA","AUTOMÓVIL","ANUAL",1.0],["030-001-000762067","2026-02-08","2027-02-08",196.23,208.0,20.0,39.25,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000773684","2026-01-28","2027-01-28",196.23,208.0,20.0,39.25,"Internacional","AUTOMÓVIL","ANUAL",1.0],["01-82-1180631-1","2026-02-01","2027-02-01",77.4,81.27,20.0,15.48,"SURA","INCENDIO","MENSUAL",10.0],["02B3419013","2025-07-15","2026-07-15",1662.78,1650.88,20.0,311.49,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["030-012-000018094","2026-04-10","2027-04-10",626.58,664.17,20.0,125.32,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["06B52344","2025-02-17","2025-07-17",500.0,525.0,20.0,100.0,"ASSA","PROPIEDAD","MENSUAL",1.0],["08300000034748","2026-03-07","2027-03-07",131.48,138.05,20.0,26.3,"MAPFRE","INCENDIO","MENSUAL",1.0],["04-04-570284-9","2025-10-22","2026-10-22",342.53,363.08,20.0,68.51,"FEDPA","AUTOMÓVIL","MENSUAL",12.0],["030-012-000019229","2026-01-03","2027-01-03",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["0225-03756-09","2025-05-31","2026-05-31",1034.55,600.91,20.0,113.38,"Ancón","AUTOMÓVIL","MENSUAL",10.0],["15051544000000","2025-05-03","2026-05-03",100.0,105.0,20.0,20.0,"MAPFRE","FIANZA","ANUAL",1.0],["033-012-000001062","2025-08-12","2026-08-12",110.0,115.5,20.0,22.0,"Internacional","INCENDIO","MENSUAL",1.0],["030-001-000773626","2025-09-08","2026-09-08",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1950814-0","2025-06-23","2026-06-23",108.49,140.0,20.0,26.42,"FEDPA","AUTOMÓVIL","MENSUAL",2.0],["030-001-000773640","2025-10-20","2026-10-20",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000773641","2025-10-21","2026-10-21",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["033-012-000000792","2025-04-19","2026-04-19",222.0,233.1,20.0,44.4,"Internacional","INCENDIO","ANUAL",1.0],["040-012-000000204","2026-04-19","2027-04-19",250.0,262.5,20.0,50.0,"Internacional","PROPIEDAD","ANUAL",1.0],["15300000041391","2026-03-04","2026-08-31",311.33,326.9,10.0,31.13,"MAPFRE","FIANZA","ANUAL",1.0],["15300000041392","2026-03-04","2026-08-31",100.0,105.0,10.0,10.0,"MAPFRE","FIANZA","ANUAL",1.0],["06-01-1057584-2","2026-01-23","2027-01-23",990.57,1050.0,20.0,198.11,"SURA","AUTOMÓVIL","MENSUAL",10.0],["02-85-1183801-1","2026-02-03","2027-02-03",144.44,153.11,20.0,28.89,"SURA","AUTOMÓVIL","MENSUAL",10.0],["02-12696563-0","2025-09-15","2026-09-15",490.19,519.6,20.0,98.04,"ACERTA","AUTOMÓVIL","MENSUAL",10.0],["0225-03316-09","2026-05-19","2027-05-19",1157.05,517.63,20.0,97.67,"Ancón","AUTOMÓVIL","MENSUAL",11.0],["02B3347696","2025-12-22","2026-12-22",643.05,616.01,20.0,116.23,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["03B91806","2025-10-14","2026-10-14",140.0,147.0,20.0,28.0,"ASSA","INCENDIO","MENSUAL",1.0],["15B36395","2025-10-14","2026-10-14",69.0,72.45,20.0,13.8,"ASSA","INCENDIO","MENSUAL",1.0],["02B3412557","2026-05-20","2027-05-20",645.71,623.64,20.0,117.67,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["030-001-000773678","2026-01-07","2027-01-07",543.65,576.27,20.0,108.73,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1708297-1","2025-08-09","2026-08-09",117.92,125.0,20.0,23.58,"FEDPA","AUTOMÓVIL","MENSUAL",1.0],["31300000003528","2025-05-21","2026-05-21",40.0,42.0,20.0,8.0,"MAPFRE","PROPIEDAD","MENSUAL",1.0],["0225-01591-01","2025-06-12","2026-06-12",5914.45,2069.02,20.0,390.38,"Ancón","AUTOMÓVIL","MENSUAL",10.0],["03B104489","2026-01-26","2027-01-26",612.0,610.47,20.0,116.28,"ASSA","INCENDIO","MENSUAL",1.0],["15B103910","2026-01-26","2027-01-26",275.0,274.31,20.0,52.25,"ASSA","INCENDIO","MENSUAL",1.0],["02-93-1237187-0","2025-11-06","2026-11-06",1968.06,2086.14,20.0,393.61,"SURA","AUTOMÓVIL","MENSUAL",10.0],["02-93-1245991-0","2026-01-05","2027-01-05",2505.75,2656.1,20.0,501.15,"SURA","AUTOMÓVIL","MENSUAL",10.0],["030-001-000773686","2026-01-29","2027-01-29",196.23,208.0,20.0,39.25,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["08300000034589","2026-01-29","2027-01-29",232.0,243.6,20.0,46.4,"MAPFRE","INCENDIO","MENSUAL",1.0],["030-001-000773652","2025-11-16","2026-11-16",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","ANUAL",1.0],["030-012-000021218","2026-01-25","2027-01-25",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["02B3433365","2025-12-15","2026-12-15",1024.9,1019.18,20.0,192.3,"ASSA","AUTOMÓVIL","MENSUAL",12.0],["02-12696031-0","2025-06-26","2026-06-26",169.82,180.01,20.0,33.96,"ACERTA","AUTOMÓVIL","ANUAL",1.0],["0830024041163","2024-12-28","2025-12-28",650.1,689.11,20.0,130.02,"MAPFRE","AUTOMÓVIL","MENSUAL",1.0],["030-001-000762069","2026-02-12","2027-02-12",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1810021-1","2025-12-26","2026-12-26",108.49,115.0,20.0,21.7,"FEDPA","AUTOMÓVIL","MENSUAL",1.0],["10-29-2176111-0","2025-03-29","2026-03-29",290.2,307.61,20.0,58.04,"La Regional","AUTOMÓVIL","MENSUAL",12.0],["02-93-1072634-2","2026-04-29","2027-04-29",551.48,584.57,20.0,110.3,"SURA","AUTOMÓVIL","MENSUAL",10.0],["033-012-000000761","2026-01-16","2027-01-16",115.78,121.57,20.0,23.16,"Internacional","INCENDIO","MENSUAL",1.0],["030-012-000021268","2026-02-01","2027-02-01",1507.41,1597.85,20.0,301.48,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["032-012-000000064","2026-02-01","2027-02-01",250.0,262.5,20.0,50.0,"Internacional","PROPIEDAD","MENSUAL",1.0],["04-04-1367045-2","2025-04-26","2026-04-26",547.27,580.11,20.0,109.45,"FEDPA","AUTOMÓVIL","MENSUAL",12.0],["02B3423630","2025-09-04","2026-09-04",403.18,409.82,20.0,77.32,"ASSA","AUTOMÓVIL","MENSUAL",10.0],["15B103914","2026-02-01","2027-02-01",275.0,274.31,20.0,52.25,"ASSA","INCENDIO","MENSUAL",1.0],["030-001-000762082","2026-03-25","2027-03-25",906.29,960.67,20.0,181.26,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-001-000773658","2025-12-04","2026-12-04",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["030-012-000019851","2026-04-23","2027-04-23",172.64,183.0,20.0,34.53,"Internacional","AUTOMÓVIL","MENSUAL",1.0],["04-05-1953528-0","2025-06-26","2026-06-26",117.92,125.0,20.0,23.58,"FEDPA","AUTOMÓVIL","MENSUAL",1.0]]
-;
+  /* Las 79 filas del reporte, tal como salieron del Excel */
+  var CC =
+[{"num":"03G50509","cli":"ALEJANDRO ANTONIO FRAUCA PALACIOS","ced":"8-845-663","mail":"","cel":"6948-3763","tel":"377-7461","aseg":"ASSA","ramo":"INCENDIO","sub":"INCENDIO","ini":"2025-02-10","fin":"2026-02-10","prima":113.4,"total":115.5,"pagado":115.5,"saldo":0.0,"pct":20.0,"com":22.0,"forma":"MENSUAL","letras":10.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"ALEJANDRO ANTONIO SOBRE EDIFICIO PROPIO DEL ASEGURADO; Urbanización:PUEBLO NUEVO, Corregim"},{"num":"02B3408559","cli":"AMSI MAVET PENA MARTINEZ","ced":"8-849-2428","mail":"penaamsi@gmail.com","cel":"6255-8354","tel":"","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-03-26","fin":"2026-03-26","prima":437.95,"total":430.14,"pagado":430.14,"saldo":0.0,"pct":20.0,"com":81.16,"forma":"MENSUAL","letras":12.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":8000.0,"desc":"HYUNDAI - TUCSON IX - 2016 - AS3788 - N  Motor: G4NAFU586601 - N  Chasis: KMHJT81EAGU09149"},{"num":"02B3423338","cli":"ANA RAQUEL LAU RODRIGUEZ","ced":"8-940-469","mail":"anaraq25@gmail.com","cel":"6673-8715","tel":"","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-08-30","fin":"2026-08-30","prima":920.77,"total":904.04,"pagado":527.31,"saldo":376.73,"pct":20.0,"com":170.57,"forma":"MENSUAL","letras":12.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":19190.0,"desc":"SUZUKI - FRONX HIBRIDO GL AT *Cam - 2026 -  - N  Motor: K15CP7044407 - N  Chasis: MBHWDB3S"},{"num":"030-001-000773693","cli":"ASHLEY NICOLE GARTH MUÑOZ","ced":"8-982-1390","mail":"","cel":"69263304","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-02-23","fin":"2027-02-23","prima":486.12,"total":515.29,"pagado":489.53,"saldo":25.76,"pct":20.0,"com":97.22,"forma":"ANUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"030-001-000773675","cli":"BELGICA YANETH TESTA DE LEON","ced":"8-751-326","mail":"","cel":"64222072","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-01-14","fin":"2027-01-14","prima":448.92,"total":475.86,"pagado":452.07,"saldo":23.79,"pct":20.0,"com":89.78,"forma":"ANUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"030-012-000021492","cli":"CARLOS IVAN LUNA CORTEZ","ced":"7-122-404","mail":"carlos.i.luna1976@gmail.com","cel":"60798681","tel":"2732751","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-03-26","fin":"2027-03-26","prima":1212.15,"total":1284.88,"pagado":0.0,"saldo":1284.88,"pct":20.0,"com":242.43,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"RIVIAN - R1S - 2023 - 0EJ2634 - N  Motor: 07PDSGABA1PN009702 - N  Chasis: 7DPSGABA1PN00970"},{"num":"02-92-1054443-2","cli":"CIPRIAN ZAMBRANO CORDOBA","ced":"7-52-907","mail":"erickzambranovcm@gmail.com","cel":"","tel":"","aseg":"SURA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-01-13","fin":"2027-01-13","prima":164.73,"total":174.61,"pagado":0.0,"saldo":174.61,"pct":20.0,"com":32.95,"forma":"MENSUAL","letras":3.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"FORD EXPLORER - FORD EXPLORER - 2013 - 980190 - N  Motor: DGA52417 - N  Chasis: 1FM5K7B8XD"},{"num":"02B3425396","cli":"CORINA BEATRIZ FLORES FUENTES","ced":"8-832-2261","mail":"c.flores296@gmail.com","cel":"6617-6116","tel":"","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-10-04","fin":"2026-10-04","prima":567.51,"total":575.29,"pagado":345.12,"saldo":230.17,"pct":20.0,"com":108.55,"forma":"MENSUAL","letras":10.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":8100.5,"desc":"CHEVROLET - TRAX - 2018 - CK1160 - N  Motor: 3GNCJ7EE3JL900121 - N  Chasis: 3GNCJ7EE3JL900"},{"num":"030-001-000653812","cli":"EDUARDO ALBERTO LASSO VIELGO","ced":"8-745-1193","mail":"edlasso@icloud.com","cel":"61039735","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-11-23","fin":"2026-11-23","prima":466.14,"total":494.11,"pagado":187.76,"saldo":306.35,"pct":20.0,"com":93.23,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"HYUNDAI - SANTA FE - 2023 - EG0235 - N  Motor: G4KMNA192175 - N  Chasis: KMHS281KBPU431574"},{"num":"030-001-000762087","cli":"EDUARDO ALBERTO LASSO VIELGO","ced":"8-745-1193","mail":"edlasso@icloud.com","cel":"61039735","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-03-31","fin":"2027-03-31","prima":811.37,"total":860.05,"pagado":0.0,"saldo":860.05,"pct":20.0,"com":162.27,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":""},{"num":"030-012-000019308","cli":"ELEANNY MARLENS UREÑA LOPEZ","ced":"4-735-1324","mail":"","cel":"61367771","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-01-19","fin":"2027-01-19","prima":172.64,"total":183.0,"pagado":109.83,"saldo":73.17,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"HYUNDAI - VELOSTER - 2013 - 889526 - N  Motor: G4FGCU538765 - N  Chasis: KMHTC61CBDU076236"},{"num":"030-001-000773605","cli":"EYVIND SAID DOMINGUEZ GONZALEZ","ced":"8-1024-1790","mail":"","cel":"66641072","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-06-03","fin":"2026-06-03","prima":172.64,"total":183.0,"pagado":183.0,"saldo":0.0,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"MAZDA - 323 - 2003 - 848573 - N  Motor: B3903418 - N  Chasis: JM7BJ103200223270"},{"num":"04-05-1970094-0","cli":"FELIX PASTOR PIZA ARRIETA","ced":"8-731-851","mail":"principalfrancy@gmail.com","cel":"","tel":"","aseg":"FEDPA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-07-18","fin":"2026-07-18","prima":117.92,"total":152.17,"pagado":114.12,"saldo":38.05,"pct":20.0,"com":28.71,"forma":"MENSUAL","letras":2.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"KIA - RIO - 2013 - 994536 - N  Motor: G4FACS355199 - N  Chasis: KNADN412BD6141839"},{"num":"02-93-1159210-1","cli":"FERNEY BEDOYA ARROYAVE","ced":"BA451807","mail":"mauriciob840129@gmail.com","cel":"","tel":"","aseg":"SURA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-10-19","fin":"2026-10-19","prima":570.0,"total":604.2,"pagado":181.26,"saldo":422.94,"pct":20.0,"com":114.0,"forma":"MENSUAL","letras":10.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":21919.65,"desc":"MAZDA CX5 - MAZDA CX5 - 2025 - EN5999 - N  Motor: PE22028607 - N  Chasis: JM7KF2W7AS012267"},{"num":"01-82-1165813-1","cli":"FRANCIS NEITOR GUERRA SAAVEDRA","ced":"8-843-331","mail":"fguerra947.fg@gmail.com","cel":"64633981","tel":"","aseg":"SURA","ramo":"INCENDIO","sub":"INCENDIO","ini":"2025-11-15","fin":"2026-11-15","prima":75.6,"total":79.38,"pagado":39.69,"saldo":39.69,"pct":20.0,"com":15.12,"forma":"MENSUAL","letras":6.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":94500.0,"desc":"FRANCIS NEITOR GUERRA SAAVEDRA ; PANAMA, SNA MIGUELITO, JOSE DOMINGO ESPINAR, VILLA LUCRE,"},{"num":"030-001-000773687","cli":"FRANCY ORALIX PRINCIPAL VILLABONA","ced":"E-8-184985","mail":"principalfrancy@gmail.com","cel":"67509852","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-02-09","fin":"2027-02-09","prima":172.64,"total":183.0,"pagado":122.01,"saldo":60.99,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"02B3408498","cli":"GABRIEL TOMAS COPETE CALDERON","ced":"8-875-486","mail":"","cel":"6206-3298","tel":"","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-03-25","fin":"2026-03-25","prima":1256.95,"total":1231.88,"pagado":1231.88,"saldo":0.0,"pct":20.0,"com":232.43,"forma":"MENSUAL","letras":12.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":28600.0,"desc":"FORD - MUSTANG - 2020 - DF6303 - N  Motor: FR3E9G479BC - N  Chasis: 1FA6P8TH6L5189577"},{"num":"02BR2908859","cli":"GABRIEL TOMAS COPETE CALDERON","ced":"8-875-486","mail":"","cel":"6206-3298","tel":"","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2024-12-31","fin":"2025-12-31","prima":150.94,"total":160.0,"pagado":160.0,"saldo":0.0,"pct":20.0,"com":30.19,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"VENCIDA","suma":0.0,"desc":"FORD - MUSTANG - 2020 -  - N  Motor: 1FA6P8TH6L5189577 - N  Chasis: 1FA6P8TH6L5189577"},{"num":"04-05-2113514-0","cli":"GABRIEL TOMAS COPETE CALDERON","ced":"8-875-486","mail":"","cel":"6206-3298","tel":"","aseg":"FEDPA","ramo":"AUTOMÓVIL","sub":"DAÑOS A TERCEROS","ini":"2026-02-05","fin":"2027-02-05","prima":122.65,"total":130.01,"pagado":130.0,"saldo":0.01,"pct":20.0,"com":24.53,"forma":"ANUAL","letras":1.0,"medio":"","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"030-001-000762067","cli":"INGRID EDITH CARDENAS CHANIS","ced":"7-701-212","mail":"legal@tova.com.pa","cel":"69821045","tel":"3995040","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-02-08","fin":"2027-02-08","prima":196.23,"total":208.0,"pagado":0.0,"saldo":208.0,"pct":20.0,"com":39.25,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"FORD - EXPLORER XLT *Cam - 2012 - 906271 - N  Motor: CGA88178 - N  Chasis: 1FMHK7D8XCGA881"},{"num":"030-001-000773684","cli":"ISURY ESTIBALIS CAMACHO RIOS","ced":"8-791-102","mail":"","cel":"69153069","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-01-28","fin":"2027-01-28","prima":196.23,"total":208.0,"pagado":208.0,"saldo":0.0,"pct":20.0,"com":39.25,"forma":"ANUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"01-82-1180631-1","cli":"ITZEL MARIA WRIGHT RUIZ","ced":"8-290-443","mail":"lezzty1224@hotmail.com","cel":"","tel":"","aseg":"SURA","ramo":"INCENDIO","sub":"INCENDIO","ini":"2026-02-01","fin":"2027-02-01","prima":77.4,"total":81.27,"pagado":4.04,"saldo":77.23,"pct":20.0,"com":15.48,"forma":"MENSUAL","letras":10.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"","suma":0.0,"desc":""},{"num":"02B3419013","cli":"JAIME ADOLFO CASTRO PEREZ","ced":"7-119-688","mail":"mdjaimecastro@gmail.com","cel":"6982-1096","tel":"503-9400","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-07-15","fin":"2026-07-15","prima":1662.78,"total":1650.88,"pagado":1238.22,"saldo":412.66,"pct":20.0,"com":311.49,"forma":"MENSUAL","letras":12.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":63900.0,"desc":"BMW - X3 20 XDRIVE - 2026 -  - N  Motor: 22467843 - N  Chasis: WBA31GP07T9042641"},{"num":"030-012-000018094","cli":"JAIME ALEXANDER CASTRO PEREZ","ced":"7-701-2117","mail":"","cel":"6550-1773","tel":"3996078","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-04-10","fin":"2027-04-10","prima":626.58,"total":664.17,"pagado":0.0,"saldo":664.17,"pct":20.0,"com":125.32,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"VOLVO - XC60 B5 MILD HYBRID - 2023 - EH3905 - N  Motor: B420T104705444 - N  Chasis: YV1UZL"},{"num":"06B52344","cli":"JAIME ALEXANDER CASTRO PEREZ","ced":"7-701-2117","mail":"","cel":"6550-1773","tel":"3996078","aseg":"ASSA","ramo":"PROPIEDAD","sub":"TODO RIESGO CONSTRUCCION","ini":"2025-02-17","fin":"2025-07-17","prima":500.0,"total":525.0,"pagado":525.0,"saldo":0.0,"pct":20.0,"com":100.0,"forma":"MENSUAL","letras":1.0,"medio":"ACH","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"VENCIDA","suma":0.0,"desc":""},{"num":"08300000034748","cli":"JAIME ALEXANDER CASTRO PEREZ","ced":"7-701-2117","mail":"","cel":"6550-1773","tel":"3996078","aseg":"MAPFRE","ramo":"INCENDIO","sub":"INCENDIO","ini":"2026-03-07","fin":"2027-03-07","prima":131.48,"total":138.05,"pagado":138.05,"saldo":0.0,"pct":20.0,"com":26.3,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"04-04-570284-9","cli":"JAVIER ARMANDO NIETO UREÑA","ced":"8-207-2587","mail":"RENEGADOJAVI@GMAIL.COM","cel":"67558296","tel":"","aseg":"FEDPA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-10-22","fin":"2026-10-22","prima":342.53,"total":363.08,"pagado":108.93,"saldo":254.15,"pct":20.0,"com":68.51,"forma":"MENSUAL","letras":12.0,"medio":"","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"KIA - RIO - 2016 - BA4631 - N  Motor: G4FAFS923995 - N  Chasis: KNADN412BG6581760"},{"num":"030-012-000019229","cli":"JEANNETTE FONT MITIL","ced":"8-206-1607","mail":"","cel":"65057177","tel":"2671040","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-01-03","fin":"2027-01-03","prima":172.64,"total":183.0,"pagado":109.83,"saldo":73.17,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"HYUNDAI - ELANTRA - 2008 - 426394 - N  Motor: G4FC7U256268 - N  Chasis: KMHDT41BP8U300967"},{"num":"0225-03756-09","cli":"JELY AN CASTRO PEREZ","ced":"7-118-282","mail":"JELYANCORREDORA@GMAIL.COM","cel":"","tel":"","aseg":"Ancón","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-05-31","fin":"2026-05-31","prima":1034.55,"total":600.91,"pagado":540.87,"saldo":60.04,"pct":20.0,"com":113.38,"forma":"MENSUAL","letras":10.0,"medio":"PAGO DIRECTO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":15990.0,"desc":"GEELY - EMGRAND - 2026 -  - N  Motor: BHE15AFDS2GA0930583 - N  Chasis: LB3F31030TG009459"},{"num":"15051544000000","cli":"JELY AN CASTRO PEREZ","ced":"7-118-282","mail":"JELYANCORREDORA@GMAIL.COM","cel":"","tel":"","aseg":"MAPFRE","ramo":"FIANZA","sub":"FIANZA","ini":"2025-05-03","fin":"2026-05-03","prima":100.0,"total":105.0,"pagado":105.0,"saldo":0.0,"pct":20.0,"com":20.0,"forma":"ANUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"FIANZAS FIANZA CORREDOR DE BIENES RAICES\nWF: 13630704 ;"},{"num":"033-012-000001062","cli":"JHON JAIRO VALVERDE OSORIO","ced":"E-8-151884","mail":"","cel":"60657168","tel":"3821159","aseg":"Internacional","ramo":"INCENDIO","sub":"INCENDIO","ini":"2025-08-12","fin":"2026-08-12","prima":110.0,"total":115.5,"pagado":115.5,"saldo":0.0,"pct":20.0,"com":22.0,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"JHON JAIRO VALVERDE OSORIO ;"},{"num":"030-001-000773626","cli":"JOAO PEDRO CARMOZINE","ced":"E-8-122659","mail":"recepcion@pylasa.com","cel":"63171565","tel":"2091991","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-09-08","fin":"2026-09-08","prima":172.64,"total":183.0,"pagado":183.0,"saldo":0.0,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"AUDI - A3 - 2014 - AU7429 - N  Motor: CJZ157996 - N  Chasis: WAUZZZ8V9EA098199"},{"num":"04-05-1950814-0","cli":"JORGE TUÑON","ced":"8-763-2045","mail":"jorgeantoniotunon@gmail.com","cel":"","tel":"","aseg":"FEDPA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-06-23","fin":"2026-06-23","prima":108.49,"total":140.0,"pagado":140.0,"saldo":0.0,"pct":20.0,"com":26.42,"forma":"MENSUAL","letras":2.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"NISSAN - PATHFINDER - 2012 - 890927 - N  Motor: YD25724983B - N  Chasis: VSKJVWR61Z0443133"},{"num":"030-001-000773640","cli":"JOSE ADRIAN GONZALES RIVAS","ced":"8-747-1453","mail":"","cel":"62950434","tel":"2670700","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-10-20","fin":"2026-10-20","prima":172.64,"total":183.0,"pagado":183.0,"saldo":0.0,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"TOYOTA - RAV 4 - 2006 - 502536 - N  Motor: 1AZ1B40635 - N  Chasis: JTEHH20V206134763"},{"num":"030-001-000773641","cli":"JOSE DE LA PAZ RODRIGUEZ ARCIA","ced":"8-739-1416","mail":"jose.arcia09@gmail.com","cel":"65266480","tel":"2478532","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-10-21","fin":"2026-10-21","prima":172.64,"total":183.0,"pagado":183.0,"saldo":0.0,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":""},{"num":"033-012-000000792","cli":"JOSE LUIS RIOS PEREZ","ced":"7-702-488","mail":"joriosp@gmail.com","cel":"69973944","tel":"206-2599","aseg":"Internacional","ramo":"INCENDIO","sub":"INCENDIO","ini":"2025-04-19","fin":"2026-04-19","prima":222.0,"total":233.1,"pagado":258.05,"saldo":-24.95,"pct":20.0,"com":44.4,"forma":"ANUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"JOSE LUIS RIOS PEREZ ;"},{"num":"040-012-000000204","cli":"JOSE LUIS RIOS PEREZ","ced":"7-702-488","mail":"joriosp@gmail.com","cel":"69973944","tel":"206-2599","aseg":"Internacional","ramo":"PROPIEDAD","sub":"RESPONSABILIDAD CIVIL","ini":"2026-04-19","fin":"2027-04-19","prima":250.0,"total":262.5,"pagado":0.0,"saldo":262.5,"pct":20.0,"com":50.0,"forma":"ANUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"JOSE LUIS RIOS PEREZ ;"},{"num":"15300000041391","cli":"JRH CONSTRUCCIONES, S.A.","ced":"155667058-2-2018","mail":"jrhconstrucionesp@gmail.com","cel":"","tel":"","aseg":"MAPFRE","ramo":"FIANZA","sub":"FIANZA","ini":"2026-03-04","fin":"2026-08-31","prima":311.33,"total":326.9,"pagado":326.9,"saldo":0.0,"pct":10.0,"com":31.13,"forma":"ANUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"15300000041392","cli":"JRH CONSTRUCCIONES, S.A.","ced":"155667058-2-2018","mail":"jrhconstrucionesp@gmail.com","cel":"","tel":"","aseg":"MAPFRE","ramo":"FIANZA","sub":"FIANZA","ini":"2026-03-04","fin":"2026-08-31","prima":100.0,"total":105.0,"pagado":105.0,"saldo":0.0,"pct":10.0,"com":10.0,"forma":"ANUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"06-01-1057584-2","cli":"JUAN CARLOS VEGA BELLAIZAN","ced":"8-NT-2-762788","mail":"JUANVEGA.CONTADOR@GMAIL.COM","cel":"62664590","tel":"","aseg":"SURA","ramo":"AUTOMÓVIL","sub":"RESPONSABILIDAD CIVIL AUTO","ini":"2026-01-23","fin":"2027-01-23","prima":990.57,"total":1050.0,"pagado":175.0,"saldo":875.0,"pct":20.0,"com":198.11,"forma":"MENSUAL","letras":10.0,"medio":"","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"02-85-1183801-1","cli":"JUAN CARLOS VEGA BELLAIZAN","ced":"AW679500","mail":"juanvega.contador2@gmail.com","cel":"","tel":"","aseg":"SURA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-02-03","fin":"2027-02-03","prima":144.44,"total":153.11,"pagado":15.31,"saldo":137.8,"pct":20.0,"com":28.89,"forma":"MENSUAL","letras":10.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"02-12696563-0","cli":"KAREN YADIRA RAMIREZ ANACONA","ced":"E-8-134628","mail":"KARENRAMIREZANACONA@GMAIL.COM","cel":"66189240","tel":"","aseg":"ACERTA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-09-15","fin":"2026-09-15","prima":490.19,"total":519.6,"pagado":311.76,"saldo":207.84,"pct":20.0,"com":98.04,"forma":"MENSUAL","letras":10.0,"medio":"","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"MITSUBISHI - ASX - 2024 - EH9099 - N  Motor: 4B11D16039 - N  Chasis: JMYXTGA2WRU000932"},{"num":"0225-03316-09","cli":"KARLA TAMARA CASTILLO OTHON","ced":"8-739-2164","mail":"karlaothon@hotmail.com","cel":"","tel":"","aseg":"Ancón","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-05-19","fin":"2027-05-19","prima":1157.05,"total":517.63,"pagado":0.0,"saldo":517.63,"pct":20.0,"com":97.67,"forma":"MENSUAL","letras":11.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":17490.0,"desc":"GEELY - COOLRAY - 2026 -  - N  Motor: BHE15AFDS1GA0718369 - N  Chasis: LB3SX203XTX800154"},{"num":"02B3347696","cli":"LEON GUILLERMO MONTAÑO CHACON PLATA","ced":"8-484-774","mail":"leo@comtel.com.pa,leon_1975@hotmail.com","cel":"6679-0666","tel":"208-7689","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-12-22","fin":"2026-12-22","prima":643.05,"total":616.01,"pagado":153.99,"saldo":462.02,"pct":20.0,"com":116.23,"forma":"MENSUAL","letras":12.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"03B91806","cli":"LEON GUILLERMO MONTAÑO CHACON PLATA","ced":"8-484-774","mail":"leo@comtel.com.pa,leon_1975@hotmail.com","cel":"6679-0666","tel":"208-7689","aseg":"ASSA","ramo":"INCENDIO","sub":"INCENDIO","ini":"2025-10-14","fin":"2026-10-14","prima":140.0,"total":147.0,"pagado":147.0,"saldo":0.0,"pct":20.0,"com":28.0,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"LEON GUILLERMO SOBRE EDIFICIO TODO DE CONCRETO INCLUYENDO TECHO DE CONCRETO SOLO ESTRUCTUR"},{"num":"15B36395","cli":"LEON GUILLERMO MONTAÑO CHACON PLATA","ced":"8-484-774","mail":"leo@comtel.com.pa,leon_1975@hotmail.com","cel":"6679-0666","tel":"208-7689","aseg":"ASSA","ramo":"INCENDIO","sub":"INCENDIO","ini":"2025-10-14","fin":"2026-10-14","prima":69.0,"total":72.45,"pagado":72.45,"saldo":0.0,"pct":20.0,"com":13.8,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"LEON GUILLERMO ; CALLE: 74, APARTAMENTO: 6-C,  P. H. SKY BLUE TOWER, SAN FRANCISCO, PANAMA"},{"num":"02B3412557","cli":"LEXMA MAGALIS GUERRA RUIZ","ced":"8-812-1753","mail":"lexma05@gmail.com","cel":"6673-8369","tel":"229-4288","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-05-20","fin":"2027-05-20","prima":645.71,"total":623.64,"pagado":0.0,"saldo":623.64,"pct":20.0,"com":117.67,"forma":"MENSUAL","letras":12.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":13288.7,"desc":"KIA - SPORTAGE - 2020 - CX5964 - N  Motor: G4NAKH710033 - N  Chasis: KNAPM81ABL7751007"},{"num":"030-001-000773678","cli":"LIZBETH LUISANA PEREA JOSEPH","ced":"3-712-1669","mail":"lizbeth.perea@gmail.com","cel":"64549682","tel":"00507-0211-6695","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-01-07","fin":"2027-01-07","prima":543.65,"total":576.27,"pagado":172.89,"saldo":403.38,"pct":20.0,"com":108.73,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"04-05-1708297-1","cli":"LIZBETH LUISANA PEREA JOSEPH","ced":"3-712-1669","mail":"lizbeth.perea@gmail.com","cel":"64549682","tel":"00507-0211-6695","aseg":"FEDPA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-08-09","fin":"2026-08-09","prima":117.92,"total":125.0,"pagado":125.0,"saldo":0.0,"pct":20.0,"com":23.58,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"CHEVROLET - AVEO - 2019 - CU3380 - N  Motor: LSGHD52HXKD031750 - N  Chasis: LSGHD52HXKD031"},{"num":"31300000003528","cli":"LIZBETH LUISANA PEREA JOSEPH","ced":"3-712-1669","mail":"lizbeth.perea@gmail.com","cel":"64549682","tel":"00507-0211-6695","aseg":"MAPFRE","ramo":"PROPIEDAD","sub":"MULTIRIESGO FAMILIAR","ini":"2025-05-21","fin":"2026-05-21","prima":40.0,"total":42.0,"pagado":42.0,"saldo":0.0,"pct":20.0,"com":8.0,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":10000.0,"desc":"MULTIMUNDIAL RENOVACION ;"},{"num":"0225-01591-01","cli":"LOREN THOMAS MC NEELY","ced":"565739669","mail":"lorenm4703@yahoo.com","cel":"6188-1075","tel":"","aseg":"Ancón","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-06-12","fin":"2026-06-12","prima":5914.45,"total":2069.02,"pagado":2069.02,"saldo":0.0,"pct":20.0,"com":390.38,"forma":"MENSUAL","letras":10.0,"medio":"PAGO DIRECTO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":68400.0,"desc":"MERCEDES BENZ - GLS 580 4MATIC - 2020 - CY5628 - N  Motor: 17698030057373 - N  Chasis: W1N"},{"num":"03B104489","cli":"LOREN THOMAS MC NEELY","ced":"565739669","mail":"lorenm4703@yahoo.com","cel":"6188-1075","tel":"","aseg":"ASSA","ramo":"INCENDIO","sub":"INCENDIO","ini":"2026-01-26","fin":"2027-01-26","prima":612.0,"total":610.47,"pagado":610.47,"saldo":0.0,"pct":20.0,"com":116.28,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"15B103910","cli":"LOREN THOMAS MC NEELY","ced":"565739669","mail":"lorenm4703@yahoo.com","cel":"6188-1075","tel":"","aseg":"ASSA","ramo":"INCENDIO","sub":"INCENDIO","ini":"2026-01-26","fin":"2027-01-26","prima":275.0,"total":274.31,"pagado":274.31,"saldo":0.0,"pct":20.0,"com":52.25,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"02-93-1237187-0","cli":"LUIS LOPEZ","ced":"7-713-810","mail":"","cel":"","tel":"","aseg":"SURA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-11-06","fin":"2026-11-06","prima":1968.06,"total":2086.14,"pagado":1043.05,"saldo":1043.09,"pct":20.0,"com":393.61,"forma":"MENSUAL","letras":10.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":44900.0,"desc":"FORD RANGER WILDTRAK - FORD RANGER WILDTRAK - 2024 - EN8262 - N  Motor: YN2QRJ129392 - N  "},{"num":"02-93-1245991-0","cli":"LUIS LOPEZ","ced":"7-713-810","mail":"","cel":"","tel":"","aseg":"SURA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-01-05","fin":"2027-01-05","prima":2505.75,"total":2656.1,"pagado":802.98,"saldo":1853.12,"pct":20.0,"com":501.15,"forma":"MENSUAL","letras":10.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"030-001-000773686","cli":"MARC LAJUENESSE","ced":"582427450","mail":"marcemba25@gmail.com","cel":"62158003","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-01-29","fin":"2027-01-29","prima":196.23,"total":208.0,"pagado":69.34,"saldo":138.66,"pct":20.0,"com":39.25,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"08300000034589","cli":"MARC LAJUENESSE","ced":"582427450","mail":"marcemba25@gmail.com","cel":"62158003","tel":"","aseg":"MAPFRE","ramo":"INCENDIO","sub":"INCENDIO","ini":"2026-01-29","fin":"2027-01-29","prima":232.0,"total":243.6,"pagado":243.6,"saldo":0.0,"pct":20.0,"com":46.4,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"030-001-000773652","cli":"MAYLIN JULIANA FUNG PACHECO","ced":"140325247","mail":"","cel":"65359432","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-11-16","fin":"2026-11-16","prima":172.64,"total":183.0,"pagado":183.0,"saldo":0.0,"pct":20.0,"com":34.53,"forma":"ANUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":""},{"num":"030-012-000021218","cli":"MELVIN MONTENEGRO DE LA ROSA","ced":"8-765-927","mail":"","cel":"68105706","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-01-25","fin":"2027-01-25","prima":172.64,"total":183.0,"pagado":73.22,"saldo":109.78,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"SUZUKI - GRAND VITARA - 2008 - 455367 - N  Motor: J20A496373 - N  Chasis: JS3TD54V48410506"},{"num":"02B3433365","cli":"MIGUEL FERMIN","ced":"8-891-1830","mail":"miguelffermin@gmail.com","cel":"6115-3100","tel":"","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-12-15","fin":"2026-12-15","prima":1024.9,"total":1019.18,"pagado":259.93,"saldo":759.25,"pct":20.0,"com":192.3,"forma":"MENSUAL","letras":12.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":22500.0,"desc":"HYUNDAI - TUCSON - 2025 - EM6377 - N  Motor: G4NLPU660329 - N  Chasis: KMHJB81DASU318970"},{"num":"02-12696031-0","cli":"NELSON BARRAGAN TEJEIRA","ced":"PE-8-2120","mail":"sabonim78@gmail.com","cel":"","tel":"","aseg":"ACERTA","ramo":"AUTOMÓVIL","sub":"DAÑOS A TERCEROS","ini":"2025-06-26","fin":"2026-06-26","prima":169.82,"total":180.01,"pagado":90.0,"saldo":90.01,"pct":20.0,"com":33.96,"forma":"ANUAL","letras":1.0,"medio":"","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"MAZDA - 2 - 2013 - 604125 - N  Motor: ZYB71131 - N  Chasis: HM7DE10Y2D0245236"},{"num":"0830024041163","cli":"NELSON BARRAGAN TEJEIRA","ced":"PE-8-2120","mail":"sabonim78@gmail.com","cel":"","tel":"","aseg":"MAPFRE","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2024-12-28","fin":"2025-12-28","prima":650.1,"total":689.11,"pagado":125.3,"saldo":563.81,"pct":20.0,"com":130.02,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"VENCIDA","suma":15000.0,"desc":"AUDI - Q5 - 2014 - AF0378 - N  Motor: CNC032617 - N  Chasis: WAUZZZ8R8EA059994"},{"num":"030-001-000762069","cli":"NILSA LETICIA ESTRADA MORENO","ced":"8-190-113","mail":"","cel":"62372312","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-02-12","fin":"2027-02-12","prima":172.64,"total":183.0,"pagado":73.22,"saldo":109.78,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"HONDA - CRV - 2011 - 581402 - N  Motor: K24Z16610324 - N  Chasis: JHLRE4830BC200191"},{"num":"04-05-1810021-1","cli":"OMAR BLANCO","ced":"N-19-1071","mail":"cesarpty29@gmail.com","cel":"","tel":"","aseg":"FEDPA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-12-26","fin":"2026-12-26","prima":108.49,"total":115.0,"pagado":0.0,"saldo":115.0,"pct":20.0,"com":21.7,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"SUZUKI - CELERIO - 2010 - 391632 - N  Motor: K10BN1183747 - N  Chasis: MA3FC31S7AA285355"},{"num":"10-29-2176111-0","cli":"ORLANDO ANTONIO HIGUERO LEZCANO","ced":"8-848-1474","mail":"ORLANDO_0923@OUTLOOK.COM","cel":"61325979","tel":"","aseg":"La Regional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-03-29","fin":"2026-03-29","prima":290.2,"total":307.61,"pagado":308.2,"saldo":-0.59,"pct":20.0,"com":58.04,"forma":"MENSUAL","letras":12.0,"medio":"","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"KIA - RIO - 2020 - CU2988 - N  Motor: G4LCJE738032 - N  Chasis: 3KPA241ABLE193769"},{"num":"02-93-1072634-2","cli":"PATRICIA MARTEZ","ced":"8-845-2470","mail":"","cel":"","tel":"","aseg":"SURA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-04-29","fin":"2027-04-29","prima":551.48,"total":584.57,"pagado":0.0,"saldo":584.57,"pct":20.0,"com":110.3,"forma":"MENSUAL","letras":10.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"","suma":0.0,"desc":""},{"num":"033-012-000000761","cli":"PILAR DE LOS ANGELES BOSCH CASTRO","ced":"7-711-1197","mail":"","cel":"64393095","tel":"","aseg":"Internacional","ramo":"INCENDIO","sub":"INCENDIO","ini":"2026-01-16","fin":"2027-01-16","prima":115.78,"total":121.57,"pagado":36.48,"saldo":85.09,"pct":20.0,"com":23.16,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"PILAR DE LOS ANGELES BOSCH CASTRO ;"},{"num":"030-012-000021268","cli":"PL PANAMA LOGISTIC S.A","ced":"155694202-2-2020-3","mail":"","cel":"62023516","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-02-01","fin":"2027-02-01","prima":1507.41,"total":1597.85,"pagado":159.79,"saldo":1438.06,"pct":20.0,"com":301.48,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"HONDA - CRV - 2018 - CS0399 - N  Motor: L15BE2206165 - N  Chasis: 1HGRW2870JL501776"},{"num":"032-012-000000064","cli":"PL PANAMA LOGISTIC S.A","ced":"155694202-2-2020-3","mail":"","cel":"62023516","tel":"","aseg":"Internacional","ramo":"PROPIEDAD","sub":"TRANSPORTE","ini":"2026-02-01","fin":"2027-02-01","prima":250.0,"total":262.5,"pagado":0.0,"saldo":262.5,"pct":20.0,"com":50.0,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"PL PANAMA LOGISTIC S.A ;"},{"num":"04-04-1367045-2","cli":"ROBERTO ELIAS COHEN PEREZ","ced":"6-715-991","mail":"COHEN.ROBERTO1991@GMAIL.COM","cel":"65929359","tel":"","aseg":"FEDPA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-04-26","fin":"2026-04-26","prima":547.27,"total":580.11,"pagado":580.1,"saldo":0.01,"pct":20.0,"com":109.45,"forma":"MENSUAL","letras":12.0,"medio":"","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"TOYOTA - HILUX - 2023 - EG9584 - N  Motor: 2GD-D176027 - N  Chasis: 8AJKB3CD801654188"},{"num":"02B3423630","cli":"ROSARIO ESTHER DELGADO ACEVEDO","ced":"7-72-135","mail":"reda122056@gmail.com","cel":"6520-9696","tel":"","aseg":"ASSA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-09-04","fin":"2026-09-04","prima":403.18,"total":409.82,"pagado":286.86,"saldo":122.96,"pct":20.0,"com":77.32,"forma":"MENSUAL","letras":10.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":6969.6,"desc":"FORD - ECOSPORT - 2018 - CU7635 - N  Motor: JU37527 - N  Chasis: MAJBXXMRKBJU37527"},{"num":"15B103914","cli":"THE NAIL GARDEN, S.A. .","ced":"155757462-2-2024","mail":"jeymi_09@hotmail.com","cel":"6188-1075","tel":"","aseg":"ASSA","ramo":"INCENDIO","sub":"INCENDIO","ini":"2026-02-01","fin":"2027-02-01","prima":275.0,"total":274.31,"pagado":274.31,"saldo":0.0,"pct":20.0,"com":52.25,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"","suma":0.0,"desc":""},{"num":"030-001-000762082","cli":"TOMAS ABDIEL HERRERA CASTAÑEDA","ced":"8-790-2376","mail":"","cel":"67245337","tel":"2205392","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-03-25","fin":"2027-03-25","prima":906.29,"total":960.67,"pagado":0.0,"saldo":960.67,"pct":20.0,"com":181.26,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"MAXUS - D90 LUXURY - 2025 -  - N  Motor: M924B070525 - N  Chasis: LSFA431B3SA060418"},{"num":"030-001-000773658","cli":"VICTOR HUGO BOSCH CASTRO","ced":"8-1000-972","mail":"","cel":"62363544","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-12-04","fin":"2026-12-04","prima":172.64,"total":183.0,"pagado":183.0,"saldo":0.0,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"HYUNDAI - EON - 2013 - 936151 - N  Motor: G3HACM101655 - N  Chasis: MALA251AADM115096"},{"num":"030-012-000019851","cli":"YEREMY MARTINEZ GONZALEZ","ced":"8-938-1518","mail":"","cel":"62975850","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2026-04-23","fin":"2027-04-23","prima":172.64,"total":183.0,"pagado":0.0,"saldo":183.0,"pct":20.0,"com":34.53,"forma":"MENSUAL","letras":1.0,"medio":"TARJETA DE CREDITO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Renovacion","ren":2.0,"est":"ACTIVA","suma":0.0,"desc":"KIA - PICANTO - 2014 - AB4124 - N  Motor: G4LADP034654 - N  Chasis: KNABX512BET545675"},{"num":"04-05-1953528-0","cli":"YULIET FONTE","ced":"L641470","mail":"yulietfonte@gmail.com","cel":"","tel":"","aseg":"FEDPA","ramo":"AUTOMÓVIL","sub":"AUTOMÓVIL","ini":"2025-06-26","fin":"2026-06-26","prima":117.92,"total":125.0,"pagado":125.0,"saldo":0.0,"pct":20.0,"com":23.58,"forma":"MENSUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":1.0,"est":"ACTIVA","suma":0.0,"desc":"VOLKSWAGEN - TIGUAN - 2009 - 921750 - N  Motor: CAW038282 - N  Chasis: WVGZZZ5NZ9W073314"},{"num":"01-82-1180631-0","cli":"ITZEL MARIA WRIGHT RUIZ","ced":"8-290-443","mail":"","cel":"","tel":"","aseg":"SURA","ramo":"INCENDIO","sub":"","ini":"2025-02-01","fin":"2026-02-01","prima":77.4,"total":81.27,"pagado":73.17,"saldo":8.1,"pct":20.0,"com":15.48,"forma":"MENSUAL","letras":10.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":0,"est":"ACTIVA","suma":77401.78,"desc":"ITZEL MARIA WRIGHT RUIZ ;"},{"num":"02-93-1072634-1","cli":"PATRICIA MARTEZ","ced":"8-845-2470","mail":"","cel":"","tel":"","aseg":"SURA","ramo":"AUTOMÓVIL","sub":"","ini":"2025-04-29","fin":"2026-04-29","prima":380.33,"total":403.15,"pagado":242.59,"saldo":160.56,"pct":20.0,"com":76.07,"forma":"MENSUAL","letras":10.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":0,"est":"ACTIVA","suma":6286.13,"desc":"TOYOTA AGYA - TOYOTA AGYA - 2019 - CN7226 - N  Motor: 1KRA463017 - N  Chasis: MHKA4DF500J0"},{"num":"030-001-000773674","cli":"XIOMARA PHILLIPS","ced":"8-305-97","mail":"","cel":"","tel":"","aseg":"Internacional","ramo":"AUTOMÓVIL","sub":"","ini":"2025-12-26","fin":"2026-12-26","prima":172.64,"total":183.0,"pagado":0.0,"saldo":183.0,"pct":20.0,"com":34.53,"forma":"ANUAL","letras":1.0,"medio":"EFECTIVO","lider":"CAPITAL CARE & CO","vend":"JELY AN CASTRO PEREZ","tipo":"Poliza Nueva","ren":0,"est":"ACTIVA","suma":0.0,"desc":""}];
 
-  function norm(x){
-    return String(x||'').toUpperCase()
+  function txt(x){ return String(x==null?'':x).trim(); }
+  function n2(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
+  function hoyISO(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+
+  /* normalizar para comparar: sin tildes, sin signos */
+  function N(x){
+    return txt(x).toUpperCase()
       .normalize('NFD').replace(/[̀-ͯ]/g,'')
-      .replace(/Ñ/g,'N').replace(/[^A-Z0-9]/g,'');
+      .replace(/Ñ/g,'N');
   }
-  /* El CRM a veces guarda el numero con un sufijo de ciclo: 123456-2 */
+  function num(x){ return N(x).replace(/[^A-Z0-9]/g,''); }
+  function ced(x){ return N(x).replace(/[^0-9A-Z]/g,''); }
+  function nom(x){ return N(x).replace(/[^A-Z ]/g,' ').replace(/\s+/g,' ').trim(); }
   function base(x){
-    var b=norm(String(x||'').replace(/-\d{1,6}$/,''));
+    var b=num(txt(x).replace(/-\d{1,6}$/,''));
     return b.length>=8 ? b : null;
   }
-  function hoyISO(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
-  function dif(a,b){
-    var x=new Date(a+'T00:00:00'), y=new Date(b+'T00:00:00');
-    if(isNaN(x)||isNaN(y)) return 12;
-    return Math.max(1, Math.round((y-x)/86400000/30.4));   /* meses aproximados */
+  /* dos nombres son la misma persona si comparten al menos dos
+     palabras largas (nombre y un apellido). Evita casar "MARIA
+     GONZALEZ" con cualquier otra María. */
+  function mismoNombre(a,b){
+    var A=nom(a).split(' ').filter(function(w){return w.length>=4;});
+    var B=nom(b).split(' ').filter(function(w){return w.length>=4;});
+    if(A.length<2||B.length<2) return false;
+    var c=0;
+    A.forEach(function(w){ if(B.indexOf(w)>=0) c++; });
+    return c>=2;
+  }
+
+  function pols(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function clis(){ return (typeof S!=='undefined'&&S.clientes)||[]; }
+
+  /* ---------- la cascada de búsqueda ---------- */
+  function buscar(f){
+    var P=pols(), i, p;
+    var fn=num(f.num), fb=base(f.num), fc=ced(f.ced);
+
+    /* 1. número exacto */
+    for(i=0;i<P.length;i++) if(num(P[i].num)===fn && fn) return {p:P[i], via:'número'};
+
+    /* 2. mismo número sin el sufijo de ciclo */
+    if(fb){
+      var cand=[];
+      for(i=0;i<P.length;i++){ var b=base(P[i].num); if(b===fb) cand.push(P[i]); }
+      if(cand.length===1) return {p:cand[0], via:'número sin sufijo'};
+    }
+
+    /* 3. uno contiene al otro por delante */
+    if(fn.length>=8){
+      for(i=0;i<P.length;i++){
+        var pn=num(P[i].num);
+        if(pn.length>=8 && (pn.indexOf(fn)===0||fn.indexOf(pn)===0)) return {p:P[i], via:'número contenido'};
+      }
+    }
+
+    /* 4. cédula + compañía  (la llave fuerte: la traen las 79) */
+    if(fc.length>=5){
+      var porCed=[];
+      for(i=0;i<P.length;i++){
+        p=P[i];
+        var pc=ced(p.cedCliente||p.cedula||'');
+        if(!pc){
+          var cl=clis().filter(function(c){ return c.id===p.clienteId; })[0];
+          pc=cl?ced(cl.cedula):'';
+        }
+        if(pc && pc===fc) porCed.push(p);
+      }
+      if(porCed.length===1) return {p:porCed[0], via:'cédula'};
+      if(porCed.length>1){
+        var m=porCed.filter(function(x){ return N(x.aseg)===N(f.aseg); });
+        if(m.length===1) return {p:m[0], via:'cédula + compañía'};
+        m=porCed.filter(function(x){ return N(x.aseg)===N(f.aseg) && N(x.ramo).indexOf(N(f.ramo).slice(0,5))>=0; });
+        if(m.length===1) return {p:m[0], via:'cédula + compañía + ramo'};
+      }
+    }
+
+    /* 5. nombre + compañía */
+    var porNom=[];
+    for(i=0;i<P.length;i++){
+      p=P[i];
+      var pn2=p.nombreCliente||'';
+      if(!pn2){
+        var cl2=clis().filter(function(c){ return c.id===p.clienteId; })[0];
+        pn2=cl2?cl2.nombre:'';
+      }
+      if(mismoNombre(pn2, f.cli)) porNom.push(p);
+    }
+    if(porNom.length===1) return {p:porNom[0], via:'nombre'};
+    if(porNom.length>1){
+      var q=porNom.filter(function(x){ return N(x.aseg)===N(f.aseg); });
+      if(q.length===1) return {p:q[0], via:'nombre + compañía'};
+      q=q.filter(function(x){ return N(x.ramo).slice(0,5)===N(f.ramo).slice(0,5); });
+      if(q.length===1) return {p:q[0], via:'nombre + compañía + ramo'};
+    }
+    return null;
+  }
+
+  function clientePorCedulaONombre(f){
+    var L=clis(), i, fc=ced(f.ced);
+    if(fc.length>=5) for(i=0;i<L.length;i++) if(ced(L[i].cedula)===fc) return L[i];
+    for(i=0;i<L.length;i++) if(mismoNombre(L[i].nombre, f.cli)) return L[i];
+    return null;
+  }
+
+  function meses(ini,fin){
+    var a=new Date(ini+'T00:00:00'), b=new Date(fin+'T00:00:00');
+    if(isNaN(a)||isNaN(b)) return 12;
+    return Math.max(1, Math.round((b-a)/86400000/30.4));
   }
   function sumarMeses(iso,m){
     var p=String(iso).split('-');
@@ -17308,100 +17437,96 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     if(d.getUTCDate()!==dia) d.setUTCDate(0);
     return d.toISOString().slice(0,10);
   }
-  function n2(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
 
-  function indice(){
-    var P=(typeof S!=='undefined'&&S.polizas)||[];
-    var exacto={}, porBase={};
-    P.forEach(function(p){
-      var n=norm(p.num);
-      if(n){ if(!exacto[n]) exacto[n]=[]; exacto[n].push(p); }
-      var b=base(p.num);
-      if(b){ if(!porBase[b]) porBase[b]=[]; porBase[b].push(p); }
-    });
-    return {P:P, exacto:exacto, porBase:porBase};
-  }
-
-  function buscar(ix, numero){
-    var n=norm(numero);
-    if(ix.exacto[n] && ix.exacto[n].length) return ix.exacto[n][0];
-    var b=base(numero);
-    if(b && ix.porBase[b] && ix.porBase[b].length===1) return ix.porBase[b][0];
-    /* uno contiene al otro por delante, con 8 caracteres o mas */
-    if(n.length>=8){
-      for(var i=0;i<ix.P.length;i++){
-        var pn=norm(ix.P[i].num);
-        if(pn.length>=8 && (pn.indexOf(n)===0 || n.indexOf(pn)===0)) return ix.P[i];
-      }
-    }
-    return null;
-  }
-
+  /* ============================================================
+     Aplicar el reporte al CRM
+     ============================================================ */
   window.jacCapitalCare = async function(opts){
     opts=opts||{};
     var hoy=hoyISO();
-    var ix=indice();
-    var r={ filas:CC.length, encontradas:0, corregidas:0, adelantadas:0,
-            sinCambio:0, noEstan:[], detalle:[], porAseguradora:{} };
+    var r={ filas:CC.length, encontradas:0, corregidas:0, adelantadas:0, marcadas:0,
+            clientesCompletados:0, sinCambio:0, noEstan:[], porVia:{}, detalle:[],
+            porAseguradora:{} };
 
     CC.forEach(function(f){
-      var numero=f[0], ini=f[1], fin=f[2], prima=n2(f[3]), total=n2(f[4]),
-          pct=n2(f[5]), com=n2(f[6]), aseg=f[7], ramo=f[8], forma=f[9], cuotas=n2(f[10]);
-
-      var p=buscar(ix, numero);
-      if(!p){ r.noEstan.push({num:numero, aseg:aseg, ramo:ramo, vence:fin, prima:prima}); return; }
+      var hit=buscar(f);
+      if(!hit){ r.noEstan.push({num:f.num, cli:f.cli, ced:f.ced, aseg:f.aseg, ramo:f.ramo, vence:f.fin, prima:f.prima}); return; }
+      var p=hit.p;
       r.encontradas++;
+      r.porVia[hit.via]=(r.porVia[hit.via]||0)+1;
 
       var cambios=[];
-      function set(campo, valor){
-        if(valor===null||valor===undefined||valor==='') return;
-        if(String(p[campo]||'')!==String(valor)){ cambios.push(campo); p[campo]=valor; }
+      function set(k,v){
+        if(v===null||v===undefined||v==='') return;
+        if(String(p[k]==null?'':p[k])!==String(v)){ cambios.push(k); p[k]=v; }
       }
 
-      set('num', numero);
-      set('aseg', aseg);
-      if(!p.ramo || opts.forzarRamo) set('ramo', ramo);
-      set('fechaInicio', ini);
-      set('fechaFin', fin);
-      if(prima>0) set('prima', prima);
-      if(total>0) set('total', total);
-      if(pct>0)   set('comPct', pct);
-      if(com>0)   set('comision', com);
-      if(forma)   set('formaPago', forma);
-      if(cuotas>0)set('cuotas', cuotas);
-      if(!p.corredor) set('corredor','CAPITAL CARE & CO');
+      set('num', f.num);
+      set('aseg', f.aseg);
+      if(f.ramo && (!p.ramo || opts.forzarRamo)) set('ramo', f.ramo);
+      if(f.sub && !p.subramo) set('subramo', f.sub);
+      set('fechaInicio', f.ini);
+      set('fechaFin', f.fin);
+      if(f.prima>0) set('prima', f.prima);
+      if(f.total>0) set('total', f.total);
+      if(f.pct>0)   set('comPct', f.pct);
+      if(f.com>0)   set('comision', f.com);
+      if(f.forma)   set('periodo', f.forma);
+      if(f.forma)   set('formaPago', f.forma);
+      if(f.letras>0)set('cuotas', f.letras);
+      if(f.medio)   set('medioPago', f.medio);
+      if(f.suma>0 && !p.sumaAsegurada) set('sumaAsegurada', f.suma);
+      if(f.desc && !p.riesgo) set('riesgo', f.desc);
+      if(f.ced && !p.cedCliente) set('cedCliente', f.ced);
+      if(f.cli && !p.nombreCliente) set('nombreCliente', f.cli);
 
-      /* Vigencia al dia: se adelanta con la duracion real de la poliza */
-      if(p.fechaFin < hoy){
-        var meses=dif(ini, fin), vueltas=0, finOrig=p.fechaFin;
+      /* LA MARCA: esto es lo que faltaba */
+      if(N(p.lider)!==N(f.lider)){ p.lider=f.lider; cambios.push('lider'); r.marcadas++; }
+      if(!p.corredor) p.corredor=f.lider;
+      if(f.vend && !p.vendedor) set('vendedor', f.vend);
+      p.extra=p.extra||{};
+      if(!p.extra.capitalCare){ p.extra.capitalCare=true; }
+      p.extra.fuenteCartera={reporte:'CAPITAL CARE', via:hit.via, cuando:hoy};
+
+      /* Vigencia al día, con la duración real de la póliza */
+      if(p.fechaFin && p.fechaFin < hoy){
+        var m=meses(f.ini, f.fin), vueltas=0, finOrig=p.fechaFin;
         while(p.fechaFin < hoy && vueltas<12){
           p.fechaInicio=p.fechaFin;
-          p.fechaFin=sumarMeses(p.fechaFin, meses);
+          p.fechaFin=sumarMeses(p.fechaFin, m);
           vueltas++;
         }
         if(vueltas){
-          p.extra=p.extra||{};
           p.extra.renovacionEstimada={fuente:'reporte CAPITAL CARE', hasta:finOrig,
-                                      meses:meses, periodos:vueltas, cuando:hoy};
-          cambios.push('vigencia adelantada '+finOrig+' → '+p.fechaFin);
+                                      meses:m, periodos:vueltas, cuando:hoy};
+          cambios.push('vigencia '+finOrig+' → '+p.fechaFin);
           r.adelantadas++;
         }
       }
 
-      if(String(p.estado||'').toLowerCase()!=='vigente'){
-        cambios.push('estado → Vigente');
-        p.estado='Vigente';
-      }
-      if(p.etapaGestion==='Cancelada' || p.etapaTarea==='Cancelada'){ p.etapaGestion='Activa'; }
+      /* Estado: el reporte por unidad manda cuando lo dice */
+      var quiere = (f.est==='VENCIDA' && f.fin<hoy) ? 'Vencida' : 'Vigente';
+      if(String(p.estado||'')!==quiere){ p.estado=quiere; cambios.push('estado → '+quiere); }
 
-      if(!r.porAseguradora[aseg]) r.porAseguradora[aseg]={n:0, prima:0, comision:0};
-      r.porAseguradora[aseg].n++;
-      r.porAseguradora[aseg].prima+=prima;
-      r.porAseguradora[aseg].comision+=com;
+      /* Completar la ficha del cliente con lo que trae el Excel */
+      var cl=clis().filter(function(c){ return c.id===p.clienteId; })[0] || clientePorCedulaONombre(f);
+      if(cl){
+        var tocado=false;
+        if(f.ced  && !cl.cedula){ cl.cedula=f.ced; tocado=true; }
+        if(f.mail && !cl.email ){ cl.email =f.mail; tocado=true; }
+        if(f.cel  && !cl.cel   ){ cl.cel   =f.cel;  tocado=true; }
+        if(f.tel  && !cl.tel   ){ cl.tel   =f.tel;  tocado=true; }
+        if(!p.clienteId && cl.id){ p.clienteId=cl.id; cambios.push('cliente vinculado'); }
+        if(tocado){ r.clientesCompletados++; }
+      }
+
+      var A=f.aseg;
+      if(!r.porAseguradora[A]) r.porAseguradora[A]={n:0, prima:0, comision:0};
+      r.porAseguradora[A].n++; r.porAseguradora[A].prima+=f.prima; r.porAseguradora[A].comision+=f.com;
 
       if(cambios.length){
         r.corregidas++;
-        if(r.detalle.length<60) r.detalle.push({num:numero, aseg:aseg, cambios:cambios});
+        if(r.detalle.length<80) r.detalle.push({num:f.num, cli:f.cli, via:hit.via, cambios:cambios});
       } else r.sinCambio++;
     });
 
@@ -17411,41 +17536,65 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
     }
 
-    /* Como queda la cartera despues de aplicar */
-    var P=(typeof S!=='undefined'&&S.polizas)||[];
+    var P=pols();
     r.carteraAhora={
       vigentes:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vigente';}).length,
       vencidas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vencida';}).length,
-      canceladas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='cancelada';}).length
+      canceladas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='cancelada';}).length,
+      capitalCare:P.filter(function(p){return N(p.lider).indexOf('CAPITAL CARE')>=0;}).length
     };
     return r;
   };
 
-  /* Crear en el CRM las que el reporte trae y el CRM no tiene */
+  /* ---------- crear las que faltan, con su cliente ---------- */
   window.jacCapitalCareCrear = async function(){
-    var ix=indice();
-    var nuevas=[];
+    var nuevasP=[], nuevasC=[], r={clientes:0, polizas:0};
     CC.forEach(function(f){
-      if(buscar(ix, f[0])) return;
-      nuevas.push({
+      if(buscar(f)) return;
+      var cl=clientePorCedulaONombre(f);
+      if(!cl){
+        cl={ id:'CLI_CC_'+Math.random().toString(36).slice(2,10),
+             nombre:f.cli, cedula:f.ced, email:f.mail, cel:f.cel, tel:f.tel,
+             tipo:'Persona Natural', ciudad:'', notas:'Alta desde el reporte CAPITAL CARE' };
+        nuevasC.push(cl);
+        if(typeof S!=='undefined') S.clientes=clis().concat([cl]);
+        r.clientes++;
+      }
+      nuevasP.push({
         id:'POL_CC_'+Math.random().toString(36).slice(2,10),
-        num:f[0], aseg:f[7], ramo:f[8],
-        fechaInicio:f[1], fechaFin:f[2],
-        prima:n2(f[3]), total:n2(f[4]), comPct:n2(f[5]), comision:n2(f[6]),
-        formaPago:f[9], cuotas:n2(f[10]),
-        estado:'Vigente', participacion:100,
-        corredor:'CAPITAL CARE & CO',
-        nombreCliente:'', clienteId:'',
-        extra:{creadaDesde:'reporte CAPITAL CARE', cuando:hoyISO(), faltaCliente:true}
+        num:f.num, aseg:f.aseg, ramo:f.ramo, subramo:f.sub,
+        clienteId:cl.id, nombreCliente:f.cli, cedCliente:f.ced,
+        fechaInicio:f.ini, fechaFin:f.fin,
+        prima:f.prima, total:f.total, comPct:f.pct, comision:f.com,
+        participacion:100, periodo:f.forma, formaPago:f.forma,
+        cuotas:f.letras, medioPago:f.medio, sumaAsegurada:f.suma, riesgo:f.desc,
+        estado:(f.est==='VENCIDA'&&f.fin<hoyISO())?'Vencida':'Vigente',
+        lider:f.lider, corredor:f.lider, vendedor:f.vend,
+        extra:{capitalCare:true, creadaDesde:'reporte CAPITAL CARE', cuando:hoyISO()}
       });
+      r.polizas++;
     });
-    if(!nuevas.length) return {creadas:0, motivo:'no falta ninguna'};
-    S.polizas=((typeof S!=='undefined'&&S.polizas)||[]).concat(nuevas);
+    if(!nuevasP.length) return {polizas:0, clientes:0, motivo:'no falta ninguna'};
+    S.polizas=pols().concat(nuevasP);
     try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
     try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
     try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
-    return {creadas:nuevas.length, aviso:'quedaron sin cliente asignado — aparécelas desde Pólizas'};
+    return r;
   };
+
+  /* ---------- ver la cartera marcada ---------- */
+  window.jacVerCapitalCare=function(){
+    var P=pols().filter(function(p){ return N(p.lider).indexOf('CAPITAL CARE')>=0 || (p.extra&&p.extra.capitalCare); });
+    return { total:P.length,
+      vigentes:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vigente';}).length,
+      vencidas:P.filter(function(p){return String(p.estado||'').toLowerCase()==='vencida';}).length,
+      prima:P.reduce(function(s,p){return s+n2(p.prima);},0).toFixed(2),
+      comision:P.reduce(function(s,p){return s+n2(p.comision);},0).toFixed(2),
+      lista:P.map(function(p){ return {num:p.num, cli:p.nombreCliente, aseg:p.aseg, estado:p.estado, vence:p.fechaFin}; })
+    };
+  };
+
+  window.JAC_CC_DATOS=CC;
 })();
 </script>
 
@@ -18700,145 +18849,154 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 
 <style id="jac-agenda-responsive">
 /* ============================================================
-   JAC CRM — La agenda, bien puesta en cualquier pantalla
+   JAC CRM — La agenda: tamaño de letra y encuadre
    ------------------------------------------------------------
-   La agenda se dibujó para un monitor grande y con medidas fijas:
-   una columna de 260px, una franja decorativa de 32px imitando la
-   espiral de una libreta, nueve pestañas en una sola fila y un
-   alto de `100vh - 58px`. En un portátil las pestañas se
-   apretaban hasta ser ilegibles; en tablet la columna se comía
-   media pantalla; en el celular el calendario salía cortado por
-   el costado y la espiral ocupaba espacio sin decir nada.
+   La vuelta anterior arregló que no se saliera por los lados,
+   pero encogió la letra de más: la agenda está escrita con
+   tamaños de 9, 10 y 11 píxeles metidos a mano en cada div, y al
+   apretar el diseño quedaron ilegibles.
 
-   Aquí se ordena por tamaño:
+   Aquí se hace lo contrario. Se sube el suelo tipográfico de toda
+   la agenda —nada baja de 12px— y se encuadra el conjunto: la
+   columna del día, el panel y la rejilla del mes con proporciones
+   que funcionan igual en un monitor, en una tablet y en un
+   celular.
 
-   · Escritorio (≥1100): columna de 240px, pestañas que se
-     deslizan si no caben, alto real de la ventana.
-   · Tablet (769–1099): columna de 200px, sin espiral, número del
-     día más pequeño, paneles con menos aire perdido.
-   · Celular (≤768): una sola columna. Arriba una franja compacta
-     con el día y los botones de crear; debajo, las pestañas
-     deslizables y el panel a lo ancho. La espiral desaparece.
-
-   Nada de esto toca el HTML de la agenda: son reglas que ganan
-   por especificidad y por ir al final del documento.
+   El truco de los tamaños: la agenda no usa clases, usa estilos
+   escritos dentro de cada etiqueta. No se pueden cambiar uno por
+   uno sin reescribir el HTML entero, así que se seleccionan por
+   el propio estilo que llevan puesto y se reemplazan en bloque.
    ============================================================ */
 
-/* --- El alto: 100vh miente en el celular (la barra del navegador
-       aparece y desaparece). --vh lo calcula el bloque de abajo. --- */
+/* ---------- 1. SUELO TIPOGRÁFICO ---------- */
+/* Nada dentro de la agenda por debajo de 12px. */
+#pg-cal [style*="font-size:9px"]  { font-size: 12px   !important }
+#pg-cal [style*="font-size:10px"] { font-size: 12px   !important }
+#pg-cal [style*="font-size:11px"] { font-size: 12.5px !important }
+#pg-cal [style*="font-size:12px"] { font-size: 13px   !important }
+#pg-cal [style*="font-size:13px"] { font-size: 14px   !important }
+#pg-cal [style*="font-size:14px"] { font-size: 15px   !important }
+#pg-cal { font-size: 14px; line-height: 1.5 }
+#pg-cal button, #pg-cal select, #pg-cal input, #pg-cal textarea { font-size: 14px }
+#pg-cal small { font-size: 12.5px }
+
+/* Los textos en gris claro sobre fondo claro tampoco ayudaban */
+#pg-cal [style*="color:#94A3B8"] { color: #64748B !important }
+#pg-cal [style*="color:#CBD5E1"] { color: #94A3B8 !important }
+
+/* ---------- 2. ENCUADRE GENERAL ---------- */
 #pg-cal > div{
   height: calc(var(--vh, 1vh) * 100 - 58px);
   max-height: calc(var(--vh, 1vh) * 100 - 58px);
 }
+#pg-cal .cal-panel{ min-width: 0 }          /* que el panel pueda encogerse */
+#pg-cal .cal-lado{ min-width: 0 }
 
-/* Las pestañas nunca deben amontonarse, en ningún tamaño */
+/* Las pestañas nunca se amontonan, en ningún tamaño */
 #pg-cal .cal-tabs-row{
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   flex-wrap: nowrap !important; scrollbar-width: none;
 }
 #pg-cal .cal-tabs-row::-webkit-scrollbar{ height: 0 }
 #pg-cal .cal-tabs-row > button{
-  flex: 0 0 auto !important; white-space: nowrap; min-width: 78px;
+  flex: 0 0 auto !important; white-space: nowrap;
+  min-width: 96px; font-size: 13px !important; padding: 12px 12px !important;
 }
 
-/* ================= ESCRITORIO GRANDE (≥1100) ================= */
+/* Rejilla del mes: celdas que se leen */
+#cal-grid > div{ min-height: 54px; font-size: 13px !important; padding: 4px !important }
+#cal-body table td, #cal-body table th{ font-size: 13px !important; padding: 6px !important }
+
+/* Los paneles con aire parejo */
+[id^="cal-pane-"]{ padding: 16px !important }
+
+/* ---------- 3. ESCRITORIO (≥1100) ---------- */
 @media (min-width: 1100px){
-  #pg-cal .cal-lado{ width: 240px !important }
-  #pg-cal .cal-espiral{ width: 26px !important }
-  #cal-day-num{ font-size: 66px !important; letter-spacing: -3px !important }
+  #pg-cal .cal-lado{ width: 268px !important }
+  #pg-cal .cal-espiral{ width: 28px !important }
+  #cal-day-num{ font-size: 72px !important; letter-spacing: -3px !important }
+  #cal-day-name{ font-size: 19px !important }
+  #cal-month-year{ font-size: 14px !important }
+  #cal-grid > div{ min-height: 62px }
 }
 
-/* ================= TABLET (769–1099) ================= */
+/* ---------- 4. TABLET (769–1099) ---------- */
 @media (min-width: 769px) and (max-width: 1099px){
-  #pg-cal .cal-lado{ width: 196px !important }
+  #pg-cal .cal-lado{ width: 224px !important }
   #pg-cal .cal-espiral{ display: none !important }
-  #cal-day-num{ font-size: 48px !important; letter-spacing: -2px !important }
-  #cal-day-name{ font-size: 15px !important }
-  #pg-cal .cal-tabs-row > button{ font-size: 10px !important; padding: 9px 4px !important; min-width: 68px }
-  [id^="cal-pane-"]{ padding: 12px !important }
+  #cal-day-num{ font-size: 56px !important; letter-spacing: -2px !important }
+  #cal-day-name{ font-size: 17px !important }
+  #pg-cal .cal-tabs-row > button{ min-width: 88px; font-size: 12.5px !important; padding: 11px 8px !important }
+  [id^="cal-pane-"]{ padding: 14px !important }
   #cal-notas-list{ grid-template-columns: 1fr 1fr !important }
+  #cal-grid > div{ min-height: 56px }
 }
 
-/* ================= CELULAR (≤768) ================= */
+/* ---------- 5. CELULAR (≤768) ---------- */
 @media (max-width: 768px){
-  #pg-cal{ padding: 0 !important }
+  #pg-cal{ padding: 0 !important; padding-bottom: calc(70px + env(safe-area-inset-bottom)) !important }
   #pg-cal > div{
     flex-direction: column !important;
     height: auto !important; max-height: none !important;
     min-height: calc(var(--vh, 1vh) * 100 - 58px);
     border-radius: 0 !important; overflow: visible !important;
   }
-
-  /* La espiral decorativa no aporta nada en un celular */
   #pg-cal .cal-espiral{ display: none !important }
 
-  /* La columna lateral pasa a ser una franja compacta arriba */
+  /* La columna del día pasa a franja superior, sin apretujar */
   #pg-cal .cal-lado{
     width: 100% !important; flex: 0 0 auto !important;
     border-right: 0 !important; border-bottom: 2px solid #C8B89A !important;
     max-height: none !important; overflow: visible !important;
   }
-  /* Día, nombre y mes en una sola línea, no en tres pisos */
-  #pg-cal .cal-lado > div:first-child{ padding: 12px 14px 10px !important }
+  #pg-cal .cal-lado > div:first-child{ padding: 14px 16px 12px !important }
   #cal-day-num{
-    font-size: 40px !important; letter-spacing: -2px !important;
-    display: inline-block; vertical-align: middle; margin-right: 10px;
+    font-size: 46px !important; letter-spacing: -2px !important;
+    display: inline-block; vertical-align: middle; margin-right: 12px;
   }
-  #cal-day-name{ display: inline-block; font-size: 15px !important; margin-top: 0 !important; vertical-align: middle }
-  #cal-month-year{ display: inline-block; font-size: 12px !important; margin: 0 0 0 8px !important; vertical-align: middle }
+  #cal-day-name{ display: inline-block; font-size: 17px !important; margin-top: 0 !important; vertical-align: middle }
+  #cal-month-year{ display: inline-block; font-size: 13px !important; margin: 0 0 0 9px !important; vertical-align: middle }
   #jac-agenda-estado{ display: inline-flex !important; margin: 0 0 0 10px !important; vertical-align: middle }
 
-  /* Las tareas del día y los mini calendarios, plegables por altura */
-  #cal-day-tasks{ max-height: 34vh; overflow-y: auto !important; padding: 0 14px 10px !important }
+  #cal-day-tasks{ max-height: 36vh; overflow-y: auto !important; padding: 0 16px 12px !important }
   #cal-mini1, #cal-mini2{ display: inline-block; width: 48%; vertical-align: top }
 
-  /* Pestañas: deslizables y pegadas arriba al bajar */
-  #pg-cal .cal-tabs-row{
-    position: sticky; top: 0; z-index: 5;
-  }
-  #pg-cal .cal-tabs-row > button{
-    font-size: 11px !important; padding: 11px 10px !important; min-width: 84px;
-  }
+  /* Pestañas pegadas arriba y con tamaño de dedo */
+  #pg-cal .cal-tabs-row{ position: sticky; top: 0; z-index: 5 }
+  #pg-cal .cal-tabs-row > button{ min-width: 100px; font-size: 13px !important; padding: 13px 12px !important }
 
-  /* El panel ocupa todo el ancho y respira */
   #pg-cal .cal-panel{ overflow: visible !important }
-  [id^="cal-pane-"]{ padding: 12px !important }
+  [id^="cal-pane-"]{ padding: 14px !important }
   #cal-notas-list{ grid-template-columns: 1fr !important }
 
-  /* Rejilla del mes: días cuadrados de verdad */
   #cal-body [style*="grid-template-columns"]{ gap: 3px !important }
-  #cal-grid > div{ min-height: 46px !important; font-size: 11px !important; padding: 3px !important }
-
-  /* Semana: se desliza en lugar de estirar la página */
+  #cal-grid > div{ min-height: 52px !important; font-size: 13px !important }
   #cal-week-body{ overflow-x: auto; -webkit-overflow-scrolling: touch }
 
-  /* Modal de la agenda a pantalla completa por abajo */
+  /* Modal como hoja inferior */
+  #cal-modal{ align-items: flex-end !important }
   #cal-modal > div{
     width: 100% !important; max-width: 100% !important;
     border-radius: 16px 16px 0 0 !important;
     margin: auto 0 0 !important; max-height: 92vh;
     padding: 18px 16px calc(18px + env(safe-area-inset-bottom)) !important;
   }
-  #cal-modal{ align-items: flex-end !important }
-
-  /* Espacio para la barra inferior del CRM */
-  #pg-cal{ padding-bottom: calc(66px + env(safe-area-inset-bottom)) !important }
 }
 
-/* ================= CELULAR ANGOSTO (≤400) ================= */
+/* ---------- 6. CELULAR ANGOSTO (≤400) ---------- */
 @media (max-width: 400px){
-  #cal-day-num{ font-size: 34px !important }
-  #cal-day-name{ font-size: 13px !important }
-  #pg-cal .cal-tabs-row > button{ min-width: 74px; font-size: 10px !important }
-  #cal-grid > div{ min-height: 40px !important; font-size: 10px !important }
+  #cal-day-num{ font-size: 40px !important }
+  #cal-day-name{ font-size: 15px !important }
+  #pg-cal .cal-tabs-row > button{ min-width: 92px; font-size: 12.5px !important }
+  #cal-grid > div{ min-height: 46px !important; font-size: 12.5px !important }
   #cal-mini1, #cal-mini2{ width: 100%; display: block }
 }
 
-/* ================= CELULAR ACOSTADO ================= */
+/* ---------- 7. CELULAR ACOSTADO ---------- */
 @media (max-width: 900px) and (orientation: landscape){
   #pg-cal > div{ flex-direction: row !important; height: calc(var(--vh,1vh) * 100 - 58px) !important }
-  #pg-cal .cal-lado{ width: 210px !important; border-bottom: 0 !important; border-right: 2px solid #C8B89A !important }
-  #cal-day-num{ display: block; font-size: 42px !important; margin-right: 0 }
+  #pg-cal .cal-lado{ width: 228px !important; border-bottom: 0 !important; border-right: 2px solid #C8B89A !important }
+  #cal-day-num{ display: block; font-size: 48px !important; margin-right: 0 }
   #cal-day-name, #cal-month-year{ display: block; margin-left: 0 !important }
   #cal-day-tasks{ max-height: none }
 }
@@ -18846,41 +19004,32 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 
 <script>
 /* ============================================================
-   Las clases que el CSS de arriba necesita
-   ------------------------------------------------------------
-   La agenda no tiene clases: está armada con estilos escritos a
-   mano en cada div. En vez de reescribir ese HTML —que es largo y
-   se usa en veinte sitios— aquí se etiquetan los tres bloques
-   por su forma, una sola vez, y el CSS ya tiene de dónde agarrar.
+   Lo que el CSS solo no alcanza
    ============================================================ */
 (function(){
   'use strict';
 
+  /* La agenda no tiene clases: se etiquetan sus tres bloques por
+     su posición, una sola vez, para que el CSS tenga de dónde
+     agarrar sin reescribir el HTML. */
   function etiquetar(){
     var pg=document.getElementById('pg-cal');
-    if(!pg || pg.__jacEtiquetada) return;
+    if(!pg) return;
     var cont=pg.firstElementChild;
-    if(!cont) return;
-    var hijos=cont.children;
-    if(hijos.length<3) return;
-
-    /* 1) columna del día  2) espiral decorativa  3) panel con pestañas */
-    hijos[0].classList.add('cal-lado');
-    hijos[1].classList.add('cal-espiral');
-    hijos[2].classList.add('cal-panel');
-
-    /* la fila de pestañas es el primer hijo del panel */
-    var fila=hijos[2].firstElementChild;
-    if(fila) fila.classList.add('cal-tabs-row');
-
-    pg.__jacEtiquetada=true;
+    if(!cont || cont.children.length<3) return;
+    var h=cont.children;
+    if(!h[0].classList.contains('cal-lado'))    h[0].classList.add('cal-lado');
+    if(!h[1].classList.contains('cal-espiral')) h[1].classList.add('cal-espiral');
+    if(!h[2].classList.contains('cal-panel'))   h[2].classList.add('cal-panel');
+    var fila=h[2].firstElementChild;
+    if(fila && !fila.classList.contains('cal-tabs-row')) fila.classList.add('cal-tabs-row');
   }
-  setTimeout(etiquetar, 600);
-  setTimeout(etiquetar, 2500);
-  setInterval(etiquetar, 5000);
+  setTimeout(etiquetar, 500);
+  setTimeout(etiquetar, 2000);
+  setInterval(etiquetar, 4000);
 
-  /* La altura real de la ventana, para que el calendario no quede
-     cortado por la barra del navegador en el celular. */
+  /* Altura real de la ventana: en el celular la barra del
+     navegador aparece y desaparece, y 100vh se pasa de largo. */
   function altura(){
     try{ document.documentElement.style.setProperty('--vh', (window.innerHeight*0.01)+'px'); }catch(e){}
   }
@@ -18888,10 +19037,9 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   window.addEventListener('resize', altura);
   window.addEventListener('orientationchange', function(){ setTimeout(altura, 250); });
 
-  /* calFixSize() fijaba el alto en píxeles con JavaScript y peleaba
-     con las reglas de arriba: en el celular dejaba la agenda con la
-     altura del escritorio. Debajo de 769px se deja mandar al CSS. */
-  function domarFixSize(){
+  /* calFixSize() fija el alto en píxeles desde JavaScript y peleaba
+     con las reglas de arriba. Por debajo de 769px manda el CSS. */
+  function domar(){
     if(typeof window.calFixSize!=='function' || window.__jacFixSizeDomado) return;
     window.__jacFixSizeDomado=true;
     var _f=window.calFixSize;
@@ -18907,20 +19055,19 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       return _f.apply(this, arguments);
     };
   }
-  setTimeout(domarFixSize, 1200);
-  setTimeout(domarFixSize, 5000);
+  setTimeout(domar, 1200);
+  setTimeout(domar, 5000);
 
   window.jacAgendaMedida=function(){
-    return { ancho:window.innerWidth,
-             modo: window.innerWidth<=400?'celular angosto'
-                 : window.innerWidth<=768?'celular'
-                 : window.innerWidth<=1099?'tablet':'escritorio',
-             etiquetada: !!(document.querySelector('#pg-cal .cal-lado')),
-             desbordaDeLado: document.documentElement.scrollWidth > document.documentElement.clientWidth+2 };
+    return { ancho:window.innerWidth, alto:window.innerHeight,
+      modo: window.innerWidth<=400?'celular angosto'
+          : window.innerWidth<=768?'celular'
+          : window.innerWidth<=1099?'tablet':'escritorio',
+      etiquetada: !!document.querySelector('#pg-cal .cal-lado'),
+      desbordaDeLado: document.documentElement.scrollWidth > document.documentElement.clientWidth+2 };
   };
 })();
 </script>
-
 
 <script>
 /* ============================================================
@@ -19402,8 +19549,18 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     window.__jacCC=r;
 
     var h='<b>Cartera CAPITAL CARE al día</b><br>'
-      +'Del reporte de 76 pólizas: <b>'+r.encontradas+'</b> encontradas en el CRM, '
-      +'<b>'+r.corregidas+'</b> corregidas, <b>'+r.adelantadas+'</b> con la vigencia adelantada.<br>';
+      +'Del reporte de '+r.filas+' pólizas: <b>'+r.encontradas+'</b> encontradas, '
+      +'<b>'+r.corregidas+'</b> corregidas, <b>'+r.marcadas+'</b> marcadas como Capital Care, '
+      +'<b>'+r.adelantadas+'</b> con la vigencia adelantada'
+      +(r.clientesCompletados?', <b>'+r.clientesCompletados+'</b> fichas de cliente completadas':'')+'.<br>';
+    var vias=r.porVia||{}, kv=Object.keys(vias);
+    if(kv.length){
+      h+='<span style="opacity:.85;font-size:11px">Encontradas por: '
+        +kv.map(function(k){ return k+' ('+vias[k]+')'; }).join(' · ')+'</span><br>';
+    }
+    if(r.carteraAhora && r.carteraAhora.capitalCare!==undefined){
+      h+='<span style="opacity:.9">Cartera marcada como Capital Care: <b>'+r.carteraAhora.capitalCare+'</b> pólizas.</span><br>';
+    }
 
     if((r.noEstan||[]).length){
       h+='<span style="opacity:.9">'+r.noEstan.length+' del reporte no existen en el CRM '
