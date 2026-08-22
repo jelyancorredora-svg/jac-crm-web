@@ -15098,7 +15098,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-22-W';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-22-X';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -17124,35 +17124,56 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 
   function aplicar(){
     try{
-      /* Se ocultan las filas y tarjetas de las tareas que no tocan.
-         Se marca por el id de la tarea que el propio CRM ya imprime. */
-      var T=S.tareas||[], mapa={};
+      /* Antes esto buscaba dentro de #pg-tar, que esta VACIO: las tareas
+         se dibujan en #tar-view, dentro de la Agenda. Por eso los tres
+         botones no hacian absolutamente nada. Ahora se recorren los
+         contenedores reales y se identifica cada fila por el id que el
+         propio CRM imprime en el onclick. */
+      var T=(typeof S!=='undefined'&&S.tareas)||[], mapa={};
       T.forEach(function(t){ mapa[t.id]=esAuto(t); });
-      var nodos=document.querySelectorAll('#pg-tar [onclick*="OT("], #pg-tar tr, #pg-tar .tcard');
-      nodos.forEach(function(n){
-        var m=(n.getAttribute('onclick')||n.innerHTML||'').match(/(auto_comision[\w-]*|T[\w]{8,})/);
-        if(!m) return;
-        var auto=mapa[m[1]];
-        if(auto===undefined) return;
-        var fila=n.closest('tr')||n.closest('.tcard')||n;
-        if(VISTA==='todas') fila.style.display='';
-        else if(VISTA==='mias') fila.style.display = auto ? 'none' : '';
-        else fila.style.display = auto ? '' : 'none';
+
+      var zonas=['#tar-view','#cal-all-tareas','#cal-day-tasks','#cal-pane-tareas','#pg-tar'];
+      var vistos=0;
+      zonas.forEach(function(z){
+        var cont=document.querySelector(z);
+        if(!cont) return;
+        var nodos=cont.querySelectorAll('tbody tr, .tcard, [data-jac-tid]');
+        for(var i=0;i<nodos.length;i++){
+          var n=nodos[i], id=null;
+          if(n.getAttribute('data-jac-tid')) id=n.getAttribute('data-jac-tid');
+          if(!id){
+            var h=(n.getAttribute('onclick')||'')+' '+(n.innerHTML||'');
+            var m=h.match(/(?:OT_open|OT|DTar|calTaskDone|jacTarEditar)\(\s*['\"]([^'\"]+)['\"]/);
+            if(m) id=m[1];
+            else { var m2=h.match(/(auto_comision[\w\-]*)/); if(m2) id=m2[1]; }
+          }
+          if(!id || mapa[id]===undefined) continue;
+          var auto=mapa[id];
+          var fila=(n.tagName==='TR')?n:(n.closest('tr')||n.closest('.tcard')||n);
+          if(VISTA==='todas')      fila.style.display='';
+          else if(VISTA==='mias')  fila.style.display = auto ? 'none' : '';
+          else                     fila.style.display = auto ? '' : 'none';
+          vistos++;
+        }
       });
+      window.__jacFiltroTareas={vista:VISTA, filasTocadas:vistos};
     }catch(e){}
   }
 
   function ponerFiltro(){
     var cont=document.getElementById('tarcnt');
+    if(!cont) cont=document.getElementById('tar-view');
     if(!cont || document.getElementById('jac-filtro-tareas')) return;
     var d=document.createElement('div');
     d.id='jac-filtro-tareas';
     d.style.cssText='display:flex;gap:6px;margin:8px 0;flex-wrap:wrap';
     var bs='padding:5px 12px;border:1px solid #CBD5E1;border-radius:999px;background:#fff;'
           +'color:#334155;font-size:12px;font-weight:600;cursor:pointer';
-    d.innerHTML='<button data-v="mias"  style="'+bs+'">Mis tareas</button>'
-               +'<button data-v="auto"  style="'+bs+'">Automáticas</button>'
-               +'<button data-v="todas" style="'+bs+'">Todas</button>';
+    var T=(typeof S!=='undefined'&&S.tareas)||[];
+    var nAuto=T.filter(esAuto).length, nMias=T.length-nAuto;
+    d.innerHTML='<button data-v="mias"  style="'+bs+'">Mis tareas ('+nMias+')</button>'
+               +'<button data-v="auto"  style="'+bs+'">Automáticas ('+nAuto+')</button>'
+               +'<button data-v="todas" style="'+bs+'">Todas ('+T.length+')</button>';
     cont.parentNode.insertBefore(d, cont.nextSibling);
     d.querySelectorAll('button').forEach(function(b){
       b.onclick=function(){ window.jacVistaTareas(b.dataset.v); };
@@ -18896,6 +18917,534 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
                  : window.innerWidth<=1099?'tablet':'escritorio',
              etiquetada: !!(document.querySelector('#pg-cal .cal-lado')),
              desbordaDeLado: document.documentElement.scrollWidth > document.documentElement.clientWidth+2 };
+  };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM — Biblioteca de mensajes
+   ------------------------------------------------------------
+   Veinticinco procesos, cada uno con su versión de WhatsApp y su
+   versión de correo. Los textos siguen tres reglas:
+
+   1. Se abren diciendo POR QUÉ escribo, no saludando en abstracto.
+      "Te escribo porque tu póliza vence el 12 de octubre" da una
+      razón; "espero que te encuentres bien" no da ninguna y es lo
+      primero que delata a un mensaje masivo.
+
+   2. Piden UNA sola cosa. Un mensaje con tres preguntas no se
+      contesta; se deja para después y después se olvida. Cada
+      plantilla termina en una pregunta cerrada, fácil de responder
+      con dos palabras.
+
+   3. No presionan. El seguro se vende por confianza y la confianza
+      no aguanta urgencias fabricadas. Cuando hay urgencia real —una
+      cobertura a punto de caerse— se dice con claridad y sin drama.
+
+   Los huecos entre llaves dobles se rellenan solos cuando el
+   mensaje se abre desde una póliza, un cliente o un prospecto.
+   La firma va siempre y lleva el cintillo de la Superintendencia.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var TEL='+507 6292-6010',
+      M1='jcastro@jacsegurospa.com',
+      M2='jelyancorredora@gmail.com',
+      WEB='www.jacsegurospa.com',
+      PAIS='Panamá';
+
+  function ssrp(){
+    return window.JAC_SSRP
+      || 'Regulado y supervisado por la Superintendencia de Seguros y Reaseguros de Panamá.';
+  }
+
+  /* Firma de WhatsApp: compacta, sin parecer un pie de correo */
+  function firmaWA(){
+    return '\n\n————————————\n'
+      + '*JAC Seguros* | Jely An Castro\n'
+      + 'Corredora de seguros · ' + PAIS + '\n'
+      + '📞 ' + TEL + '\n'
+      + '✉️ ' + M1 + '\n'
+      + '🌐 ' + WEB + '\n\n'
+      + '_' + ssrp() + '_';
+  }
+
+  /* Firma de correo en texto */
+  function firmaMail(){
+    return '\n\nUn saludo,\n'
+      + 'Jely An Castro\n'
+      + 'JAC Seguros | Jely An Castro\n'
+      + 'Corredora de seguros · ' + PAIS + '\n'
+      + 'Tel. ' + TEL + '\n'
+      + M1 + '\n'
+      + M2 + '\n'
+      + WEB + '\n\n'
+      + ssrp();
+  }
+  window.jacFirmaWA=firmaWA;
+  window.jacFirmaMail=firmaMail;
+
+  /* ============================================================
+     LAS PLANTILLAS
+     proceso · nombre · wa · asunto · mail
+     ============================================================ */
+  var PL=[
+
+  /* ---------- PROSPECCIÓN ---------- */
+  {g:'Prospectos', n:'Primer contacto',
+   wa:'Hola {{nombre}} 👋🏼\n\nSoy Jely An Castro, corredora de seguros. Me pasaron tu contacto porque estás viendo opciones de {{interes}}.\n\nTe explico en dos líneas qué hago: trabajo con todas las aseguradoras del mercado panameño, comparo coberturas y precios, y te digo cuál te conviene de verdad. No te cuesta nada — a mí me paga la aseguradora, no tú.\n\n¿Te sirve que te arme una comparación esta semana?',
+   as:'Comparación de opciones de {{interes}} — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nMi nombre es Jely An Castro y soy corredora de seguros en Panamá. Le escribo porque entiendo que está evaluando opciones de {{interes}}.\n\nMi trabajo es sencillo de explicar: en lugar de representar a una sola aseguradora, trabajo con las compañías del mercado y comparo entre ellas. Eso significa que puedo mostrarle lado a lado qué cubre cada una, qué deja fuera y cuánto cuesta, para que la decisión sea suya y esté informada. El servicio no tiene costo para usted; la comisión la paga la aseguradora.\n\nSi le parece bien, puedo preparar una comparación con dos o tres alternativas. Solo necesito unos datos básicos y la tendría lista en poco tiempo.\n\n¿Le viene bien que le llame esta semana?'},
+
+  {g:'Prospectos', n:'Seguimiento — sin respuesta',
+   wa:'Hola {{nombre}} 👋🏼\n\nTe escribí hace unos días por lo de {{interes}} y no quiero ser inoportuna, así que este es mi último recordatorio.\n\nSi todavía te interesa, dime y retomamos donde lo dejamos. Si ya lo resolviste por otro lado, también dímelo y cierro el tema sin problema — prefiero saberlo a seguir escribiéndote.\n\n¿Cuál de las dos?',
+   as:'¿Seguimos con lo de {{interes}}? — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nLe escribí hace unos días respecto a {{interes}} y no he tenido respuesta, cosa que entiendo perfectamente: estas cosas rara vez son urgentes hasta que lo son.\n\nLe escribo una última vez para no dejar el tema abierto. Si sigue interesado/a, retomamos cuando usted diga. Si ya lo resolvió con otra persona, le agradezco que me lo indique y cierro el seguimiento — prefiero eso a insistir sin necesidad.\n\nQuedo atenta a cualquiera de las dos respuestas.'},
+
+  {g:'Prospectos', n:'Reactivar contacto antiguo',
+   wa:'Hola {{nombre}} 👋🏼\n\nHace un tiempo hablamos de un seguro de {{interes}} y quedó en pausa. Te escribo porque las condiciones del mercado cambiaron desde entonces y puede que hoy te convenga más que antes.\n\nSi quieres, reviso qué hay disponible ahora y te lo mando sin compromiso. ¿Te lo preparo?',
+   as:'Volviendo a lo de {{interes}} — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nHace un tiempo conversamos sobre un seguro de {{interes}} y el tema quedó en pausa.\n\nLe escribo porque las condiciones han cambiado desde entonces —primas, coberturas y requisitos se mueven más de lo que la gente supone— y es posible que hoy encuentre algo que antes no estaba.\n\nSi le interesa, reviso el mercado y le envío un resumen sin compromiso alguno.\n\n¿Se lo preparo?'},
+
+  /* ---------- COTIZACIÓN ---------- */
+  {g:'Cotización', n:'Envío de cotización',
+   wa:'Hola {{nombre}} 👋🏼\n\nAquí tienes la cotización de {{ramo}} que preparé para ti:\n\n📋 *La propuesta*\n• Aseguradora: {{aseguradora}}\n• Prima: *{{prima}}*\n• Vigencia: {{vigencia}}\n\nLa armé pensando en lo que me contaste, no en lo más barato del mercado. Si quieres te explico qué cubre exactamente y qué no, que ahí es donde suele estar la diferencia entre una póliza y otra.\n\n¿La revisamos juntos o prefieres leerla primero?',
+   as:'Su cotización de {{ramo}} — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nLe comparto la cotización de {{ramo}} que preparé a partir de lo que conversamos.\n\nDETALLE DE LA PROPUESTA\n• Aseguradora: {{aseguradora}}\n• Prima: {{prima}}\n• Vigencia: {{vigencia}}\n\nUna aclaración que me parece importante: esta no es necesariamente la opción más barata que encontré, sino la que mejor responde a lo que usted necesita cubrir. Con gusto le muestro también las alternativas que descarté y por qué, si quiere comparar.\n\nQuedo a disposición para repasar coberturas, exclusiones y deducibles antes de que tome una decisión.\n\n¿Le agenda bien una llamada breve esta semana?'},
+
+  {g:'Cotización', n:'Seguimiento a cotización',
+   wa:'Hola {{nombre}} 👋🏼\n\n¿Pudiste ver la cotización de {{ramo}} que te mandé?\n\nNo te escribo para apurarte — te escribo por si quedó alguna duda que no te dieron ganas de preguntar. Pasa seguido con los deducibles y las exclusiones, y es justo lo que conviene entender antes de firmar.\n\n¿Hay algo que quieras que te aclare?',
+   as:'Sobre su cotización de {{ramo}} — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nLe escribo para saber si tuvo oportunidad de revisar la cotización de {{ramo}} que le envié.\n\nMás que apurar una decisión, mi interés es que no quede ninguna duda pendiente. En mi experiencia, lo que suele generar preguntas son los deducibles, las exclusiones y los períodos de espera, y son exactamente los puntos que conviene tener claros antes de contratar.\n\nSi hay algo que quiera que le explique, dígamelo y se lo aclaro con calma.'},
+
+  /* ---------- CLIENTE NUEVO ---------- */
+  {g:'Cliente nuevo', n:'Bienvenida',
+   wa:'¡Bienvenido/a, {{nombre}}! 🤝\n\nTu póliza de {{ramo}} con {{aseguradora}} ya está activa.\n\n📋 *Tus datos*\n• N° de póliza: {{poliza}}\n• Vigencia: {{vigencia}}\n\nGuarda este número en tus contactos. Para cualquier cosa —un choque, una duda de cobertura, un cambio de datos, un reclamo— escríbeme directamente a mí. No tienes que llamar a la aseguradora ni pelear con un call center: para eso estoy yo.\n\nGracias por la confianza 😊',
+   as:'Bienvenido/a a JAC Seguros — su póliza {{poliza}} está activa',
+   mail:'Estimado/a {{nombre}}:\n\nSu póliza de {{ramo}} con {{aseguradora}} ya se encuentra activa. Bienvenido/a.\n\nDATOS DE SU PÓLIZA\n• Número: {{poliza}}\n• Ramo: {{ramo}}\n• Aseguradora: {{aseguradora}}\n• Vigencia: {{vigencia}}\n\nQuiero dejarle claro cómo funciona esto de aquí en adelante: usted no tiene que gestionar nada con la aseguradora. Ante un siniestro, una duda de cobertura, un cambio de datos o una renovación, escríbame a mí y yo me encargo del trámite completo.\n\nGuarde mi número y este correo. Le agradezco mucho la confianza.'},
+
+  {g:'Cliente nuevo', n:'Entrega de documentos',
+   wa:'Hola {{nombre}} 👋🏼\n\nTe envío los documentos de tu póliza {{poliza}} de {{ramo}} con {{aseguradora}}.\n\nTe recomiendo dos cosas: guarda una copia en el celular (sirve más de lo que crees en carretera) y échale un ojo a la sección de exclusiones. Si algo no te cuadra, dímelo ahora que estamos a tiempo de ajustarlo.\n\n¿Te llegaron bien?',
+   as:'Documentos de su póliza {{poliza}} — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nAdjunto los documentos correspondientes a su póliza {{poliza}} de {{ramo}} con {{aseguradora}}.\n\nDos recomendaciones prácticas:\n\n1. Conserve una copia digital en su teléfono. En un percance en vía es más útil que el original guardado en casa.\n2. Revise el apartado de exclusiones. Es la parte que nadie lee y la única que importa el día del reclamo. Si encuentra algo que no esperaba, indíquemelo: estamos dentro del plazo para ajustar la póliza.\n\nQuedo atenta a confirmarme que recibió todo correctamente.'},
+
+  /* ---------- RENOVACIONES ---------- */
+  {g:'Renovaciones', n:'Aviso a 60 días',
+   wa:'Hola {{nombre}} 👋🏼\n\nTu póliza de {{ramo}} con {{aseguradora}} (N° {{poliza}}) vence el *{{vence}}* — faltan {{dias}} días.\n\nTe aviso con tiempo a propósito. Con dos meses por delante puedo revisar si te conviene renovar igual, mejorar la cobertura o mover la póliza a otra compañía. Sobre la fecha, en cambio, solo alcanza para renovar tal cual.\n\n¿Quieres que la revise?',
+   as:'Su póliza {{poliza}} vence el {{vence}} — revisemos con tiempo',
+   mail:'Estimado/a {{nombre}}:\n\nSu póliza de {{ramo}} con {{aseguradora}} (N° {{poliza}}) vence el {{vence}}, dentro de {{dias}} días.\n\nLe aviso con esta antelación de forma deliberada. Con dos meses por delante tenemos margen real para trabajar: puedo revisar si sus necesidades cambiaron durante el año, comparar lo que ofrece hoy el mercado y, si conviene, mover la póliza a otra aseguradora sin quedarnos sin tiempo.\n\nCuando el aviso llega a última hora, lo único que se puede hacer es renovar en las mismas condiciones.\n\n¿Le parece que revisemos su cobertura estas semanas?'},
+
+  {g:'Renovaciones', n:'Aviso a 30 días',
+   wa:'Hola {{nombre}} 👋🏼\n\nRecordatorio: tu póliza de {{ramo}} (N° {{poliza}}) vence el *{{vence}}*, en {{dias}} días.\n\nSi quieres renovar tal cual, dime y lo dejo listo esta semana. Si prefieres que compare precios antes, todavía estamos a tiempo — pero es ahora.\n\n¿Cuál prefieres?',
+   as:'Renovación de su póliza {{poliza}} — vence en {{dias}} días',
+   mail:'Estimado/a {{nombre}}:\n\nLe recuerdo que su póliza de {{ramo}} con {{aseguradora}} (N° {{poliza}}) vence el {{vence}}, dentro de {{dias}} días.\n\nTiene dos caminos y ambos son razonables:\n\n• Renovar en las mismas condiciones. Si su situación no cambió, es lo más simple y lo dejo tramitado esta semana.\n• Comparar antes de renovar. Reviso qué ofrece hoy el mercado para su perfil y le presento alternativas. Todavía hay margen, aunque conviene decidirlo pronto.\n\nDígame cuál prefiere y me pongo con ello.'},
+
+  {g:'Renovaciones', n:'Aviso urgente — última semana',
+   wa:'Hola {{nombre}} 👋🏼\n\nTu póliza de {{ramo}} (N° {{poliza}}) vence el *{{vence}}*. Quedan {{dias}} días.\n\nTe lo digo sin rodeos: si llega la fecha sin renovar, quedas sin cobertura desde ese día. No hay período de gracia y volver a emitirla después puede salir más caro o exigir requisitos nuevos.\n\nCon que me digas «sí, renueva» yo me encargo del resto hoy mismo.',
+   as:'Acción necesaria: su póliza {{poliza}} vence el {{vence}}',
+   mail:'Estimado/a {{nombre}}:\n\nSu póliza de {{ramo}} con {{aseguradora}} (N° {{poliza}}) vence el {{vence}}. Quedan {{dias}} días.\n\nLe escribo con claridad porque el plazo ya es corto: si llega la fecha de vencimiento sin renovar, la cobertura termina ese mismo día. No existe período de gracia, y una reemisión posterior puede implicar una prima mayor o requisitos de suscripción que hoy no le aplican.\n\nNo necesito nada complicado de su parte. Con su confirmación por este medio yo tramito la renovación hoy mismo.\n\nQuedo pendiente de su respuesta.'},
+
+  {g:'Renovaciones', n:'Póliza ya vencida — recuperar',
+   wa:'Hola {{nombre}} 👋🏼\n\nTu póliza de {{ramo}} (N° {{poliza}}) venció el {{vence}} y ahora mismo no tienes cobertura.\n\nNo te escribo a reclamarte nada — se pasa, es normal. Te escribo porque cada día que pasa el riesgo lo estás cargando tú, y eso sí se puede arreglar rápido.\n\nDime si quieres que la reactive y veo hoy mismo qué opciones hay.',
+   as:'Su póliza {{poliza}} venció — cómo la reactivamos',
+   mail:'Estimado/a {{nombre}}:\n\nSu póliza de {{ramo}} con {{aseguradora}} (N° {{poliza}}) venció el {{vence}}. A la fecha de este correo no cuenta con cobertura vigente.\n\nLe escribo sin ánimo de reproche: es algo que ocurre con frecuencia y tiene solución. Le escribo porque, mientras la póliza esté caída, cualquier siniestro corre íntegramente por su cuenta.\n\nSegún el tiempo transcurrido, hay dos vías posibles: la rehabilitación de la póliza anterior o una emisión nueva. Reviso cuál aplica en su caso y le confirmo hoy mismo.\n\n¿Quiere que lo gestione?'},
+
+  /* ---------- COBROS ---------- */
+  {g:'Cobros', n:'Recordatorio de cuota',
+   wa:'Hola {{nombre}} 👋🏼\n\nTe escribo por la cuota de tu póliza {{poliza}} de {{ramo}}: {{monto}}, con fecha {{fecha}}.\n\nNada grave — es un recordatorio, no un reclamo. Si ya la pagaste, mándame el comprobante y la registro hoy. Si no, dime qué día te sirve y lo coordino con {{aseguradora}}.',
+   as:'Recordatorio de pago — póliza {{poliza}}',
+   mail:'Estimado/a {{nombre}}:\n\nLe escribo respecto a la cuota de su póliza {{poliza}} de {{ramo}} con {{aseguradora}}, por {{monto}}, correspondiente al {{fecha}}.\n\nSi el pago ya fue realizado, le agradezco que me envíe el comprobante para registrarlo y cerrar el punto.\n\nSi aún está pendiente, indíqueme qué fecha le resulta viable y coordino con la aseguradora para que no se genere ningún inconveniente con su cobertura.\n\nQuedo atenta.'},
+
+  {g:'Cobros', n:'Cuota atrasada — riesgo de suspensión',
+   wa:'Hola {{nombre}} 👋🏼\n\nLa cuota de tu póliza {{poliza}} lleva ya un tiempo pendiente ({{monto}}, del {{fecha}}).\n\nTe lo digo porque prefiero avisarte yo antes de que la aseguradora empiece a contar el plazo de suspensión. Cuando eso pasa, la cobertura se cae aunque el carro esté en el garaje.\n\nHablemos hoy y vemos cómo lo resolvemos — pago completo o dividido, lo que te funcione.',
+   as:'Cuota pendiente de su póliza {{poliza}} — evitemos la suspensión',
+   mail:'Estimado/a {{nombre}}:\n\nLa cuota de su póliza {{poliza}} por {{monto}}, correspondiente al {{fecha}}, continúa pendiente de pago.\n\nLe escribo antes de que la aseguradora active el procedimiento de suspensión por mora. Le explico por qué importa: una vez suspendida la póliza, la falta de cobertura aplica desde la fecha de suspensión, independientemente de que el bien asegurado no esté en uso.\n\nHay margen para resolverlo, y hay más de una forma: pago total, pago parcial con compromiso de fecha, o revisión del plan de cuotas con la compañía.\n\nDígame qué le funciona y lo gestiono.'},
+
+  {g:'Cobros', n:'Confirmación de pago recibido',
+   wa:'Hola {{nombre}} ✅\n\nRecibido y registrado: {{monto}} de tu póliza {{poliza}}.\n\nTu cobertura sigue al día. Cualquier cosa que necesites, aquí estoy. ¡Gracias!',
+   as:'Pago registrado — póliza {{poliza}}',
+   mail:'Estimado/a {{nombre}}:\n\nConfirmo la recepción y el registro de su pago por {{monto}} correspondiente a la póliza {{poliza}}.\n\nSu cobertura se mantiene vigente y al día. No se requiere ninguna acción adicional de su parte.\n\nLe agradezco la puntualidad.'},
+
+  /* ---------- SINIESTROS ---------- */
+  {g:'Siniestros', n:'Apertura de reclamo',
+   wa:'Hola {{nombre}} 👋🏼\n\nLamento lo que pasó. Ya abrí el reclamo con {{aseguradora}} por tu póliza {{poliza}}.\n\nDe aquí en adelante lo llevo yo: hablo con el ajustador, sigo el expediente y te aviso en cada paso. Tú solo tienes que mandarme lo que te vaya pidiendo la compañía.\n\nSi te llaman directamente y no entiendes algo, no contestes de una — pásamelo a mí primero.',
+   as:'Reclamo abierto — póliza {{poliza}}',
+   mail:'Estimado/a {{nombre}}:\n\nLamento lo ocurrido. Confirmo que el reclamo ya fue reportado a {{aseguradora}} bajo su póliza {{poliza}}.\n\nA partir de este momento la gestión corre por mi cuenta: coordinación con el ajustador, seguimiento del expediente y comunicación con la compañía. Le mantendré informado/a en cada etapa.\n\nDe su parte solo necesito que me haga llegar la documentación que la aseguradora vaya solicitando.\n\nUna recomendación importante: si la compañía o el ajustador lo/la contacta directamente y hay algo que no le queda claro, no responda de inmediato. Consúlteme antes. Una declaración imprecisa puede complicar un reclamo que de otro modo procedería sin problema.'},
+
+  {g:'Siniestros', n:'Solicitud de documentos',
+   wa:'Hola {{nombre}} 👋🏼\n\nPara avanzar con tu reclamo {{caso}}, {{aseguradora}} está pidiendo:\n\n{{documentos}}\n\nEn cuanto me los mandes los subo yo. Mientras falte algo, el expediente no avanza — no es burocracia mía, es cómo funciona la compañía.\n\n¿Los tienes a mano?',
+   as:'Documentos pendientes — reclamo {{caso}}',
+   mail:'Estimado/a {{nombre}}:\n\nPara continuar con el trámite de su reclamo {{caso}}, {{aseguradora}} requiere la siguiente documentación:\n\n{{documentos}}\n\nEn cuanto la reciba, la remito y doy seguimiento. Le adelanto que mientras algún documento esté pendiente, el expediente permanece detenido en la compañía; no es un requisito que yo pueda saltar.\n\nSi alguno de estos documentos le resulta difícil de conseguir, dígamelo y buscamos una alternativa aceptable para la aseguradora.'},
+
+  {g:'Siniestros', n:'Resolución del reclamo',
+   wa:'Hola {{nombre}} 👋🏼\n\nBuenas noticias: tu reclamo {{caso}} quedó resuelto.\n\n📋 *Resultado*\n{{resultado}}\n\nSi algo del cálculo no te cuadra, dímelo antes de aceptar — todavía se puede discutir. Y si todo está bien, cerramos.\n\n¿Cómo lo ves?',
+   as:'Reclamo {{caso}} resuelto — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nLe informo que su reclamo {{caso}} ha sido resuelto por {{aseguradora}}.\n\nRESULTADO\n{{resultado}}\n\nAntes de dar el caso por cerrado, le pido que revise el cálculo con detenimiento —deducible aplicado, depreciación, partidas incluidas y excluidas—. Si algo no coincide con lo que esperaba, indíquemelo: una vez aceptada la liquidación, el margen para objetar se reduce mucho.\n\nSi está conforme, procedo a cerrar el expediente.'},
+
+  /* ---------- FIDELIZACIÓN ---------- */
+  {g:'Fidelización', n:'Cumpleaños',
+   wa:'¡Feliz cumpleaños, {{nombre}}! 🎉\n\nQue tengas un año tranquilo, con salud y con todo en su sitio.\n\nGracias por confiarme tus seguros un año más. Disfrútalo mucho 🥳',
+   as:'¡Feliz cumpleaños, {{nombre}}!',
+   mail:'Estimado/a {{nombre}}:\n\nSolo quería desearle un muy feliz cumpleaños.\n\nQue sea un año tranquilo, con salud y con las cosas importantes en su sitio. Gracias por la confianza de tenerme como su corredora.\n\nQue lo disfrute mucho.'},
+
+  {g:'Fidelización', n:'Aniversario de cliente',
+   wa:'Hola {{nombre}} 👋🏼\n\nHoy se cumple un año más desde que trabajamos juntos. Gracias de verdad.\n\nAprovecho para algo útil, no solo para el saludo: en un año cambian cosas —un carro nuevo, una mudanza, alguien más en la familia— y la póliza a veces se queda atrás sin que nadie lo note.\n\n¿Hay algo que haya cambiado de tu lado este año?',
+   as:'Un año más juntos — y una revisión pendiente',
+   mail:'Estimado/a {{nombre}}:\n\nHoy se cumple un año más de nuestra relación como cliente y corredora. Se lo agradezco sinceramente.\n\nAprovecho el correo para algo práctico. En doce meses suelen cambiar cosas —un vehículo nuevo, un cambio de domicilio, una incorporación a la familia, una mejora en la vivienda— y es habitual que la póliza no se actualice al mismo ritmo. El problema aparece el día del siniestro, cuando la suma asegurada ya no corresponde a la realidad.\n\n¿Ha cambiado algo relevante en este último año? Con que me lo cuente por encima, yo reviso si hay que ajustar algo.'},
+
+  {g:'Fidelización', n:'Pedir referidos',
+   wa:'Hola {{nombre}} 👋🏼\n\nTe hago una pregunta directa y sin compromiso: ¿conoces a alguien que ande buscando seguro y no sepa por dónde empezar?\n\nMi trabajo crece casi todo por recomendación, y prefiero que sea así — significa que a la gente le fue bien conmigo.\n\nSi se te ocurre alguien, pásame el contacto o pásale el mío. Y si no, no pasa nada 😊',
+   as:'Una pregunta rápida — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nLe escribo con una pregunta breve y sin ningún compromiso.\n\n¿Conoce a alguien que esté buscando un seguro y no sepa bien por dónde empezar? Puede ser un familiar, un compañero de trabajo o alguien que acaba de comprar carro o casa.\n\nBuena parte de mi cartera llegó por recomendación de clientes, y prefiero que siga siendo así: significa que el servicio funcionó.\n\nSi se le ocurre alguien, puede pasarme el contacto o darle el mío. Y si no, no se preocupe en absoluto.\n\nGracias en cualquier caso.'},
+
+  {g:'Fidelización', n:'Encuesta de satisfacción',
+   wa:'Hola {{nombre}} 👋🏼\n\nUna pregunta corta, de verdad corta: del 1 al 10, ¿qué tan bien te he atendido?\n\nY si el número no es 10, dime qué le falta. Prefiero saberlo y arreglarlo a quedarme con la duda.',
+   as:'¿Cómo lo estoy haciendo? — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nLe hago una consulta breve.\n\nDel 1 al 10, ¿cómo calificaría la atención que ha recibido de mi parte?\n\nY si la respuesta no es un 10, le agradecería mucho que me dijera qué falta. Prefiero un comentario incómodo hoy a un cliente que se va sin decir por qué.\n\nGracias por el minuto.'},
+
+  /* ---------- GESTIÓN ---------- */
+  {g:'Gestión', n:'Venta cruzada',
+   wa:'Hola {{nombre}} 👋🏼\n\nRevisando tu expediente vi que tienes {{ramo}} conmigo, pero no {{otroRamo}}.\n\nNo te escribo para venderte por vender. Te escribo porque en tu caso concreto tiene sentido: {{motivo}}\n\nSi quieres te cotizo y lo ves con números. Si no aplica, lo dejamos ahí sin problema.',
+   as:'Una cobertura que le falta — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nAl revisar su expediente noté que tiene contratado {{ramo}} pero no cuenta con {{otroRamo}}.\n\nNo le escribo con una oferta genérica. Le escribo porque en su situación particular tiene sentido considerarlo: {{motivo}}\n\nSi le interesa verlo con números, le preparo una cotización sin compromiso. Si al mirarla concluye que no le aplica, cerramos el tema sin más.'},
+
+  {g:'Gestión', n:'Actualización de datos',
+   wa:'Hola {{nombre}} 👋🏼\n\nEstoy poniendo al día mi archivo y quiero confirmar tus datos, sobre todo el correo y el celular.\n\nNo es trámite por trámite: si la aseguradora tiene un dato viejo, un aviso importante puede no llegarte — y esos avisos suelen tener plazo.\n\n¿Me confirmas si esto sigue correcto?\n📧 {{email}}\n📱 {{celular}}',
+   as:'Confirmación de sus datos de contacto — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nEstoy actualizando mi registro de clientes y quisiera confirmar sus datos de contacto.\n\nLos que tengo registrados son:\n• Correo: {{email}}\n• Teléfono: {{celular}}\n\nNo es un trámite formal sin más. Cuando la aseguradora tiene un dato desactualizado, avisos con plazo —renovaciones, requerimientos de documentos, notificaciones de cobro— pueden no llegar a destino, y las consecuencias las asume el asegurado.\n\n¿Me confirma si están correctos o si debo modificar alguno?'},
+
+  {g:'Gestión', n:'Documentos pendientes de suscripción',
+   wa:'Hola {{nombre}} 👋🏼\n\n{{aseguradora}} me está pidiendo unos documentos para terminar de emitir tu póliza de {{ramo}}:\n\n{{documentos}}\n\nMientras falten, la póliza queda en trámite y no en vigor — que es una diferencia importante si pasa algo en el medio.\n\n¿Me los puedes mandar por aquí mismo?',
+   as:'Documentos pendientes para emitir su póliza de {{ramo}}',
+   mail:'Estimado/a {{nombre}}:\n\nPara completar la emisión de su póliza de {{ramo}}, {{aseguradora}} requiere la siguiente documentación:\n\n{{documentos}}\n\nLe señalo un punto que conviene tener claro: mientras la documentación esté incompleta, la solicitud permanece en trámite y no constituye cobertura vigente. Si ocurriera un siniestro en ese intervalo, la compañía no respondería.\n\nPuede enviármelos por este medio o por WhatsApp, como le resulte más cómodo. En cuanto los reciba, los remito el mismo día.'},
+
+  {g:'Gestión', n:'SOAT o revisado por vencer',
+   wa:'Hola {{nombre}} 👋🏼\n\nRecordatorio del vehículo placa *{{placa}}*: {{tramite}} vence el *{{vence}}*.\n\nEs de esas cosas que cuestan poco a tiempo y mucho a destiempo — multa, y en un accidente puede complicarte el reclamo.\n\nSi quieres te ayudo con el trámite. ¿Lo gestionas tú o lo veo yo?',
+   as:'Vence el {{tramite}} de su vehículo {{placa}}',
+   mail:'Estimado/a {{nombre}}:\n\nLe recuerdo que el {{tramite}} del vehículo con placa {{placa}} vence el {{vence}}.\n\nEs un trámite de bajo costo cuando se hace a tiempo y de consecuencias desproporcionadas cuando no: además de la multa correspondiente, circular sin él puede complicar la atención de un reclamo ante la aseguradora.\n\nSi desea, le apoyo con la gestión. Indíqueme si lo tramita usted o prefiere que lo vea yo.'},
+
+  {g:'Gestión', n:'Cliente inactivo — reconexión',
+   wa:'Hola {{nombre}} 👋🏼\n\nHace rato que no hablamos y quería saber cómo va todo.\n\nSin agenda comercial detrás: si tus pólizas están bien y no necesitas nada, perfecto. Y si algo cambió —o si dejaste caer alguna cobertura— dímelo y lo revisamos.\n\n¿Todo en orden por allá?',
+   as:'¿Cómo va todo, {{nombre}}? — JAC Seguros',
+   mail:'Estimado/a {{nombre}}:\n\nHace tiempo que no conversamos y quería saber cómo va todo.\n\nEste correo no lleva ninguna propuesta detrás. Si sus pólizas están en orden y no necesita nada, me doy por satisfecha. Y si algo cambió en el camino —o si alguna cobertura quedó sin renovar— dígamelo y lo revisamos juntos.\n\nQuedo a su disposición, como siempre.'}
+
+  ];
+
+  window.JAC_PLANTILLAS=PL;
+
+  /* ============================================================
+     Rellenar los huecos con datos reales
+     ============================================================ */
+  function f(d){ return (typeof fmt==='function'&&d)?fmt(d):(d||''); }
+  function m(v){ return (typeof fmtM==='function')?fmtM(v||0):('$'+(Number(v)||0).toFixed(2)); }
+  function diasA(x){
+    if(!x) return '';
+    var d=new Date(String(x).slice(0,10)+'T00:00:00');
+    if(isNaN(d.getTime())) return '';
+    return String(Math.ceil((d-new Date())/86400000));
+  }
+
+  window.jacRellenar=function(texto, ctx){
+    ctx=ctx||{};
+    var cl=ctx.cli||{}, p=ctx.pol||{}, pr=ctx.pros||{}, pg=ctx.pag||{}, si=ctx.sin||{};
+    var v={
+      nombre: String(cl.nombre||pr.nombre||p.nombreCliente||'').split(' ')[0] || '{{nombre}}',
+      nombreCompleto: cl.nombre||pr.nombre||p.nombreCliente||'{{nombre}}',
+      poliza: p.num||'{{poliza}}',
+      ramo: p.ramo||'{{ramo}}',
+      otroRamo: ctx.otroRamo||'{{otroRamo}}',
+      motivo: ctx.motivo||'{{motivo}}',
+      aseguradora: p.aseg||si.aseg||'{{aseguradora}}',
+      vence: f(p.fechaFin)||'{{vence}}',
+      vigencia: (p.fechaInicio&&p.fechaFin)?(f(p.fechaInicio)+' al '+f(p.fechaFin)):'{{vigencia}}',
+      dias: diasA(p.fechaFin)||'{{dias}}',
+      prima: p.prima?m(p.prima):'{{prima}}',
+      monto: pg.monto?m(pg.monto):(p.prima?m(p.prima):'{{monto}}'),
+      cuota: pg.cuota||'{{cuota}}',
+      fecha: f(pg.fecha)||'{{fecha}}',
+      interes: (Array.isArray(pr.interes)?pr.interes.join(', '):pr.interes)||ctx.interes||'seguros',
+      email: cl.email||pr.email||'{{email}}',
+      celular: cl.cel||cl.tel||pr.cel||'{{celular}}',
+      placa: ctx.placa||'{{placa}}',
+      tramite: ctx.tramite||'el SOAT',
+      caso: si.numCia||si.numSin||'{{caso}}',
+      documentos: ctx.documentos||'{{documentos}}',
+      resultado: ctx.resultado||'{{resultado}}'
+    };
+    return String(texto||'').replace(/\{\{(\w+)\}\}/g, function(t,k){
+      return (v[k]!==undefined && v[k]!=='') ? v[k] : t;
+    });
+  };
+
+  window.jacPlantillaWA=function(nombre, ctx){
+    var t=PL.filter(function(x){ return x.n===nombre; })[0];
+    if(!t) return '';
+    return window.jacRellenar(t.wa, ctx) + firmaWA();
+  };
+  window.jacPlantillaMail=function(nombre, ctx){
+    var t=PL.filter(function(x){ return x.n===nombre; })[0];
+    if(!t) return {asunto:'', cuerpo:''};
+    return { asunto: window.jacRellenar(t.as, ctx),
+             cuerpo: window.jacRellenar(t.mail, ctx) + firmaMail() };
+  };
+
+  /* ============================================================
+     Sembrar en S.plantillas para que salgan en los selectores
+     ============================================================ */
+  window.jacSembrarBiblioteca=function(forzar){
+    if(typeof S==='undefined') return 0;
+    if(!Array.isArray(S.plantillas)) S.plantillas=[];
+    if(S.__bibliotecaV1 && !forzar) return 0;
+    var n=0;
+    PL.forEach(function(t){
+      ['WhatsApp','Correo'].forEach(function(canal){
+        var nom=t.g+' — '+t.n+' ('+canal+')';
+        if(S.plantillas.some(function(p){ return p.nombre===nom; })) return;
+        S.plantillas.push({
+          id:'TPL'+Math.random().toString(36).slice(2,10),
+          nombre:nom,
+          tipo:(canal==='WhatsApp')?'whatsapp':'email',
+          grupo:t.g,
+          asunto:(canal==='Correo')?t.as:'',
+          texto:(canal==='WhatsApp')?(t.wa+firmaWA()):(t.mail+firmaMail())
+        });
+        n++;
+      });
+    });
+    S.__bibliotecaV1=true;
+    try{ if(typeof save==='function') save(); }catch(e){}
+    return n;
+  };
+
+  var i=0;
+  var t=setInterval(function(){
+    i++;
+    if(i>60){ clearInterval(t); return; }
+    if(typeof S!=='undefined' && S.clientes){
+      clearInterval(t);
+      try{ window.jacSembrarBiblioteca(); }catch(e){}
+      try{ pintarPanel(); }catch(e){}
+    }
+  }, 800);
+
+  /* ============================================================
+     Panel para verlas, copiarlas y enviarlas
+     ============================================================ */
+  window._jacPlGrupo='Renovaciones';
+  window.jacPlGrupo=function(g){ window._jacPlGrupo=g; pintarPanel(true); };
+
+  window.jacPlCopiar=function(idx, canal){
+    var t=PL[idx]; if(!t) return;
+    var txt=(canal==='wa')?(t.wa+firmaWA()):(t.as+'\n\n'+t.mail+firmaMail());
+    try{
+      navigator.clipboard.writeText(txt);
+      if(typeof toast==='function') toast('✓ Copiado — pégalo donde lo necesites');
+    }catch(e){
+      var ta=document.createElement('textarea');
+      ta.value=txt; document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy'); if(typeof toast==='function') toast('✓ Copiado'); }catch(x){}
+      document.body.removeChild(ta);
+    }
+  };
+
+  function tarjeta(t, idx){
+    var wa=(t.wa+firmaWA()).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    var ml=(t.mail+firmaMail()).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    return '<div style="border:1px solid #E2E8F0;border-radius:12px;margin-bottom:10px;overflow:hidden;background:#fff">'
+      +'<div style="padding:10px 13px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;'
+        +'display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'
+        +'<b style="font-size:13px;color:#1E293B">'+t.n+'</b>'
+        +'<div style="display:flex;gap:5px">'
+          +'<button class="btn bsm" onclick="jacPlCopiar('+idx+',\'wa\')" '
+            +'style="background:#25D366;color:#fff;border-color:#25D366">💬 Copiar WhatsApp</button>'
+          +'<button class="btn bsm" onclick="jacPlCopiar('+idx+',\'mail\')" '
+            +'style="background:#1D4ED8;color:#fff;border-color:#1D4ED8">📧 Copiar correo</button>'
+        +'</div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">'
+        +'<div style="padding:11px 13px;border-right:1px solid #F1F5F9">'
+          +'<div style="font-size:10px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">WhatsApp</div>'
+          +'<pre style="white-space:pre-wrap;font-family:inherit;font-size:11.5px;line-height:1.55;color:#334155;margin:0">'+wa+'</pre>'
+        +'</div>'
+        +'<div style="padding:11px 13px">'
+          +'<div style="font-size:10px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Correo</div>'
+          +'<div style="font-size:11px;color:#64748B;margin-bottom:4px"><b>Asunto:</b> '+t.as+'</div>'
+          +'<pre style="white-space:pre-wrap;font-family:inherit;font-size:11.5px;line-height:1.55;color:#334155;margin:0">'+ml+'</pre>'
+        +'</div>'
+      +'</div></div>';
+  }
+
+  function pintarPanel(forzar){
+    var cont=document.getElementById('pg-cfg')||document.getElementById('pg-conf');
+    if(!cont) return;
+    var caja=document.getElementById('jac-card-plantillas');
+    if(caja && !forzar) return;
+    if(!caja){
+      caja=document.createElement('div');
+      caja.className='card'; caja.id='jac-card-plantillas';
+      caja.style.marginTop='10px';
+      cont.appendChild(caja);
+    }
+    var grupos=[]; PL.forEach(function(t){ if(grupos.indexOf(t.g)<0) grupos.push(t.g); });
+    var g=window._jacPlGrupo;
+    if(grupos.indexOf(g)<0){ g=grupos[0]; window._jacPlGrupo=g; }
+
+    var h='<div class="ch"><h3>💬 Biblioteca de mensajes</h3>'
+      +'<small>'+PL.length+' procesos · WhatsApp y correo · firma y cintillo incluidos</small></div>'
+      +'<div style="padding:12px 14px">'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+      +grupos.map(function(x){
+        var on=(x===g);
+        return '<button type="button" onclick="jacPlGrupo(\''+x+'\')" style="padding:6px 13px;border-radius:999px;'
+          +'border:1px solid '+(on?'#1E3A8A':'#CBD5E1')+';background:'+(on?'#1E3A8A':'#fff')+';'
+          +'color:'+(on?'#fff':'#334155')+';font-size:12px;font-weight:600;cursor:pointer">'+x+'</button>';
+      }).join('')
+      +'</div>';
+    PL.forEach(function(t,i){ if(t.g===g) h+=tarjeta(t,i); });
+    h+='<div style="margin-top:10px;font-size:11px;color:#64748B;line-height:1.6">'
+      +'Los huecos entre llaves —<code>{{nombre}}</code>, <code>{{poliza}}</code>, <code>{{vence}}</code>— '
+      +'se rellenan solos cuando el mensaje se abre desde una póliza o un cliente. '
+      +'Las '+(PL.length*2)+' plantillas también quedan guardadas y aparecen en los selectores de WhatsApp y correo del CRM.'
+      +'</div></div>';
+    caja.innerHTML=h;
+  }
+  window.jacPanelPlantillas=pintarPanel;
+  setInterval(function(){ try{ pintarPanel(); }catch(e){} }, 5000);
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Poner la cartera al día sin tener que pulsar nada
+   ------------------------------------------------------------
+   El botón de CAPITAL CARE funcionaba, pero había que ir a
+   Configuración y pulsarlo. Si nadie lo pulsa, la cartera sigue
+   igual — y eso es exactamente lo que estaba pasando.
+
+   Aquí se ejecuta solo, una vez por sesión, con dos cautelas que
+   ya nos costaron caro antes:
+
+   1. No corre hasta que haya sesión de nube viva. Aplicar
+      correcciones con la sesión caída las escribe en local y la
+      siguiente bajada las borra. Se espera y se reintenta.
+   2. No corre hasta que las pólizas estén cargadas de verdad.
+      Con la lista a medias, media cartera quedaría sin tocar.
+
+   Al terminar aparece un aviso abajo con lo que hizo y con lo que
+   queda pendiente — cuántas vencidas siguen y de qué compañías
+   son, que es la pregunta que siempre viene después.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var YA=false, INTENTOS=0;
+
+  function pols(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function est(p){ return String((p&&p.estado)||'').toLowerCase(); }
+
+  async function hayNube(){
+    try{
+      if(!window.db || window.db.__esStub) return false;
+      var s=await window.db.auth.getSession();
+      return !!(s && s.data && s.data.session);
+    }catch(e){ return false; }
+  }
+
+  function vencidas(){
+    return pols().filter(function(p){ return est(p)==='vencida'; });
+  }
+
+  function porCompania(lista){
+    var m={};
+    lista.forEach(function(p){
+      var k=p.aseg||'Sin compañía';
+      m[k]=(m[k]||0)+1;
+    });
+    return Object.keys(m).map(function(k){ return {aseg:k, n:m[k]}; })
+      .sort(function(a,b){ return b.n-a.n; });
+  }
+
+  function banner(html){
+    var el=document.getElementById('jac-aviso-cc');
+    if(!el){
+      el=document.createElement('div');
+      el.id='jac-aviso-cc';
+      el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:2147482000;'
+        +'background:#0F766E;color:#fff;padding:12px 16px;border-radius:12px;font-size:12px;line-height:1.6;'
+        +'box-shadow:0 10px 30px rgba(0,0,0,.28);max-width:min(560px,94vw);text-align:left';
+      document.body.appendChild(el);
+    }
+    el.innerHTML=html
+      +'<div style="text-align:right;margin-top:8px">'
+      +'<button onclick="document.getElementById(\'jac-aviso-cc\').remove()" '
+      +'style="background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:7px;padding:4px 12px;'
+      +'cursor:pointer;font-size:11px">Entendido</button></div>';
+  }
+
+  async function correr(){
+    if(YA) return;
+    INTENTOS++;
+    if(INTENTOS>40) return;
+
+    if(typeof window.jacCapitalCare!=='function') return;
+    if(pols().length<20) return;              /* aún cargando */
+    if(!(await hayNube())) return;            /* sin sesión: se espera */
+
+    YA=true;
+    var antes=vencidas().length;
+    var r;
+    try{ r=await window.jacCapitalCare(); }catch(e){ YA=false; return; }
+
+    var quedan=vencidas();
+    window.__jacCC=r;
+
+    var h='<b>Cartera CAPITAL CARE al día</b><br>'
+      +'Del reporte de 76 pólizas: <b>'+r.encontradas+'</b> encontradas en el CRM, '
+      +'<b>'+r.corregidas+'</b> corregidas, <b>'+r.adelantadas+'</b> con la vigencia adelantada.<br>';
+
+    if((r.noEstan||[]).length){
+      h+='<span style="opacity:.9">'+r.noEstan.length+' del reporte no existen en el CRM '
+        +'(Configuración → 📁 Cartera CAPITAL CARE para crearlas).</span><br>';
+    }
+
+    h+='<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.25)">'
+      +'Vencidas: <b>'+antes+' → '+quedan.length+'</b>';
+    if(quedan.length){
+      var pc=porCompania(quedan).slice(0,6);
+      h+='<br><span style="opacity:.9;font-size:11px">Las que quedan son de: '
+        +pc.map(function(x){ return x.aseg+' ('+x.n+')'; }).join(' · ')
+        +'</span><br><span style="opacity:.8;font-size:11px">Esas no están en el reporte de Capital Care: '
+        +'necesito su cuadro de renovaciones, o las adelanto yo con el botón «Completar faltantes».</span>';
+    }
+    h+='</div>';
+
+    banner(h);
+
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+  }
+
+  setTimeout(correr, 12000);
+  var t=setInterval(function(){
+    if(YA || INTENTOS>40){ clearInterval(t); return; }
+    correr();
+  }, 8000);
+
+  /* Por si quiere volver a correrlo a mano desde la consola o un botón */
+  window.jacCarteraAlDia=function(){ YA=false; INTENTOS=0; return correr(); };
+
+  /* Diagnóstico de por qué no corrió */
+  window.jacPorQueNoCorre=async function(){
+    return {
+      bloqueCargado: typeof window.jacCapitalCare==='function',
+      polizasEnMemoria: pols().length,
+      sesionDeNube: await hayNube(),
+      yaCorrio: YA,
+      intentos: INTENTOS,
+      vencidasAhora: vencidas().length
+    };
   };
 })();
 </script>
