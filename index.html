@@ -15098,7 +15098,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-22-AF';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-22-AG';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -18002,6 +18002,259 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 
 <script>
 /* ============================================================
+   JAC CRM — Revisar las vencidas, una por una
+   ------------------------------------------------------------
+   Comprobé en tu CRM en vivo, contra Supabase, qué está pasando
+   con las vencidas. El resultado:
+
+     · Las 79 del Excel de Capital Care YA tienen el gancho y ya
+       están vigentes. La nube confirma 87 pólizas con
+       `co_cor = Capital Care & Co`.
+     · Las 68 que siguen en rojo NO están en ese Excel. Son otras
+       pólizas: VIDA, ACCIDENTES PERSONALES, SALUD, VIAJES,
+       FIANZAS — y de compañías que ni aparecen en el reporte
+       (Aliado, Pan American, Worldwide Medical, La Regional
+       Vumi).
+     · De esas 68, veintiocho SÍ son de un cliente que está en el
+       Excel. Pero son pólizas distintas de ese mismo cliente, y
+       ya sabemos lo que pasa si las marco por mi cuenta: meto
+       datos que no me constan.
+
+   Así que esto no decide nada. Te las pone delante, con las 28
+   ya pre-marcadas por ser de clientes de la cartera, y tú
+   confirmas. Lo que tildes se marca como co-corretaje y pasa a
+   vigente; lo que dejes sin tildar no se toca.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function AG(){ return window.JAC_CC_AGENCIA || 'Capital Care & Co'; }
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function C(){ return (typeof S!=='undefined'&&S.clientes)||[]; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function n2(v){ var n=parseFloat(v); return isFinite(n)?n:0; }
+  function hoy(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+
+  function norm(x){
+    return String(x==null?'':x).toUpperCase().normalize('NFD')
+      .replace(/[̀-ͯ]/g,'').replace(/[^A-Z ]/g,' ').replace(/\s+/g,' ').trim();
+  }
+  function ced(x){ return String(x==null?'':x).replace(/[^0-9A-Za-z]/g,'').toUpperCase(); }
+
+  var IDX=null;
+  function idxExcel(){
+    if(IDX) return IDX;
+    var CC=window.JAC_CC_DATOS||[];
+    IDX={ ceds:{}, noms:CC.map(function(f){
+            return norm(f.cli).split(' ').filter(function(w){ return w.length>=4; }); }) };
+    CC.forEach(function(f){ var c=ced(f.ced); if(c.length>=5) IDX.ceds[c]=f.cli; });
+    return IDX;
+  }
+  function clienteDe(p){
+    var L=C();
+    for(var i=0;i<L.length;i++) if(L[i].id===p.clienteId) return L[i];
+    return null;
+  }
+  /* ¿el CLIENTE de esta póliza aparece en el Excel? Solo sirve para
+     sugerir: la decisión la tomas tú marcando la casilla. */
+  function clienteEnExcel(p){
+    var ix=idxExcel(), cl=clienteDe(p);
+    var c=ced(p.cedCliente || (cl&&cl.cedula) || '');
+    if(c.length>=5 && ix.ceds[c]) return 'cédula';
+    var A=norm(p.nombreCliente || (cl&&cl.nombre) || '').split(' ').filter(function(w){ return w.length>=4; });
+    if(A.length<2) return null;
+    for(var i=0;i<ix.noms.length;i++){
+      var B=ix.noms[i], k=0;
+      for(var j=0;j<A.length;j++) if(B.indexOf(A[j])>=0) k++;
+      if(k>=2) return 'nombre';
+    }
+    return null;
+  }
+
+  function meses(a,b){
+    var x=new Date(String(a)+'T00:00:00'), y=new Date(String(b)+'T00:00:00');
+    if(isNaN(x)||isNaN(y)) return 12;
+    return Math.max(1, Math.round((y-x)/86400000/30.4));
+  }
+  function sumar(iso,m){
+    var q=String(iso).split('-');
+    var d=new Date(Date.UTC(+q[0],+q[1]-1,+q[2]));
+    var dia=d.getUTCDate();
+    d.setUTCMonth(d.getUTCMonth()+m);
+    if(d.getUTCDate()!==dia) d.setUTCDate(0);
+    return d.toISOString().slice(0,10);
+  }
+
+  window.jacVencidas=function(){
+    return P().filter(function(p){ return String(p.estado||'').toLowerCase()==='vencida'; })
+      .map(function(p){
+        return { p:p, sugerida:clienteEnExcel(p),
+                 cli:p.nombreCliente || ((clienteDe(p)||{}).nombre) || '(sin cliente)' };
+      })
+      .sort(function(a,b){
+        if(!!a.sugerida!==!!b.sugerida) return a.sugerida?-1:1;
+        return String(a.cli).localeCompare(String(b.cli));
+      });
+  };
+
+  window.jacPanelVencidas=function(){
+    var L=window.jacVencidas();
+    if(!L.length){ alert('No hay pólizas vencidas.'); return; }
+    var sug=L.filter(function(x){ return x.sugerida; }).length;
+
+    var h='<div style="font-size:12px;color:#334155;line-height:1.65;margin-bottom:10px">'
+      +'<b>'+L.length+' pólizas figuran vencidas.</b><br>'
+      +'Ninguna de ellas está en el Excel de Capital Care — esas 79 ya tienen su gancho y ya están vigentes. '
+      +'Pero <b>'+sug+'</b> son de clientes que sí aparecen en el Excel, así que vienen pre-marcadas. '
+      +'Revisa, destilda lo que no vaya por la agencia, y aplica.'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">'
+      +'<button onclick="jacVencSel(\'sug\')" style="padding:5px 11px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:11px">Solo las sugeridas ('+sug+')</button>'
+      +'<button onclick="jacVencSel(\'todas\')" style="padding:5px 11px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:11px">Todas</button>'
+      +'<button onclick="jacVencSel(\'ninguna\')" style="padding:5px 11px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:11px">Ninguna</button>'
+      +'</div>'
+      +'<div style="max-height:46vh;overflow:auto;border:1px solid #E2E8F0;border-radius:10px">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+      +'<thead><tr style="background:#F8FAFC;position:sticky;top:0">'
+      +'<th style="padding:7px 8px;width:28px"></th>'
+      +'<th style="padding:7px 8px;text-align:left">Cliente</th>'
+      +'<th style="padding:7px 8px;text-align:left">Póliza</th>'
+      +'<th style="padding:7px 8px;text-align:left">Compañía</th>'
+      +'<th style="padding:7px 8px;text-align:left">Ramo</th>'
+      +'<th style="padding:7px 8px;text-align:left">Vence</th>'
+      +'<th style="padding:7px 8px;text-align:left">Cliente en el Excel</th>'
+      +'</tr></thead><tbody>';
+    L.forEach(function(x){
+      h+='<tr style="border-top:1px solid #F1F5F9;'+(x.sugerida?'background:#F0FDF4':'')+'">'
+        +'<td style="padding:6px 8px;text-align:center">'
+          +'<input type="checkbox" class="jac-venc-chk" data-id="'+e(x.p.id)+'" '
+          +(x.sugerida?'checked':'')+' style="width:16px;height:16px;accent-color:#16A34A;cursor:pointer"></td>'
+        +'<td style="padding:6px 8px;font-weight:600">'+e(String(x.cli).split(' ').slice(0,3).join(' '))+'</td>'
+        +'<td style="padding:6px 8px;font-family:monospace">'+e(x.p.num||'(sin número)')+'</td>'
+        +'<td style="padding:6px 8px">'+e(x.p.aseg||'—')+'</td>'
+        +'<td style="padding:6px 8px">'+e(x.p.ramo||'—')+'</td>'
+        +'<td style="padding:6px 8px;white-space:nowrap">'+e(x.p.fechaFin||'sin fecha')+'</td>'
+        +'<td style="padding:6px 8px;color:'+(x.sugerida?'#15803D':'#94A3B8')+'">'
+          +(x.sugerida?('sí · por '+x.sugerida):'no')+'</td>'
+        +'</tr>';
+    });
+    h+='</tbody></table></div>'
+      +'<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap">'
+      +'<button onclick="jacAplicarVencidas({gancho:true})" '
+        +'style="padding:9px 16px;border-radius:9px;border:none;background:#1D4ED8;color:#fff;'
+        +'font-size:12px;font-weight:700;cursor:pointer">🤝 Marcar co-corretaje y poner vigentes</button>'
+      +'<button onclick="jacAplicarVencidas({gancho:false})" '
+        +'style="padding:9px 16px;border-radius:9px;border:1px solid #CBD5E1;background:#fff;'
+        +'color:#334155;font-size:12px;cursor:pointer">Solo poner vigentes (sin gancho)</button>'
+      +'</div>'
+      +'<div id="jac-venc-res" style="font-size:11px;color:#475569;margin-top:8px"></div>'
+      +'<div style="font-size:11px;color:#94A3B8;margin-top:6px">'
+      +'La vigencia se adelanta usando el propio período de cada póliza, y queda anotado en su ficha '
+      +'para poder revisarlo.</div>';
+
+    if(typeof openDP==='function') openDP(h,'Pólizas vencidas — revisión');
+    else alert('No se pudo abrir el panel.');
+  };
+
+  window.jacVencSel=function(modo){
+    var chks=document.querySelectorAll('.jac-venc-chk');
+    var sug={};
+    window.jacVencidas().forEach(function(x){ if(x.sugerida) sug[x.p.id]=1; });
+    for(var i=0;i<chks.length;i++){
+      var id=chks[i].getAttribute('data-id');
+      chks[i].checked = (modo==='todas') ? true : (modo==='ninguna' ? false : !!sug[id]);
+    }
+  };
+
+  window.jacAplicarVencidas=async function(opts){
+    opts=opts||{};
+    var ag=AG(), H=hoy();
+    var chks=document.querySelectorAll('.jac-venc-chk');
+    var ids={};
+    for(var i=0;i<chks.length;i++) if(chks[i].checked) ids[chks[i].getAttribute('data-id')]=1;
+    var n=Object.keys(ids).length;
+    if(!n){ document.getElementById('jac-venc-res').innerHTML='No hay ninguna tildada.'; return; }
+
+    var r={marcadas:0, aVigente:0, adelantadas:0, sinFecha:0};
+    P().forEach(function(p){
+      if(!ids[p.id]) return;
+      if(opts.gancho){
+        if(p.coCor!==ag){ p.coCor=ag; r.marcadas++; }
+        p.coCorPart=35; p.participacion=65;
+        p.extra=p.extra||{};
+        p.extra.capitalCare=true;
+        p.extra.marcadaAMano={cuando:H, motivo:'confirmada desde la revisión de vencidas'};
+        var bruta=n2(p.extra.comisionBruta);
+        if(!(bruta>0)) bruta=n2(p.prima)*n2(p.comPct)/100;
+        if(bruta>0){
+          p.extra.comisionBruta=+bruta.toFixed(2);
+          p.comision=+(bruta*0.65).toFixed(2);
+          p.coCorCom=+(bruta*0.35).toFixed(2);
+        }
+      }
+      if(p.fechaFin && p.fechaFin<H){
+        var m=(p.fechaInicio&&p.fechaFin)?meses(p.fechaInicio,p.fechaFin):12;
+        var v=0, orig=p.fechaFin;
+        while(p.fechaFin<H && v<15){ p.fechaInicio=p.fechaFin; p.fechaFin=sumar(p.fechaFin,m); v++; }
+        if(v){
+          p.extra=p.extra||{};
+          p.extra.renovacionEstimada={fuente:'revisión de vencidas', hasta:orig, meses:m, periodos:v, cuando:H};
+          r.adelantadas++;
+        }
+      } else if(!p.fechaFin) r.sinFecha++;
+      if(String(p.estado||'')!=='Vigente'){ p.estado='Vigente'; r.aVigente++; }
+      if(/cancelad|vencid/i.test(String(p.etapaGestion||''))) p.etapaGestion='Activa';
+    });
+
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(x){}
+
+    var enNube=null;
+    try{
+      if(window.db && !window.db.__esStub){
+        var ses=await window.db.auth.getSession();
+        if(ses&&ses.data&&ses.data.session){
+          var q=await window.db.from('polizas').select('id,co_cor').ilike('co_cor','%Capital Care%');
+          if(!q.error) enNube=(q.data||[]).length;
+        }
+      }
+    }catch(x){}
+
+    ['RP','RD','calcKPIs','renderKPIs','RCom','renderCom']
+      .forEach(function(fn){ try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(x){}
+
+    var o=document.getElementById('jac-venc-res');
+    if(o) o.innerHTML='Aplicado sobre <b>'+n+'</b> pólizas: '
+      +(opts.gancho?('gancho nuevo <b>'+r.marcadas+'</b> · '):'')
+      +'pasadas a Vigente <b>'+r.aVigente+'</b> · vigencias adelantadas <b>'+r.adelantadas+'</b>'
+      +(r.sinFecha?(' · <span style="color:#B45309">'+r.sinFecha+' sin fecha de vencimiento</span>'):'')
+      +(enNube!==null?(' · <b style="color:#15803D">'+enNube+' con co-corretaje en la nube</b>'):'');
+    return r;
+  };
+
+  /* Botón en la lista de Pólizas, junto al chip */
+  function boton(){
+    var chip=document.getElementById('jac-cc-chip');
+    if(!chip) return;
+    var fila=chip.firstElementChild;
+    if(!fila || document.getElementById('jac-btn-venc')) return;
+    var venc=P().filter(function(p){ return String(p.estado||'').toLowerCase()==='vencida'; }).length;
+    if(!venc) return;
+    var b=document.createElement('button');
+    b.id='jac-btn-venc'; b.type='button';
+    b.style.cssText='padding:6px 13px;border-radius:999px;border:none;background:#B91C1C;color:#fff;'
+      +'font-size:12px;font-weight:600;cursor:pointer';
+    b.textContent='🔴 Revisar '+venc+' vencidas';
+    b.onclick=window.jacPanelVencidas;
+    fila.appendChild(b);
+  }
+  setInterval(function(){ try{ boton(); }catch(e){} }, 3000);
+})();
+</script>
+
+<script>
+/* ============================================================
    JAC CRM — Los mensajes de cobro y de pago
    ------------------------------------------------------------
    Los textos que salían antes eran de una línea: "le contacto de
@@ -19743,10 +19996,26 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   /* ============================================================
      Sembrar en S.plantillas para que salgan en los selectores
      ============================================================ */
+  /* Cuántas plantillas mías deberían estar guardadas */
+  function cuantasMias(){
+    if(typeof S==='undefined' || !Array.isArray(S.plantillas)) return 0;
+    var n=0;
+    S.plantillas.forEach(function(p){
+      if(/\((WhatsApp|Correo)\)$/.test(String(p.nombre||''))) n++;
+    });
+    return n;
+  }
+  window.jacPlantillasMias=cuantasMias;
+
   window.jacSembrarBiblioteca=function(forzar){
     if(typeof S==='undefined') return 0;
     if(!Array.isArray(S.plantillas)) S.plantillas=[];
-    if(S.__bibliotecaV1 && !forzar) return 0;
+    /* La bandera sola no vale. Pasó esto: sembraba las 52 antes de que
+       bajara la nube, la bandera quedaba puesta, y acto seguido la
+       lectura de la nube reemplazaba S.plantillas por las 7 viejas.
+       La bandera decía "ya está" y no había nada. Ahora se comprueba
+       contando: si faltan, se siembran otra vez. */
+    if(!forzar && cuantasMias() >= PL.length*2) return 0;
     var n=0;
     PL.forEach(function(t){
       ['WhatsApp','Correo'].forEach(function(canal){
@@ -19768,16 +20037,32 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     return n;
   };
 
+  /* Se siembra cuando el CRM ya tiene datos, y se vuelve a comprobar
+     un rato después por si la bajada de la nube las barrió. */
   var i=0;
   var t=setInterval(function(){
     i++;
-    if(i>60){ clearInterval(t); return; }
+    if(i>80){ clearInterval(t); return; }
     if(typeof S!=='undefined' && S.clientes){
-      clearInterval(t);
-      try{ window.jacSembrarBiblioteca(); }catch(e){}
+      try{ if(window.jacSembrarBiblioteca()) { if(typeof save==='function') save(); } }catch(e){}
       try{ pintarPanel(); }catch(e){}
+      if(i>40) clearInterval(t);
     }
-  }, 800);
+  }, 1500);
+
+  /* Y también después de cada sincronización, que es cuando se perdían */
+  setTimeout(function(){
+    if(typeof window.sincronizar!=='function' || window.__jacPlantSinc) return;
+    window.__jacPlantSinc=true;
+    var _s=window.sincronizar;
+    window.sincronizar=async function(){
+      var r=await _s.apply(this, arguments);
+      setTimeout(function(){
+        try{ if(window.jacSembrarBiblioteca()){ if(typeof save==='function') save(); } }catch(e){}
+      }, 800);
+      return r;
+    };
+  }, 3000);
 
   /* ============================================================
      Panel para verlas, copiarlas y enviarlas
