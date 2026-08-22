@@ -5200,11 +5200,25 @@ function calCancelarTarea(id){
  if(typeof RTar==='function')RTar();
  if(typeof calRenderDayTasks==='function')calRenderDayTasks();
 }
+/* Que vista de tareas esta activa. Si el bloque del filtro no ha
+   cargado todavia, se comporta como antes: solo las tuyas. */
+function jacTareaEnVista(t){
+  var v = (typeof window.jacVistaActual==='function') ? window.jacVistaActual() : 'mias';
+  var auto = (typeof window.jacTareaAuto==='function')
+    ? window.jacTareaAuto(t)
+    : (t && (t._autoTipo==='comision' || /^auto_comision/i.test(String(t.id||''))));
+  if(v==='todas') return true;
+  if(v==='auto')  return !!auto;
+  return !auto;
+}
 function renderTarK(){
  const clr={'Por Hacer':'#1D4ED8','En Proceso':'#D97706','Hecho':'#15803D','Cancelada':'#B91C1C','Reprogramada':'#7C3AED','Eliminada':'#64748B'};
  let h='<div class="tboard">';
  ['Por Hacer','En Proceso','Hecho','Cancelada','Reprogramada','Eliminada'].forEach(et=>{
- const items=S.tareas.filter(t=>t.etapaTarea===et&&t._autoTipo!=='comision'),col=clr[et];
+ /* El tablero excluia las automaticas de raiz: por eso "Automaticas"
+    salia vacio en Kanban aunque en Lista se vieran las 226. Ahora
+    respeta la vista elegida arriba (Mis tareas / Automaticas / Todas). */
+ const items=S.tareas.filter(t=>t.etapaTarea===et&&jacTareaEnVista(t)),col=clr[et];
  h+=`<div class="tcol"><div class="tch" style="background:${col}18;color:${col}">${esc(et)} <span style="background:${col}30;border-radius:10px;padding:1px 6px;font-size:10px">${items.length}</span></div><div class="tbody2">`;
  items.forEach(t=>{
  const pc2=pcol(t.prioridad);const atrasada=t.fechaLimite&&dAgo(t.fechaLimite)>0&&et!=='Hecho';
@@ -15098,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-22-AG';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-22-AH';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -17124,9 +17138,18 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
         var autos=T.length-mias.length;
         var el=document.getElementById('tarcnt');
         if(el){
-          el.innerHTML = mias.length+' tareas · '+pend+' pendientes'
-            + (atras? ' · ⚠️ '+atras+' atrasadas' : '')
-            + (autos? ' <span style="color:#94A3B8">· '+autos+' automáticas ocultas</span>' : '');
+          if(VISTA==='auto'){
+            var A=T.filter(esAuto);
+            var pa=A.filter(function(t){ return t.etapaTarea!=='Hecho'; }).length;
+            el.innerHTML = A.length+' tareas automáticas · '+pa+' pendientes';
+          } else if(VISTA==='todas'){
+            var pt=T.filter(function(t){ return t.etapaTarea!=='Hecho'; }).length;
+            el.innerHTML = T.length+' tareas en total · '+pt+' pendientes';
+          } else {
+            el.innerHTML = mias.length+' tareas · '+pend+' pendientes'
+              + (atras? ' · ⚠️ '+atras+' atrasadas' : '')
+              + (autos? ' <span style="color:#94A3B8">· '+autos+' automáticas</span>' : '');
+          }
         }
       }catch(e){}
       return r;
@@ -17137,8 +17160,11 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 
   /* ---- 2. Selector Mías / Automáticas / Todas ---- */
   var VISTA='mias';   /* por defecto, solo el trabajo real */
+  window.jacVistaActual=function(){ return VISTA; };
   window.jacVistaTareas=function(v){
     VISTA=v;
+    /* Kanban se dibuja entero desde cero segun la vista, asi que hay
+       que repintar antes de tocar nada mas. */
     try{ if(typeof RTar==='function') RTar(); }catch(e){}
     try{
       document.querySelectorAll('#jac-filtro-tareas button').forEach(function(b){
@@ -17223,46 +17249,10 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     if(el) el.remove();
   }
 
-  /* Si la vista elegida no deja nada visible, se explica por que en
-     lugar de dejar el panel en blanco. */
-  function avisoVacio(visibles){
-    var cont=document.getElementById('tar-view');
-    if(!cont){ return; }
-    if(visibles>0){ quitarAviso(); return; }
-    var el=document.getElementById('jac-tar-vacio');
-    if(!el){
-      el=document.createElement('div');
-      el.id='jac-tar-vacio';
-      el.style.cssText='padding:22px;text-align:center;color:#334155;font-size:13px;line-height:1.7;'
-        +'background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:12px;margin:10px 0';
-      cont.insertBefore(el, cont.firstChild);
-    }
-    var T=(typeof S!=='undefined'&&S.tareas)||[];
-    var nAuto=T.filter(esAuto).length;
-    if(VISTA==='auto'){
-      el.innerHTML='<b>No hay tareas autom\u00e1ticas visibles.</b><br>'
-        +'En la lista hay <b>'+T.length+'</b> tareas en total y <b>'+nAuto+'</b> reconocidas como autom\u00e1ticas.<br>'
-        +'<span style="font-size:12px;color:#64748B">Si antes estaban y ya no: se archivaron, o se pasaron al m\u00f3dulo de Comisiones. '
-        +'Las dos cosas se deshacen.</span><br>'
-        +'<button onclick="jacRestaurarTareas().then(function(r){alert(\'Restauradas: \'+(r.restauradas||0));if(typeof RTar===\'function\')RTar();})" '
-        +'style="margin-top:9px;padding:7px 14px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:12px">'
-        +'Restaurar las archivadas</button> '
-        +'<button onclick="window.jacVistaTareas(\'todas\')" '
-        +'style="margin-top:9px;padding:7px 14px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:12px">'
-        +'Ver todas</button> '
-        +'<button onclick="SH(\'com\');if(typeof renderCom===\'function\')renderCom()" '
-        +'style="margin-top:9px;padding:7px 14px;border-radius:8px;border:none;background:#1E3A8A;color:#fff;cursor:pointer;font-size:12px">'
-        +'Ver Comisiones</button>';
-    } else if(VISTA==='mias'){
-      el.innerHTML='<b>No tienes tareas propias visibles.</b><br>'
-        +'De las <b>'+T.length+'</b> tareas de la lista, <b>'+nAuto+'</b> son autom\u00e1ticas.<br>'
-        +'<button onclick="window.jacVistaTareas(\'todas\')" '
-        +'style="margin-top:9px;padding:7px 14px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;cursor:pointer;font-size:12px">'
-        +'Ver todas</button>';
-    } else {
-      el.innerHTML='La lista de tareas est\u00e1 vac\u00eda.';
-    }
-  }
+  /* El cartel que explicaba por que no habia nada ya no hace falta:
+     el tablero muestra las automaticas igual que la lista. Se deja
+     la funcion vacia para no romper a quien la llame. */
+  function avisoVacio(){ quitarAviso(); }
 
   function ponerFiltro(){
     var cont=document.getElementById('tarcnt');
