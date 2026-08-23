@@ -11051,9 +11051,9 @@ function calRenderWeek(){
     var isT=day.toDateString()===today.toDateString();
     h+='<div style="background:'+(isT?'#EFF6FF':'#F8FAFC')+';border:1px solid '+(isT?'#93C5FD':'#E2E8F0')+';border-radius:8px;padding:6px;min-height:120px">';
     h+='<div style="font-size:10px;font-weight:700;color:'+(isT?'#2563EB':'#64748B')+';text-align:center;margin-bottom:4px">'+dnames[d]+'<br><span style="font-size:14px;color:'+(isT?'#2563EB':'#1E293B')+'">'+day.getDate()+'</span></div>';
-    ev.pols.forEach(function(nm){h+='<div onclick="OP(\''+nm.id+'\')" style="cursor:pointer;font-size:10px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:3px 5px;margin-bottom:2px;line-height:1.3">&#128203; '+esc(String(nm.nombre).substring(0,18))+' &#9998;</div>';});
-    ev.tareas.forEach(function(nm){h+='<div onclick="calOpenTask(\''+nm.id+'\')" style="cursor:pointer;font-size:10px;background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:3px 5px;margin-bottom:2px;line-height:1.3">&#9989; '+esc(String(nm.nombre).substring(0,18))+' &#9998;</div>';});
-    ev.pros.forEach(function(nm){h+='<div onclick="OPros(\''+nm.id+'\')" style="cursor:pointer;font-size:10px;background:#D1FAE5;color:#065F46;border-radius:4px;padding:3px 5px;margin-bottom:2px;line-height:1.3">&#128100; '+esc(String(nm.nombre).substring(0,18))+' &#9998;</div>';});
+    ev.pols.forEach(function(nm){h+='<div onclick="OP(\''+nm.id+'\')" style="cursor:pointer;font-size:10px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:3px 5px;margin-bottom:2px;line-height:1.3">&#128203; '+esc(String(nm.nombre).substring(0,46))+' &#9998;</div>';});
+    ev.tareas.forEach(function(nm){h+='<div onclick="calOpenTask(\''+nm.id+'\')" style="cursor:pointer;font-size:10px;background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:3px 5px;margin-bottom:2px;line-height:1.3">&#9989; '+esc(String(nm.nombre).substring(0,46))+' &#9998;</div>';});
+    ev.pros.forEach(function(nm){h+='<div onclick="OPros(\''+nm.id+'\')" style="cursor:pointer;font-size:10px;background:#D1FAE5;color:#065F46;border-radius:4px;padding:3px 5px;margin-bottom:2px;line-height:1.3">&#128100; '+esc(String(nm.nombre).substring(0,46))+' &#9998;</div>';});
     h+='</div>';}
   h+='</div>';
   var we=document.getElementById('cal-week-body');if(we)we.innerHTML=h;}
@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AY';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-BB';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -25733,6 +25733,847 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       columnas: [].map.call(document.querySelectorAll('#pg-rep thead th'), function(th){
         return th.textContent.trim()+':'+Math.round(th.getBoundingClientRect().width); }) };
   };
+})();
+</script>
+
+
+<!-- bloque-agenda-semana.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — La semana de la Agenda, a tamaño de trabajo
+   ------------------------------------------------------------
+   LO QUE HABÍA, MEDIDO
+
+     celda ................ 123 px de ancho × 176 de alto
+     min-height ........... 120 px
+     hueco entre celdas ...   4 px
+     relleno ..............   6 px
+     espacio vacío debajo . 399 px
+
+   La rejilla terminaba a 324 px y la ventana mide 723: casi
+   cuatrocientos píxeles en blanco debajo, mientras arriba los
+   eventos se apelotonaban en cajitas de 176 px. Los nombres se
+   cortaban a media palabra — «Eric Armando Guerr», «Juan Carlos
+   Vega B».
+
+   ------------------------------------------------------------
+   CÓMO QUEDA
+
+   Las celdas crecen hasta ocupar el alto de la pantalla, con más
+   aire entre ellas y dentro. El día se lee de un vistazo, los
+   eventos ya no se cortan, y si un día tiene muchos, esa celda
+   sola se desplaza sin descolocar las otras seis.
+
+   En pantalla estrecha —el móvil— siete columnas no caben por
+   mucho que se estiren: ahí se pone una debajo de otra, que es
+   como de verdad se usa desde el teléfono.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var CSS=''
+    /* ---- la rejilla ocupa el alto disponible ---- */
+    +'#cal-week-body > div{'
+    +'  display:grid!important;'
+    +'  grid-template-columns:repeat(7,minmax(0,1fr))!important;'
+    +'  gap:10px!important;'
+    +'  min-height:max(430px, calc(100vh - 215px))!important;'
+    +'  align-items:stretch;'
+    +'}'
+    /* ---- cada día ---- */
+    +'#cal-week-body > div > div{'
+    +'  min-height:0!important;'
+    +'  padding:11px 10px!important;'
+    +'  border-radius:12px!important;'
+    +'  display:flex!important;'
+    +'  flex-direction:column;'
+    +'  gap:6px;'
+    +'  overflow:hidden;'
+    +'}'
+    /* El día de hoy, marcado sin gritar */
+    +'#cal-week-body > div > div[style*="EFF6FF"],'
+    +'#cal-week-body > div > div[style*="eff6ff"]{'
+    +'  box-shadow:0 0 0 2px #BFDBFE inset;'
+    +'}'
+    /* ---- cabecera del día: más grande y legible ---- */
+    +'#cal-week-body > div > div > div:first-child{'
+    +'  font-size:13px!important;'
+    +'  font-weight:700;'
+    +'  letter-spacing:.2px;'
+    +'  flex:0 0 auto;'
+    +'}'
+    /* ---- los eventos ---- */
+    +'#cal-week-body > div > div > div:not(:first-child){'
+    +'  font-size:12px!important;'
+    +'  line-height:1.45!important;'
+    +'  padding:7px 9px!important;'
+    +'  border-radius:8px!important;'
+    +'  white-space:normal!important;'
+    +'  word-break:break-word;'
+    +'  flex:0 0 auto;'
+    +'}'
+    /* Si un día se llena, se desplaza ESA celda, no la fila entera */
+    +'#cal-week-body > div > div{scrollbar-width:thin}'
+    +'#cal-week-body > div > div:hover{overflow-y:auto}'
+    /* ---- pantalla estrecha: los días, uno debajo de otro ---- */
+    +'@media(max-width:760px){'
+    +'  #cal-week-body > div{'
+    +'    grid-template-columns:1fr!important;'
+    +'    min-height:0!important;'
+    +'    gap:8px!important;'
+    +'  }'
+    +'  #cal-week-body > div > div{'
+    +'    min-height:76px!important;'
+    +'    padding:10px 12px!important;'
+    +'  }'
+    +'  #cal-week-body > div > div > div:first-child{font-size:14px!important}'
+    +'}'
+    /* ---- pantalla grande: aún más aire ---- */
+    +'@media(min-width:1400px){'
+    +'  #cal-week-body > div{gap:13px!important}'
+    +'  #cal-week-body > div > div{padding:13px 12px!important}'
+    +'  #cal-week-body > div > div > div:not(:first-child){font-size:12.5px!important}'
+    +'}';
+
+  function poner(){
+    try{
+      var st=document.getElementById('jac-css-semana');
+      if(!st){ st=document.createElement('style'); st.id='jac-css-semana'; document.head.appendChild(st); }
+      if(st.textContent!==CSS) st.textContent=CSS;
+    }catch(e){}
+  }
+  poner();
+  setTimeout(poner, 1500);
+  setInterval(poner, 12000);
+
+  /* Para comprobar la medida sin abrir el inspector */
+  window.jacMedidaSemana=function(){
+    var wb=document.getElementById('cal-week-body');
+    if(!wb || !wb.firstElementChild) return {error:'la vista de semana no está abierta'};
+    var g=wb.firstElementChild, c=g.children[0];
+    var r=g.getBoundingClientRect();
+    return { celda:{ancho:Math.round(c.getBoundingClientRect().width),
+                    alto:Math.round(c.getBoundingClientRect().height)},
+             rejillaAlto:Math.round(r.height),
+             terminaEn:Math.round(r.bottom),
+             ventana:window.innerHeight,
+             espacioVacioDebajo:Math.round(window.innerHeight-r.bottom),
+             columnas:getComputedStyle(g).gridTemplateColumns.split(' ').length };
+  };
+})();
+</script>
+
+
+<!-- bloque-agenda-arreglos.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Agenda: cuatro arreglos
+   ------------------------------------------------------------
+   1. TAREAS AUTOMÁTICAS: 224 escondidas por una mayúscula
+
+      Las automáticas se guardan con etapaTarea = "Por hacer".
+      El kanban busca "Por Hacer". Con hache mayúscula. Como no
+      coinciden, esas 224 tareas no caen en ninguna columna y la
+      pantalla queda casi vacía: «Por Hacer 0 · En Proceso 0 ·
+      Hecho 2», de 226 que hay.
+
+      Y sus propias tareas están partidas igual: 37 con "Por
+      Hacer" y 9 con "Por hacer".
+
+      Se unifican los valores y, por si acaso, el kanban pasa a
+      comparar sin distinguir mayúsculas.
+
+   2. METAS: no había forma de editar una meta, solo completarla
+      o borrarla. Si se escribía mal el importe, tocaba borrarla
+      y crearla de nuevo.
+
+   3. ALERTAS: 134 alertas y un único botón de WhatsApp por fila.
+      No se podía abrir la póliza, ni el cliente, ni escribir un
+      correo, ni marcar la alerta como atendida.
+
+   4. SEMANA: los nombres se cortaban a los 18 caracteres —«Eric
+      Armando Guerr»—. Eso se corrigió en el propio código de la
+      vista; aquí queda el resto.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* ---------- 1. Las etapas, con la misma grafía ---------- */
+  var CANON={'POR HACER':'Por Hacer','PORHACER':'Por Hacer','PENDIENTE':'Por Hacer',
+             'EN PROCESO':'En Proceso','ENPROCESO':'En Proceso','PROCESO':'En Proceso',
+             'HECHO':'Hecho','HECHA':'Hecho','COMPLETADA':'Hecho','COMPLETADO':'Hecho'};
+  function llave(x){ return String(x==null?'':x).toUpperCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z ]/g,'').trim(); }
+
+  window.jacEtapaCanon=function(x){
+    var c=CANON[llave(x)];
+    return c || 'Por Hacer';
+  };
+
+  window.jacUnificarEtapas=function(){
+    var T=(typeof S!=='undefined'&&S.tareas)||[], n=0, det={};
+    T.forEach(function(t){
+      var b=window.jacEtapaCanon(t.etapaTarea);
+      if(t.etapaTarea!==b){ det[(t.etapaTarea||'(vacío)')+' → '+b]=(det[(t.etapaTarea||'(vacío)')+' → '+b]||0)+1;
+        t.etapaTarea=b; n++; }
+    });
+    return {cambios:n, detalle:det, total:T.length};
+  };
+
+  /* El kanban, tolerante: aunque algo entre con otra grafía, cae
+     en su columna igual. Cinturón además de tirantes. */
+  function envolverKanban(){
+    if(typeof window.renderTarK!=='function' || window.renderTarK.__jacEtapa) return;
+    var _r=window.renderTarK;
+    var nuevo=function(){
+      try{ window.jacUnificarEtapas(); }catch(e){}
+      return _r.apply(this, arguments);
+    };
+    nuevo.__jacEtapa=true;
+    window.renderTarK=nuevo;
+  }
+  setTimeout(envolverKanban, 1500);
+  setTimeout(envolverKanban, 6000);
+  setInterval(envolverKanban, 15000);
+
+  /* Una pasada al arrancar, y se guarda si cambió algo */
+  var _hecho=false;
+  async function primeraPasada(){
+    if(_hecho) return;
+    var T=(typeof S!=='undefined'&&S.tareas)||[];
+    if(T.length<5) return;
+    _hecho=true;
+    var r=window.jacUnificarEtapas();
+    if(r.cambios){
+      try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      if(typeof window.jacGuardarYa==='function'){ try{ await window.jacGuardarYa({silencioso:true}); }catch(e){} }
+      try{ if(typeof RTar==='function') RTar(); }catch(e){}
+    }
+    window.__jacEtapas=r;
+  }
+  setTimeout(primeraPasada, 7000);
+  setTimeout(primeraPasada, 18000);
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Metas: el botón de editar
+   ============================================================ */
+(function(){
+  'use strict';
+  function M(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.calMetas))S.calMetas=[]; return S.calMetas; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+
+  window.calEditMeta=function(id){
+    var m=M().filter(function(x){ return x.id===id; })[0];
+    if(!m){ if(typeof toast==='function') toast('No encuentro esa meta','err'); return; }
+    var txt=prompt('Meta:', m.texto||m.titulo||'');
+    if(txt===null) return;                       /* canceló */
+    txt=String(txt).trim();
+    if(!txt){ if(typeof toast==='function') toast('La meta no puede quedar vacía','err'); return; }
+    var obj=(m.objetivo!==undefined||m.meta!==undefined)
+      ? prompt('Objetivo (número, deja vacío si no aplica):',
+               String(m.objetivo!==undefined?m.objetivo:(m.meta||''))) : null;
+    if(m.texto!==undefined) m.texto=txt; else m.titulo=txt;
+    if(obj!==null){
+      var v=parseFloat(String(obj).replace(/[^0-9.\-]/g,''));
+      if(!isNaN(v)){ if(m.objetivo!==undefined) m.objetivo=v; else m.meta=v; }
+    }
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') window.jacGuardarYa({silencioso:true});
+    try{ if(typeof calRenderMetas==='function') calRenderMetas(); }catch(x){}
+    if(typeof toast==='function') toast('Meta actualizada','ok');
+  };
+
+  /* El botón, junto a los de completar y borrar */
+  function poner(){
+    var pane=document.getElementById('cal-pane-metas');
+    if(!pane || pane.style.display==='none') return;
+    [].forEach.call(pane.querySelectorAll('button'), function(b){
+      var oc=b.getAttribute('onclick')||'';
+      var m=/calDelMeta\(['"]([^'"]+)['"]\)/.exec(oc);
+      if(!m) return;
+      if(b.__jacEdit) return;
+      b.__jacEdit=1;
+      var ed=document.createElement('button');
+      ed.type='button';
+      ed.textContent='✏️';
+      ed.title='Editar esta meta';
+      ed.setAttribute('onclick', "calEditMeta('"+m[1]+"')");
+      ed.style.cssText=(b.getAttribute('style')||'')
+        .replace(/color\s*:\s*[^;]+;?/g,'')+';color:#1D4ED8';
+      if(b.parentNode) b.parentNode.insertBefore(ed, b);
+    });
+  }
+  setInterval(function(){ try{ poner(); }catch(x){} }, 1200);
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Alertas: que se pueda hacer algo con ellas
+   ------------------------------------------------------------
+   Había 134 alertas y un solo botón de WhatsApp por fila. Ni
+   abrir la póliza, ni ver al cliente, ni escribir un correo, ni
+   dar la alerta por atendida.
+
+   Se le añade a cada fila lo que hace falta para resolverla sin
+   salir de ahí, y una marca de «atendida» que se guarda, para
+   que la lista no repita lo que ya trabajó.
+   ============================================================ */
+(function(){
+  'use strict';
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function C(){ return (typeof S!=='undefined'&&S.clientes)||[]; }
+  function k(x){ return String(x==null?'':x).toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+  /* Las atendidas se recuerdan */
+  function vistas(){
+    try{ return JSON.parse(localStorage.getItem('jacAlertasVistas')||'{}'); }catch(x){ return {}; }
+  }
+  window.jacAlertaAtendida=function(clave){
+    try{ var v=vistas(); v[clave]=new Date().toISOString().slice(0,10);
+         localStorage.setItem('jacAlertasVistas', JSON.stringify(v)); }catch(x){}
+    var fila=document.querySelector('[data-jac-alerta="'+clave+'"]');
+    if(fila){ fila.style.opacity='.42'; fila.style.filter='grayscale(1)'; }
+    if(typeof toast==='function') toast('Alerta marcada como atendida','ok');
+  };
+  window.jacAlertaReabrir=function(clave){
+    try{ var v=vistas(); delete v[clave];
+         localStorage.setItem('jacAlertasVistas', JSON.stringify(v)); }catch(x){}
+    var fila=document.querySelector('[data-jac-alerta="'+clave+'"]');
+    if(fila){ fila.style.opacity=''; fila.style.filter=''; }
+  };
+
+  function buscarPoliza(txt){
+    var t=String(txt||'');
+    var m=/([A-Z0-9][A-Z0-9\-\/]{5,})/i.exec(t);
+    if(m){ var p=P().filter(function(x){ return k(x.num)===k(m[1]); })[0]; if(p) return p; }
+    /* por nombre de cliente */
+    var nom=t.split('·')[0].trim();
+    if(nom.length>5){
+      var q=k(nom);
+      var p2=P().filter(function(x){ return k(x.nombreCliente)===q; })[0];
+      if(p2) return p2;
+    }
+    return null;
+  }
+  function buscarCliente(pol, txt){
+    if(pol && pol.clienteId){
+      var c=C().filter(function(x){ return x.id===pol.clienteId; })[0];
+      if(c) return c;
+    }
+    var nom=String(txt||'').split('·')[0].trim();
+    if(nom.length>5){
+      var q=k(nom);
+      return C().filter(function(x){ return k(x.nombre)===q; })[0]||null;
+    }
+    return null;
+  }
+
+  function botonesDe(fila, idx){
+    var txt=(fila.textContent||'').replace(/\s+/g,' ').trim();
+    var clave='al'+idx+'_'+k(txt).slice(0,26);
+    fila.setAttribute('data-jac-alerta', clave);
+    if(vistas()[clave]){ fila.style.opacity='.42'; fila.style.filter='grayscale(1)'; }
+
+    var pol=buscarPoliza(txt), cli=buscarCliente(pol, txt);
+    var bs='padding:4px 9px;border-radius:7px;border:1px solid #CBD5E1;background:#fff;'
+      +'font-size:11px;cursor:pointer;margin:2px 3px 0 0;white-space:nowrap';
+    var h='<div class="jac-alerta-acc" style="display:flex;flex-wrap:wrap;margin-top:5px">';
+    if(pol) h+='<button type="button" style="'+bs+';border-color:#1D4ED8;color:#1D4ED8" '
+      +'onclick="event.stopPropagation();OP(\''+e(pol.id)+'\')">📋 Ver póliza</button>';
+    if(cli) h+='<button type="button" style="'+bs+';border-color:#0F766E;color:#0F766E" '
+      +'onclick="event.stopPropagation();OC(\''+e(cli.id)+'\')">👤 Ver cliente</button>';
+    if(cli && cli.email) h+='<button type="button" style="'+bs+';border-color:#7C3AED;color:#7C3AED" '
+      +'onclick="event.stopPropagation();window.open(\'mailto:'+e(cli.email)+'\')">✉️ Correo</button>';
+    if(pol) h+='<button type="button" style="'+bs+';border-color:#B45309;color:#B45309" '
+      +'onclick="event.stopPropagation();jacAlertaTarea(\''+e(pol.id)+'\')">📌 Crear tarea</button>';
+    h+='<button type="button" style="'+bs+';border-color:#15803D;color:#15803D" '
+      +'onclick="event.stopPropagation();jacAlertaAtendida(\''+clave+'\')">✓ Atendida</button>'
+      +'<button type="button" style="'+bs+'" '
+      +'onclick="event.stopPropagation();jacAlertaReabrir(\''+clave+'\')">↺</button>'
+      +'</div>';
+    var d=document.createElement('div');
+    d.innerHTML=h;
+    fila.appendChild(d.firstChild);
+  }
+
+  window.jacAlertaTarea=function(polId){
+    var p=P().filter(function(x){ return x.id===polId; })[0];
+    if(!p) return;
+    if(typeof S==='undefined') return;
+    if(!Array.isArray(S.tareas)) S.tareas=[];
+    S.tareas.push({ id:'t'+Date.now().toString(36),
+      titulo:'Gestionar: '+(p.nombreCliente||'')+' — '+(p.num||'sin número'),
+      desc:(p.aseg||'')+' · '+(p.ramo||'')+' · vence '+(p.fechaFin||'—'),
+      tipoRel:'poliza', relId:p.id, clienteId:p.clienteId||'',
+      etapaTarea:'Por Hacer', prioridad:'Alta',
+      fechaLimite:p.fechaFin||new Date().toISOString().slice(0,10), estado:'pendiente' });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') window.jacGuardarYa({silencioso:true});
+    try{ if(typeof RTar==='function') RTar(); }catch(x){}
+    if(typeof toast==='function') toast('Tarea creada','ok');
+  };
+
+  function poner(){
+    var pane=document.getElementById('cal-pane-alertas');
+    if(!pane || pane.style.display==='none') return;
+    var filas=[].filter.call(pane.querySelectorAll('div'), function(d){
+      if(d.querySelector('.jac-alerta-acc')) return false;
+      if(d.__jacAcc) return false;
+      /* una fila de alerta: tiene un WhatsApp y texto de póliza/cliente */
+      var a=d.querySelector('a[href*="wa.me"],a[href*="whatsapp"]');
+      if(!a) return false;
+      /* la más pegada al enlace, no el contenedor entero */
+      return d.querySelectorAll('a[href*="wa.me"],a[href*="whatsapp"]').length===1;
+    });
+    filas.forEach(function(f,i){ f.__jacAcc=1; try{ botonesDe(f,i); }catch(x){} });
+  }
+  setInterval(function(){ try{ poner(); }catch(x){} }, 1500);
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - Ramos y subramos de Panama, sin duplicar
+   ------------------------------------------------------------
+   DE DONDE SALE ESTA LISTA
+
+   Ley 12 de 3 de abril de 2012, articulo 47, que es la que
+   clasifica los seguros en Panama en tres bloques:
+
+     · Ramo de personas: vida en todas sus modalidades, vida
+       colectiva, accidentes personales, salud, vida industrial,
+       anualidades, rentas vitalicias, invalidez, perdida de
+       ingreso y asistencia al viajero.
+     · Ramos generales: fidelidad, incendio y lineas aliadas,
+       transporte maritimo, terrestre y aereo, casco maritimo y
+       aereo, automovil, aviacion, responsabilidad civil, robo,
+       hurto, vidrio, ramos tecnicos, titulos de propiedad,
+       riesgos diversos y extensiones de garantia.
+     · Fianzas: cumplimiento de contrato, de pago y las conexas a
+       obras, materiales o equipos.
+
+   Los subramos salen de los cuadros estadisticos de la propia
+   Superintendencia, que es donde aparecen desglosados: TRC, TRM,
+   rotura de maquinaria, equipo pesado, DDD, BBB, oferta y
+   cumplimiento, multiriesgo, etc.
+
+   ------------------------------------------------------------
+   LO IMPORTANTE: NO DUPLICAR
+
+   Los doce ramos que ya usan sus polizas se respetan tal cual
+   estan escritos. No se renombra ninguno: renombrar un ramo que
+   ya tiene polizas encima le descuadraria la tabla de comisiones,
+   que va indexada por aseguradora + ramo.
+
+   Lo que se hace es COMPLETAR: se anaden los que faltaban y se
+   quitan los repetidos, y la misma lista pasa a todos los
+   desplegables del CRM, igual que se hizo con las aseguradoras.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var ARBOL={"VIDA": ["Vida individual", "Vida colectiva o de grupo", "Vida industrial", "Vida universal", "Vida término", "Dotal", "Rentas vitalicias o anualidades", "Invalidez", "Pérdida de ingreso", "Vida con ahorro"], "SALUD/MÉDICOS": ["Salud individual", "Salud colectiva", "Salud internacional", "Gastos médicos mayores", "Dental", "Visión", "Enfermedades graves"], "ACCIDENTES PERSONALES": ["Accidentes personales individual", "Accidentes personales colectivo", "Escolar o estudiantil", "Ocupacional", "Deportivo"], "VIAJES/TURISMO": ["Asistencia al viajero", "Cancelación de viaje", "Estudiantes en el exterior"], "AUTOS/VEHÍCULOS": ["Automóvil particular", "Automóvil comercial", "Flotas", "Equipo pesado", "Responsabilidad civil vehicular", "Cobertura completa", "Daños a terceros", "Autos de alquiler"], "MOTOS": ["Motocicleta particular", "Motocicleta comercial", "Responsabilidad civil motos"], "INCENDIO Y LÍNEAS ALIADAS": ["Incendio", "Líneas aliadas", "Terremoto", "Inundación", "Huracán y vientos", "Lucro cesante", "Daños por agua"], "MULTIRIESGO": ["Multiriesgo residencial", "Multiriesgo comercial", "Multiriesgo empresarial", "Multiriesgo PYME"], "HOGAR": ["Contenido", "Edificación", "Responsabilidad civil familiar", "Todo riesgo hogar"], "PROPIEDAD": ["Edificios", "Contenido", "Todo riesgo de propiedad", "Pérdida de beneficios"], "RESPONSABILIDAD CIVIL": ["Responsabilidad civil general", "Responsabilidad civil profesional", "Responsabilidad civil de productos", "Responsabilidad civil patronal", "Responsabilidad civil de directores y administradores", "Responsabilidad civil de locales"], "TRANSPORTE": ["Transporte de carga marítimo", "Transporte terrestre", "Transporte aéreo", "Transporte de valores"], "CASCO": ["Casco marítimo", "Casco aéreo", "Embarcaciones de recreo"], "AVIACIÓN": ["Casco aeronaves", "Responsabilidad civil aeronáutica"], "RAMOS TÉCNICOS": ["Todo riesgo construcción (TRC)", "Todo riesgo montaje (TRM)", "Rotura de maquinaria", "Equipo electrónico", "Equipo de contratista", "Calderas y maquinaria", "Obras civiles terminadas"], "FIANZAS/ROBO/SUSTRACCIÓN": ["Robo con violencia", "Hurto", "Sustracción", "Dinero y valores"], "FIDELIDAD": ["Fidelidad de empleados", "DDD (dinero y valores)", "BBB (póliza bancaria)"], "VIDRIOS": ["Vidrios y cristales", "Rótulos y letreros"], "RIESGOS DIVERSOS": ["Riesgos diversos", "Extensión de garantía", "Equipos electrónicos portátiles", "Mascotas", "Bicicletas"], "TÍTULOS DE PROPIEDAD": ["Títulos de propiedad"], "TODO RIESGO": ["Todo riesgo empresarial", "Todo riesgo de bienes"], "CUMPLIMIENTO": ["Cumplimiento de contrato", "Oferta o propuesta", "Pago o anticipo", "Suministro de materiales", "Buena ejecución de obra", "Fianzas judiciales", "Fianzas aduaneras", "Fianzas de alquiler"], "SOAT": ["Responsabilidad civil obligatoria"]};
+
+  var RAMOS=Object.keys(ARBOL);
+
+  function llave(x){
+    return String(x==null?'':x).toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/[^A-Z0-9]/g,'');
+  }
+
+  /* Equivalencias: lo mismo escrito de otra forma va al ramo bueno.
+     Solo grafías, nunca conceptos distintos. */
+  var ALIAS={};
+  function reg(bueno, vs){ ALIAS[llave(bueno)]=bueno;
+    vs.forEach(function(v){ ALIAS[llave(v)]=bueno; }); }
+  reg('AUTOS/VEHÍCULOS',['AUTOMOVIL','AUTOMOVILES','AUTO','AUTOS','VEHICULOS','AUTOS/VEHICULOS']);
+  reg('INCENDIO Y LÍNEAS ALIADAS',['INCENDIO','INCENDIO Y LINEAS ALIADAS','LINEAS ALIADAS']);
+  reg('FIANZAS/ROBO/SUSTRACCIÓN',['FIANZA','FIANZAS','ROBO','HURTO','SUSTRACCION','FIANZAS/ROBO/SUSTRACCION']);
+  reg('SALUD/MÉDICOS',['SALUD','SALUD/MEDICOS','MEDICOS','GASTOS MEDICOS']);
+  reg('VIAJES/TURISMO',['VIAJES','TURISMO','ASISTENCIA AL VIAJERO','VIAJES/TURISMO']);
+  reg('RESPONSABILIDAD CIVIL',['RC','RESP CIVIL','RESPONSABILIDAD']);
+  reg('ACCIDENTES PERSONALES',['ACCIDENTES','AP']);
+  reg('RAMOS TÉCNICOS',['RAMOS TECNICOS','TECNICOS']);
+  reg('TÍTULOS DE PROPIEDAD',['TITULOS DE PROPIEDAD','TITULO DE PROPIEDAD']);
+  reg('CUMPLIMIENTO',['FIANZA DE CUMPLIMIENTO','OFERTA Y CUMPLIMIENTO']);
+
+  window.jacNormalizarRamo=function(x){
+    var s=String(x==null?'':x).trim();
+    if(!s) return '';
+    /* Si ya es uno de la lista, se deja exactamente como está */
+    for(var i=0;i<RAMOS.length;i++) if(llave(RAMOS[i])===llave(s)) return RAMOS[i];
+    var c=ALIAS[llave(s)];
+    return c || s;                         /* desconocido: se respeta */
+  };
+  window.jacListaRamos=function(){ return RAMOS.slice(); };
+  window.jacSubramos=function(ramo){
+    var r=window.jacNormalizarRamo(ramo);
+    return (ARBOL[r]||[]).slice();
+  };
+
+  /* ---------- La lista final, sin repetidos ---------- */
+  function listaCompleta(){
+    var vistos={}, out=[];
+    RAMOS.forEach(function(r){ var k=llave(r); if(vistos[k]) return; vistos[k]=1; out.push(r); });
+    /* Cualquier ramo suyo que no esté en la oficial se conserva al final:
+       tiene pólizas encima y borrarlo sería perderlas de vista. */
+    ((typeof S!=='undefined'&&S.polizas)||[]).forEach(function(p){
+      var r=String(p.ramo||'').trim(); if(!r) return;
+      var k=llave(r); if(vistos[k]) return;
+      vistos[k]=1; out.push(r);
+    });
+    return out;
+  }
+
+  /* ---------- Los desplegables ---------- */
+  function esDeRamos(sel){
+    if(!sel||!sel.options) return false;
+    if(/ramo/i.test(sel.id||'')||/ramo/i.test(sel.name||'')) return true;
+    var t=[].map.call(sel.options,function(o){ return o.textContent; }).join('|').toUpperCase();
+    var g=0;
+    ['VIDA','SALUD','INCENDIO','AUTOS','AUTOMOVIL','FIANZA','MOTOS'].forEach(function(m){
+      if(t.indexOf(m)>=0) g++; });
+    return g>=3;
+  }
+
+  window.jacPoblarRamos=function(){
+    var L=listaCompleta(), n=0;
+    [].forEach.call(document.querySelectorAll('select'), function(sel){
+      if(!esDeRamos(sel)) return;
+      var actual=window.jacNormalizarRamo(sel.value);
+      var cab=null;
+      if(sel.options.length && (!sel.options[0].value ||
+          /todos|todas|seleccionar|—/i.test(sel.options[0].textContent)))
+        cab={v:sel.options[0].value, t:sel.options[0].textContent};
+      var igual=(sel.options.length===L.length+(cab?1:0)) &&
+        [].every.call(sel.options,function(o,i){
+          if(cab&&i===0) return o.textContent===cab.t;
+          return o.value===L[i-(cab?1:0)]; });
+      if(igual) return;
+      var h='';
+      if(cab) h+='<option value="'+cab.v.replace(/"/g,'&quot;')+'">'+cab.t+'</option>';
+      L.forEach(function(x){ h+='<option value="'+x.replace(/"/g,'&quot;')+'">'+x+'</option>'; });
+      sel.innerHTML=h;
+      if(actual && L.indexOf(actual)>=0) sel.value=actual;
+      else if(cab) sel.value=cab.v;
+      n++;
+    });
+    return n;
+  };
+
+  /* ---------- Subramos, encadenados al ramo ---------- */
+  function poblarSub(){
+    var ram=document.getElementById('p-ra');
+    var sub=document.getElementById('p-sr')||document.getElementById('p-sub');
+    if(!ram||!sub) return;
+    if(!ram.__jacSub){
+      ram.__jacSub=1;
+      ram.addEventListener('change', function(){ pintarSub(ram,sub); });
+    }
+    if(sub.tagName==='SELECT' && !sub.__jacLleno){ sub.__jacLleno=1; pintarSub(ram,sub); }
+    /* Si es un campo de texto, se le engancha una lista de sugerencias */
+    if(sub.tagName==='INPUT' && !sub.__jacLista){
+      sub.__jacLista=1;
+      var dl=document.getElementById('jac-dl-sub');
+      if(!dl){ dl=document.createElement('datalist'); dl.id='jac-dl-sub'; document.body.appendChild(dl); }
+      sub.setAttribute('list','jac-dl-sub');
+      pintarSub(ram,sub);
+    }
+  }
+  function pintarSub(ram,sub){
+    var subs=window.jacSubramos(ram.value);
+    if(sub.tagName==='SELECT'){
+      var v=sub.value;
+      sub.innerHTML='<option value="">— Subramo —</option>'
+        +subs.map(function(x){ return '<option value="'+x.replace(/"/g,'&quot;')+'">'+x+'</option>'; }).join('');
+      if(v) sub.value=v;
+    } else {
+      var dl=document.getElementById('jac-dl-sub');
+      if(dl) dl.innerHTML=subs.map(function(x){
+        return '<option value="'+x.replace(/"/g,'&quot;')+'">'; }).join('');
+    }
+  }
+
+  function repasar(){
+    try{ window.jacPoblarRamos(); poblarSub(); }catch(e){}
+  }
+  setTimeout(repasar, 4000);
+  setInterval(repasar, 9000);
+
+  window.jacEstadoRamos=function(){
+    var P=(typeof S!=='undefined'&&S.polizas)||[];
+    var c={}; P.forEach(function(p){ var k=p.ramo||'(vacío)'; c[k]=(c[k]||0)+1; });
+    var L=listaCompleta();
+    return { oficiales:RAMOS.length, subramos:Object.keys(ARBOL).reduce(function(s,k){
+        return s+ARBOL[k].length; },0),
+      listaFinal:L.length, enPolizas:c,
+      suyosNoOficiales:Object.keys(c).filter(function(k){
+        return RAMOS.map(llave).indexOf(llave(k))<0 && k!=='(vacío)'; }),
+      desplegables:[].filter.call(document.querySelectorAll('select'), esDeRamos)
+        .map(function(s){ return (s.id||'(sin id)')+':'+s.options.length; }) };
+  };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM - Boton de eliminar en el Pipeline
+   ------------------------------------------------------------
+   Las tarjetas del pipeline solo traian WhatsApp, correo e
+   historial. Para borrar un prospecto habia que irse a la lista
+   de Prospectos. Aqui se le agrega el boton a cada tarjeta.
+
+   No se toca RPipe por dentro: se le pone el boton a la tarjeta
+   ya pintada. Asi si un dia se reescribe RPipe, esto sigue
+   funcionando.
+
+   El borrado pide confirmacion, marca el CRM como sucio para que
+   el guardado protegido lo suba, y repinta pipeline y prospectos.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* S se declara con let: no vive en window. Hay que buscarlo por nombre. */
+  function jacEstado(){
+    try{ if(window.S && window.S.prospectos) return window.S; }catch(e){}
+    try{ if(typeof S!=='undefined' && S && S.prospectos) return S; }catch(e){}
+    try{ var f=new Function('return typeof S!=="undefined"?S:null'); var v=f(); if(v&&v.prospectos) return v; }catch(e){}
+    return null;
+  }
+  window.jacPipeEstado=jacEstado;
+
+  window.jacPipeEliminar=function(id){
+    var E=jacEstado(); if(!E){ return; }
+    var lista=E.prospectos||[];
+    var p=null;
+    for(var i=0;i<lista.length;i++){ if(String(lista[i].id)===String(id)){ p=lista[i]; break; } }
+    if(!p){ if(typeof toast==='function') toast('No se encontro el prospecto','err'); return; }
+    var nom=p.nombre||'este prospecto';
+
+    function hazlo(){
+      /* por referencia directa: si dos prospectos comparten id
+         (pasa cuando se importan), filtrar por id borra los dos */
+      var idx=E.prospectos.indexOf(p);
+      if(idx<0) return;
+      E.prospectos.splice(idx,1);
+      window.__jacSucio=true;
+      try{ E._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      if(typeof window.jacGuardarYa==='function'){ try{ window.jacGuardarYa({silencioso:true}); }catch(e){} }
+      try{ if(typeof RPipe==='function') RPipe(); }catch(e){}
+      try{ if(typeof RPros==='function') RPros(); }catch(e){}
+      try{ if(typeof RVC==='function') RVC(); }catch(e){}
+      if(typeof toast==='function') toast('Prospecto eliminado','ok');
+    }
+
+    if(typeof confirm2==='function') confirm2('¿Eliminar "'+nom+'" del pipeline?', hazlo);
+    else if(window.confirm('¿Eliminar "'+nom+'" del pipeline?')) hazlo();
+  };
+
+  function sacarId(card){
+    if(card.__jacPid) return card.__jacPid;
+    var m=null;
+    var ds=card.getAttribute('ondragstart')||'';
+    m=ds.match(/prosDragStart\s*\(\s*event\s*,\s*'([^']*)'/);
+    if(!m){ var oc=card.getAttribute('onclick')||''; m=oc.match(/showProsDP\s*\(\s*'([^']*)'/); }
+    return m?(card.__jacPid=m[1]):null;
+  }
+
+  function poner(){
+    var pv=document.getElementById('pipe-view');
+    if(!pv) return;
+    var cards=pv.querySelectorAll('.pcard');
+    for(var i=0;i<cards.length;i++){
+      var c=cards[i];
+      if(c.querySelector('.jac-pipe-del')) continue;
+      var id=sacarId(c);
+      if(!id) continue;
+      /* la fila de botones es la ultima con stopPropagation */
+      var fila=null, divs=c.children;
+      for(var j=divs.length-1;j>=0;j--){
+        if(divs[j].querySelector && divs[j].querySelector('button,a')){ fila=divs[j]; break; }
+      }
+      if(!fila){
+        fila=document.createElement('div');
+        fila.style.cssText='display:flex;gap:3px;margin-top:4px';
+        fila.setAttribute('onclick','event.stopPropagation()');
+        c.appendChild(fila);
+      }
+      var b=document.createElement('button');
+      b.className='btn bsm jac-pipe-del';
+      b.title='Eliminar prospecto';
+      b.textContent='🗑';
+      b.style.cssText='background:#FEE2E2;color:#B91C1C;border-color:#FCA5A5;margin-left:auto';
+      b.setAttribute('data-pid', id);
+      b.onclick=function(ev){
+        ev.stopPropagation(); ev.preventDefault();
+        window.jacPipeEliminar(this.getAttribute('data-pid'));
+      };
+      fila.appendChild(b);
+    }
+  }
+
+  window.jacPipeBotones=poner;
+
+  /* al abrir la pantalla y despues de cada repintado */
+  function arrancar(){
+    try{ poner(); }catch(e){}
+    if(typeof window.RPipe==='function' && !window.RPipe.__jacDel){
+      var orig=window.RPipe;
+      var nueva=function(){
+        var r=orig.apply(this, arguments);
+        setTimeout(function(){ try{ poner(); }catch(e){} }, 0);
+        return r;
+      };
+      nueva.__jacDel=1;
+      window.RPipe=nueva;
+    }
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arrancar);
+  else arrancar();
+  setTimeout(arrancar, 1200);
+  setTimeout(arrancar, 3000);
+  /* red de seguridad: si algo repinta el pipeline por fuera */
+  setInterval(function(){
+    var pg=document.getElementById('pg-pipe');
+    if(pg && pg.style.display!=='none'){ try{ poner(); }catch(e){} }
+  }, 2000);
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - Los desplegables del formulario de poliza
+   ------------------------------------------------------------
+   EL PROBLEMA
+
+   Unificamos aseguradoras y ramos y los desplegables del CRM
+   quedaron bien... menos el del formulario de poliza.
+
+   La razon: OP() vuelve a llenar #p-as y #p-ra cada vez que se
+   abre el formulario, con dos listas escritas a mano dentro de
+   la propia funcion. Como OP() corre DESPUES de que nosotros
+   llenamos los desplegables, borraba nuestro trabajo. Por eso
+   al crear una poliza seguian saliendo "La Regional" y "La
+   Regional de Seguros" como si fueran dos, "Generali" y
+   "GENERALI", "WW Medical" y "WorldWide Medical Assurance", etc.
+
+   LA SOLUCION
+
+   Se envuelve OP(): primero hace lo suyo, y en cuanto termina
+   se vuelven a llenar los dos desplegables con la lista unica.
+   Se hace en el mismo instante (no con temporizador) para que
+   el traspaso desde una cotizacion, que ajusta el valor justo
+   despues de OP(), siga funcionando.
+
+   SE RESPETA LO QUE YA ESTA GUARDADO: si una poliza vieja tiene
+   una aseguradora o un ramo que no esta en la lista unica, no se
+   pierde; se agrega al final marcado, para que al guardar no se
+   cambie sola.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function canonAseg(v){
+    if(!v) return v;
+    try{ if(typeof window.jacNormalizarAseg==='function') return window.jacNormalizarAseg(v)||v; }catch(e){}
+    return v;
+  }
+  function canonRamo(v){
+    if(!v) return v;
+    try{ if(typeof window.jacNormalizarRamo==='function') return window.jacNormalizarRamo(v)||v; }catch(e){}
+    return v;
+  }
+
+  function llenar(sel, lista, valorActual){
+    if(!sel || !lista || !lista.length) return;
+    var actual = valorActual;
+    var vistos = {}, ops = [];
+    lista.forEach(function(x){
+      var k=String(x).trim(); if(!k) return;
+      var kk=k.toUpperCase();
+      if(vistos[kk]) return;
+      vistos[kk]=1; ops.push(k);
+    });
+    /* lo que ya tiene la poliza no se pierde aunque no este en la lista */
+    var suelto=null;
+    if(actual && !vistos[String(actual).trim().toUpperCase()]){
+      suelto=String(actual).trim();
+      ops.push(suelto);
+    }
+    var html='<option value="">— Seleccione —</option>';
+    ops.forEach(function(x){
+      var marca = (suelto && x===suelto) ? ' (sin unificar)' : '';
+      html += '<option value="'+x.replace(/"/g,'&quot;')+'">'+
+              x.replace(/&/g,'&amp;').replace(/</g,'&lt;')+marca+'</option>';
+    });
+    sel.innerHTML=html;
+    if(actual) sel.value=actual;
+    if(sel.value!==actual && actual){ sel.value=actual; }
+  }
+
+  function refrescar(){
+    var as=document.getElementById('p-as');
+    var ra=document.getElementById('p-ra');
+
+    if(as && typeof window.jacListaAseguradoras==='function'){
+      var vA=canonAseg(as.value||'');
+      var listaA=null;
+      try{ listaA=window.jacListaAseguradoras(); }catch(e){}
+      if(listaA && listaA.length) llenar(as, listaA, vA);
+    }
+    if(ra && typeof window.jacListaRamos==='function'){
+      var vR=canonRamo(ra.value||'');
+      var listaR=null;
+      try{ listaR=window.jacListaRamos(); }catch(e){}
+      if(listaR && listaR.length){
+        llenar(ra, listaR, vR);
+        /* onRC decide ITBMS y la fila de co-corretaje segun el ramo */
+        try{ if(typeof onRC==='function') onRC(); }catch(e){}
+      }
+    }
+  }
+  window.jacRefrescarDesplegablesPoliza=refrescar;
+
+  function envolver(){
+    if(typeof window.OP!=='function' || window.OP.__jacDespl) return false;
+    var orig=window.OP;
+    var nueva=function(){
+      var r=orig.apply(this, arguments);
+      try{ refrescar(); }catch(e){}
+      return r;
+    };
+    nueva.__jacDespl=1;
+    window.OP=nueva;
+    return true;
+  }
+
+  /* OP se declara como funcion normal: vive en window, pero puede
+     que otro bloque la envuelva despues. Se reintenta un rato. */
+  var intentos=0;
+  (function reintentar(){
+    envolver();
+    if(++intentos<12) setTimeout(reintentar, 900);
+  })();
+
+  /* si el formulario ya esta abierto cuando carga esto */
+  setTimeout(function(){
+    var m=document.getElementById('mp');
+    if(m && m.style.display!=='none' && m.className.indexOf('on')>=0){ try{ refrescar(); }catch(e){} }
+  }, 2500);
 })();
 </script>
 
