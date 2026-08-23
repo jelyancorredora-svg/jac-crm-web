@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AJ';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AM';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -21191,6 +21191,1468 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   }
   setTimeout(function(){ try{ panel(); }catch(e){} }, 3500);
   setInterval(function(){ try{ panel(); }catch(e){} }, 5000);
+})();
+</script>
+
+
+<!-- bloque-worldwide.html -->
+
+<script>
+/* ============================================================
+   JAC CRM - WorldWide Medical, unificada y completa
+   ------------------------------------------------------------
+   De donde sale esto: del portal, poliza por poliza, entrando a
+   cada expediente. No de las capturas ni de memoria.
+
+   Lo que estaba mal antes:
+
+   . La compania figuraba como "WORLDWIDE MEDICAL ASSURAN", el
+     nombre cortado a mitad. Cualquier otra grafia creaba una
+     compania distinta en los listados y en los KPIs.
+   . De las 8 polizas del portal, en el CRM solo habia 3, y las
+     tres SIN titular, SIN fecha de fin y SIN prima real.
+   . Las tres estaban en Vencida. El portal las da ACTIVO.
+   . La comision estaba en 3% en dos y 70% en otra. Eso no es un
+     criterio, es arrastre de la sincronizacion vieja.
+
+   Un dato importante que salio al entrar: NINGUNA de las ocho
+   esta en primer ano. Van de la 4a a la 6a vigencia. Asi que la
+   comision de todas cae en el tramo de renovacion, no en el de
+   ano 1.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var NOMBRE='WorldWide Medical Assurance';
+  var SEPC='||';
+  /* Ojo: en su cartera existe 'WORLWIDE' sin la D. Si el regex
+     no la coge, esa póliza queda fuera y se duplica. */
+  var RE=/wor?ld?\s*wide|ww\s*medical|wwseguros|^ww$/i;
+
+  /* Los ocho expedientes, tal como los devuelve el portal. */
+  var PORTAL=[
+ {
+  "num": "WVP-08635",
+  "cli": "MARIA TERESA PADILLA LAYNES",
+  "prod": "TERM VALUE",
+  "ramo": "VIDA",
+  "ini": "2026-04-22",
+  "fin": "2027-04-22",
+  "cuota": 23.66,
+  "anual": 283.92,
+  "origen": "2022-04-22",
+  "dir": "PANAMA OESTE, LA CHORRERA, ARBOLEDAS, CLUSTER LOS ROBLES, CASA 138",
+  "t1": "6880-6099",
+  "t2": "251-8030",
+  "cod": "00080008202062",
+  "fnac": "1988-10-30",
+  "gen": "F",
+  "insId": "723551",
+  "pgN": 15,
+  "pgT": 354.9,
+  "pgU": "2026-01-30",
+  "forma": "PAGOS CON ACH",
+  "pend": [
+   [
+    "841396",
+    23.66,
+    "2026-08-22"
+   ],
+   [
+    "854205",
+    23.66,
+    "2026-09-22"
+   ],
+   [
+    "867380",
+    23.66,
+    "2026-10-22"
+   ]
+  ],
+  "anio": 5,
+  "saldo": 70.98,
+  "pagado": 212.94,
+  "sub": "VIDA WW TERM VALUE"
+ },
+ {
+  "num": "WPSR-02791",
+  "cli": "LARRY JAVIER NIETO DELGADO",
+  "prod": "WW SURVIVOR",
+  "ramo": "VIDA",
+  "ini": "2026-04-22",
+  "fin": "2027-04-22",
+  "cuota": 43.62,
+  "anual": 523.44,
+  "origen": "2022-04-22",
+  "dir": "LA CHORRERA, ARBOLEDAS LOS ROBLES, CALLE 9, CASA 138, PANAMA",
+  "t1": "6672-463",
+  "t2": "251-8030",
+  "cod": "00080000798178",
+  "fnac": "1986-08-20",
+  "gen": "M",
+  "insId": "723771",
+  "pgN": 14,
+  "pgT": 610.68,
+  "pgU": "2026-06-30",
+  "forma": "PAGOS CON ACH",
+  "pend": [
+   [
+    "838137",
+    43.62,
+    "2026-08-22"
+   ],
+   [
+    "850869",
+    43.62,
+    "2026-09-22"
+   ],
+   [
+    "863996",
+    43.62,
+    "2026-10-22"
+   ]
+  ],
+  "anio": 5,
+  "saldo": 130.86,
+  "pagado": 392.58,
+  "sub": "VIDA INDIVIDUAL - WW SURVIVOR"
+ },
+ {
+  "num": "WPSR-02612",
+  "cli": "HELEN MELISSA DELLA SERA GUERRA",
+  "prod": "WW SURVIVOR",
+  "ramo": "VIDA",
+  "ini": "2026-08-31",
+  "fin": "2027-08-31",
+  "cuota": 51.12,
+  "anual": 613.44,
+  "origen": "2021-08-31",
+  "dir": "PANAMA, SAN FRANCISCO, VIA ISRAEL, CALLE 69 ESTE, PH MARINA PLAZA, APTO. 29-B",
+  "t1": "6203-4487",
+  "t2": "208-6924",
+  "cod": "00040007702072",
+  "fnac": "1994-01-19",
+  "gen": "F",
+  "insId": "699931",
+  "pgN": 16,
+  "pgT": 817.92,
+  "pgU": "2026-04-28",
+  "forma": "TARJETA DE CREDITO",
+  "pend": [
+   [
+    "835796",
+    51.12,
+    "2026-08-31"
+   ],
+   [
+    "850753",
+    51.12,
+    "2026-09-30"
+   ],
+   [
+    "863869",
+    51.12,
+    "2026-10-31"
+   ]
+  ],
+  "anio": 6,
+  "saldo": 153.36,
+  "pagado": 460.08,
+  "sub": "VIDA INDIVIDUAL - WW SURVIVOR"
+ },
+ {
+  "num": "WPSR-02643",
+  "cli": "HECTOR ELCKJAER LUQUE CASTROVERDE",
+  "prod": "WW SURVIVOR",
+  "ramo": "VIDA",
+  "ini": "2026-09-30",
+  "fin": "2027-09-30",
+  "cuota": 45.81,
+  "anual": 549.72,
+  "origen": "2021-09-30",
+  "dir": "PANAMA, SAN ANTONIO",
+  "t1": "6069-7088",
+  "t2": "",
+  "cod": "00010000011119",
+  "fnac": "1986-07-31",
+  "gen": "M",
+  "insId": "703771",
+  "pgN": 24,
+  "pgT": 1282.07,
+  "pgU": "2026-08-11",
+  "forma": "TRANS. BANCO GENERAL CUENTA CORRIENTE",
+  "pend": [
+   [
+    "824774",
+    45.81,
+    "2026-07-31"
+   ],
+   [
+    "838025",
+    45.81,
+    "2026-08-31"
+   ],
+   [
+    "848889",
+    45.81,
+    "2026-09-30"
+   ],
+   [
+    "863896",
+    45.81,
+    "2026-10-31"
+   ]
+  ],
+  "anio": 6,
+  "saldo": 183.24,
+  "pagado": 366.48,
+  "sub": "VIDA INDIVIDUAL - WW SURVIVOR"
+ },
+ {
+  "num": "WPSR-03051",
+  "cli": "SHERIL NAZARETH BOHORQUEZ GUTIERREZ",
+  "prod": "WW SURVIVOR",
+  "ramo": "VIDA",
+  "ini": "2026-01-31",
+  "fin": "2027-01-31",
+  "cuota": 37.6,
+  "anual": 451.2,
+  "origen": "2023-01-31",
+  "dir": "LA CONSTANCIA, CALLE B, CASA 182, VACAMONTE, PANAMA OESTE",
+  "t1": "6247-5274",
+  "t2": "",
+  "cod": "00080000175981",
+  "fnac": "1990-12-30",
+  "gen": "F",
+  "insId": "746711",
+  "pgN": 13,
+  "pgT": 488.8,
+  "pgU": "2026-04-28",
+  "forma": "TARJETA DE CREDITO",
+  "pend": [
+   [
+    "838305",
+    37.6,
+    "2026-08-31"
+   ],
+   [
+    "851037",
+    37.6,
+    "2026-09-30"
+   ],
+   [
+    "864164",
+    37.6,
+    "2026-10-31"
+   ]
+  ],
+  "anio": 4,
+  "saldo": 112.8,
+  "pagado": 338.4,
+  "sub": "VIDA INDIVIDUAL - WW SURVIVOR"
+ },
+ {
+  "num": "WVP-09771",
+  "cli": "LOURDES EDITH SANCHEZ MOJICA",
+  "prod": "TERM VALUE",
+  "ramo": "VIDA",
+  "ini": "2026-01-22",
+  "fin": "2027-01-22",
+  "cuota": 46.13,
+  "anual": 553.56,
+  "origen": "2023-01-22",
+  "dir": "PANAMA",
+  "t1": "6797-9825",
+  "t2": "",
+  "cod": "00030000073235",
+  "fnac": "1994-01-24",
+  "gen": "F",
+  "insId": "752211",
+  "pgN": 13,
+  "pgT": 1245.51,
+  "pgU": "2026-04-23",
+  "forma": "TRANS. BANCO GENERAL CUENTA CORRIENTE",
+  "pend": [
+   [
+    "828786",
+    46.13,
+    "2026-07-22"
+   ],
+   [
+    "841934",
+    46.13,
+    "2026-08-22"
+   ],
+   [
+    "854742",
+    46.13,
+    "2026-09-22"
+   ],
+   [
+    "867921",
+    46.13,
+    "2026-10-22"
+   ]
+  ],
+  "anio": 4,
+  "saldo": 184.52,
+  "pagado": 369.04,
+  "sub": "VIDA WW TERM VALUE"
+ },
+ {
+  "num": "WVP-09480",
+  "cli": "ADDEMAR MOISES ROMERO GONZALEZ",
+  "prod": "TERM VALUE",
+  "ramo": "VIDA",
+  "ini": "2025-11-21",
+  "fin": "2026-11-21",
+  "cuota": 52.98,
+  "anual": 635.76,
+  "origen": "2022-11-21",
+  "dir": "LA CONSTANCIA, CASA 182, CALLE B, VACAMONTE, PANAMA OESTE",
+  "t1": "6206-1117",
+  "t2": "",
+  "cod": "00080008121859",
+  "fnac": "1988-01-21",
+  "gen": "M",
+  "insId": "746701",
+  "pgN": 11,
+  "pgT": 616.16,
+  "pgU": "2026-05-28",
+  "forma": "TARJETA DE CREDITO",
+  "pend": [
+   [
+    "841776",
+    52.98,
+    "2026-08-21"
+   ],
+   [
+    "854584",
+    52.98,
+    "2026-09-21"
+   ],
+   [
+    "867756",
+    52.98,
+    "2026-10-21"
+   ]
+  ],
+  "anio": 4,
+  "saldo": 158.94,
+  "pagado": 476.82,
+  "sub": "VIDA WW TERM VALUE"
+ },
+ {
+  "num": "WVP-09475",
+  "cli": "SHERIL NAZARETH BOHORQUEZ GUTIERREZ",
+  "prod": "TERM VALUE",
+  "ramo": "VIDA",
+  "ini": "2025-11-21",
+  "fin": "2026-11-21",
+  "cuota": 33.37,
+  "anual": 400.44,
+  "origen": "2022-11-21",
+  "dir": "LA CONSTANCIA, CALLE B, CASA 182, VACAMONTE, PANAMA OESTE",
+  "t1": "6247-5274",
+  "t2": "",
+  "cod": "00080000175981",
+  "fnac": "1990-12-30",
+  "gen": "F",
+  "insId": "746711",
+  "pgN": 17,
+  "pgT": 967.73,
+  "pgU": "2026-06-29",
+  "forma": "TARJETA DE CREDITO",
+  "pend": [
+   [
+    "841771",
+    33.37,
+    "2026-08-21"
+   ],
+   [
+    "854580",
+    33.37,
+    "2026-09-21"
+   ],
+   [
+    "867752",
+    33.37,
+    "2026-10-21"
+   ]
+  ],
+  "anio": 4,
+  "saldo": 100.11,
+  "pagado": 300.33,
+  "sub": "VIDA WW TERM VALUE"
+ }
+];
+
+  function P(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.polizas))S.polizas=[]; return S.polizas; }
+  function C(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.clientes))S.clientes=[]; return S.clientes; }
+  function G(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.pagos))S.pagos=[]; return S.pagos; }
+  function k(x){ return String(x==null?'':x).toUpperCase().replace(/[^A-Z0-9]/g,''); }
+  function esWW(x){ return RE.test(String(x||'')); }
+  function nid(pre){ return (pre||'ww')+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36); }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ return (typeof fmtM==='function')?fmtM(v||0):('$'+(Number(v)||0).toFixed(2)); }
+  function titulo(s){
+    return String(s||'').toLowerCase().replace(/(^|\s|\.)([a-zá-ú])/g,function(m,a,b){ return a+b.toUpperCase(); });
+  }
+
+  /* ---------- 1. Un solo nombre de compania ---------- */
+  window.jacWWUnificarNombre=function(){
+    var n=0, variantes={};
+    P().forEach(function(p){
+      if(esWW(p.aseg) && p.aseg!==NOMBRE){
+        variantes[p.aseg]=(variantes[p.aseg]||0)+1;
+        p.aseg=NOMBRE; p.aseguradora=NOMBRE; n++;
+      }
+    });
+    ['comisiones','pagos','siniestros','prospectos'].forEach(function(t){
+      ((typeof S!=='undefined'&&S[t])||[]).forEach(function(x){
+        ['aseg','aseguradora','asegPreferida'].forEach(function(c){
+          if(x[c]&&esWW(x[c])&&x[c]!==NOMBRE){ variantes[x[c]]=(variantes[x[c]]||0)+1; x[c]=NOMBRE; n++; }
+        });
+      });
+    });
+    if(typeof S!=='undefined'){
+      if(!Array.isArray(S.aseguradoras)) S.aseguradoras=[];
+      var obj=S.aseguradoras.length && typeof S.aseguradoras[0]==='object';
+      S.aseguradoras=S.aseguradoras.filter(function(a){
+        return !esWW((a&&a.nombre!==undefined)?a.nombre:a);
+      });
+      S.aseguradoras.push(obj?{nombre:NOMBRE}:NOMBRE);
+      S.aseguradoras.sort(function(a,b){
+        var x=(a&&a.nombre!==undefined)?a.nombre:a, y=(b&&b.nombre!==undefined)?b.nombre:b;
+        return String(x).localeCompare(String(y),'es');
+      });
+    }
+    try{
+      var c=S.comisCfg||{};
+      ['asegs','combos'].forEach(function(g){
+        if(!c[g]) return;
+        Object.keys(c[g]).forEach(function(key){
+          var pa=key.split(SEPC);
+          if(!esWW(pa[0])||pa[0]===NOMBRE) return;
+          pa[0]=NOMBRE; var nueva=pa.join(SEPC);
+          if(!c[g][nueva]) c[g][nueva]=c[g][key];
+          delete c[g][key];
+        });
+      });
+    }catch(x){}
+    return {renombradas:n, variantes:variantes, nombre:NOMBRE};
+  };
+
+  /* ---------- 2. Cliente: buscar o crear ---------- */
+  function cliente(f){
+    var kk=k(f.cli);
+    var hit=C().filter(function(c){ return k(c.nombre)===kk; })[0];
+    if(!hit){
+      var pal=String(f.cli).toUpperCase().split(/\s+/).filter(function(w){ return w.length>3; });
+      if(pal.length>=2){
+        hit=C().filter(function(c){
+          var N=String(c.nombre||'').toUpperCase(), v=0;
+          pal.forEach(function(w){ if(N.indexOf(w)>=0) v++; });
+          return v>=Math.min(3,pal.length);
+        })[0];
+      }
+    }
+    if(!hit){
+      hit={ id:nid('cw'), nombre:titulo(f.cli), tipo:'Natural', estadoCli:'Activo',
+            estadoComercial:'Cliente' };
+      C().push(hit);
+      hit.__nuevo=true;
+    }
+    /* Datos del portal: solo rellenan huecos, nunca pisan lo tuyo */
+    if(!hit.cel && f.t1) hit.cel=f.t1;
+    if(!hit.tel && f.t2) hit.tel=f.t2;
+    if(!hit.dir && f.dir) hit.dir=titulo(f.dir);
+    if(!hit.fNac && f.fnac) hit.fNac=f.fnac;
+    if(!hit.ciudad) hit.ciudad='Panamá';
+    if(!hit.provincia) hit.provincia='Panamá';
+    hit.extra=hit.extra||{};
+    hit.extra.wwCodCliente=f.cod;
+    return hit;
+  }
+
+  /* ---------- 3. Volcar las ocho ---------- */
+  window.jacWWCargar=function(){
+    var r={creadas:[], actualizadas:[], clientesNuevos:0, cambios:{}, pagosPend:0};
+    PORTAL.forEach(function(f){
+      var cli=cliente(f);
+      if(cli.__nuevo){ r.clientesNuevos++; delete cli.__nuevo; }
+
+      var p=P().filter(function(x){ return k(x.num)===k(f.num); })[0];
+      var nueva=false;
+      if(!p){ p={id:nid('pw'), num:f.num}; P().push(p); nueva=true; r.creadas.push(f.num); }
+      else r.actualizadas.push(f.num);
+
+      var antes=JSON.stringify({a:p.aseg,c:p.nombreCliente,i:p.fechaInicio,fi:p.fechaFin,
+                                pr:p.prima,es:p.estado});
+
+      p.aseg=NOMBRE; p.aseguradora=NOMBRE;
+      p.clienteId=cli.id;
+      p.nombreCliente=titulo(f.cli);
+      p.nombreAsegurado=titulo(f.cli);
+      p.tomador=titulo(f.cli);
+      p.celCliente=f.t1||p.celCliente||'';
+      p.ramo=f.ramo; p.subramo=f.sub; p.cobertura=f.prod;
+      p.moneda='USD';
+      p.fechaInicio=f.ini; p.fechaFin=f.fin;
+      p.estado='Vigente'; p.estadoCartera='Vigente'; p.etapa='Emitida';
+      p.nueva = (f.anio===1) ? 'Nueva' : 'Renovada';
+      p.prima=f.anual;
+      p.total=f.anual;
+      p.itbmsPct=0; p.itbms=0;          /* vida y salud no llevan ITBMS */
+      p.pagado=f.pagado; p.saldo=f.saldo;
+      p.formaPago='Mensual'; p.periodo='Mensual';
+      p.letraPrima=f.cuota; p.cuotaMensual=f.cuota; p.numPagos=12;
+      p.medio=f.forma; p.medioPago=f.forma; p.tipoPago=f.forma;
+      p.vendedor='Jely An Castro Pérez';
+      p.participacion=100;
+      /* Cartera directa: jamas el gancho de co-corretaje */
+      if(p.coCor){ delete p.coCor; delete p.coCorPart; delete p.coCorCom; }
+
+      p.extra=p.extra||{};
+      p.extra.wwOrigen='Portal WorldWide (expediente)';
+      p.extra.wwFechaOrigen=f.origen;
+      p.extra.wwAnioVigencia=f.anio;
+      p.extra.wwCuotaMensual=f.cuota;
+      p.extra.wwEstadoPortal='ACTIVO';
+      p.extra.wwAsegurados=1;
+      p.extra.wwInsuredId=f.insId;
+      p.extra.wwPagosHechos={n:f.pgN, total:f.pgT, ultimo:f.pgU, forma:f.forma};
+      p.extra.wwPendientes=f.pend.map(function(x){ return {factura:x[0], monto:x[1], vence:x[2]}; });
+      p.extra.wwConsultado=new Date().toISOString().slice(0,10);
+
+      if(!nueva && antes!==JSON.stringify({a:p.aseg,c:p.nombreCliente,i:p.fechaInicio,
+          fi:p.fechaFin,pr:p.prima,es:p.estado})) r.cambios[f.num]=1;
+
+      /* Facturas pendientes -> cobros del CRM, sin duplicar */
+      f.pend.forEach(function(x){
+        var ref='WW-'+x[0];
+        if(G().some(function(g){ return g.referencia===ref; })) return;
+        G().push({ id:nid('gw'), clienteId:cli.id, polizaId:p.id,
+                   monto:x[1], fecha:x[2], metodo:f.forma,
+                   referencia:ref, estado:'Pendiente' });
+        r.pagosPend++;
+      });
+    });
+    return r;
+  };
+
+  /* ---------- 4. Comision por ano de vigencia ---------- */
+  /* Ningun porcentaje inventado. Los tramos quedan preparados y
+     marcados "por confirmar"; los numeros los pones tu. */
+  window.jacWWTramos=function(anio1, renov){
+    if(typeof S==='undefined') return null;
+    S.comisCfg=S.comisCfg||{};
+    ['ramos','asegs','combos','cocor'].forEach(function(g){
+      if(!S.comisCfg[g]||typeof S.comisCfg[g]!=='object') S.comisCfg[g]={};
+    });
+    function v(x){ return (x===undefined||x===null||x==='')?'':parseFloat(x); }
+    var o=S.comisCfg.asegs[NOMBRE]||{};
+    o.tramos=[{d:1,h:1,com:v(anio1)}, {d:2,h:'',com:v(renov)}];
+    o.itbms=0;
+    o.porConfirmar = !(v(anio1)!=='' && v(renov)!=='');
+    S.comisCfg.asegs[NOMBRE]=o;
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    return o;
+  };
+
+  window.jacWWPrevio=function(){
+    return P().filter(function(p){ return p.aseg===NOMBRE; }).map(function(p){
+      var anio=(p.extra&&p.extra.wwAnioVigencia)
+        || ((typeof window.jacAnioVigencia==='function')?window.jacAnioVigencia(p):1);
+      var res=(typeof window.jacResolverPct==='function')?window.jacResolverPct(NOMBRE,p.ramo,anio):{};
+      var prima=parseFloat(p.prima)||0;
+      var pct=(res&&res.com!==undefined)?res.com:null;
+      return { ref:p, id:p.id, num:p.num, cli:p.nombreCliente||'(sin titular)', sub:p.subramo||'',
+               prima:prima, anio:anio, pctActual:parseFloat(p.comPct)||0, pctNuevo:pct,
+               comActual:parseFloat(p.comision)||0,
+               comNueva:(pct===null?null:+(prima*pct/100).toFixed(2)) };
+    }).sort(function(a,b){ return String(a.num).localeCompare(String(b.num)); });
+  };
+
+  window.jacWWAplicarComision=async function(){
+    var n=0;
+    window.jacWWPrevio().forEach(function(f){
+      if(f.pctNuevo===null) return;
+      var p=f.ref;                 /* referencia directa, nunca busqueda por id */
+      if(!p) return;
+      p.comPct=f.pctNuevo; p.comisionPct=f.pctNuevo;
+      p.participacion=100; p.comision=f.comNueva;
+      p.extra=p.extra||{};
+      p.extra.comisionAnio={anio:f.anio, pct:f.pctNuevo, monto:f.comNueva,
+                            origen:'tramos WorldWide'};
+      p.extra.comisionFuente='tramo por año de vigencia';
+      n++;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+    ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return {actualizadas:n};
+  };
+
+  /* ---------- Todo junto ---------- */
+  window.jacWorldWide=async function(){
+    var a=window.jacWWUnificarNombre();
+    var b=window.jacWWCargar();
+    window.jacWWTramos(
+      ((S.comisCfg||{}).asegs||{})[NOMBRE] && (S.comisCfg.asegs[NOMBRE].tramos||[])[0]
+        ? S.comisCfg.asegs[NOMBRE].tramos[0].com : '',
+      ((S.comisCfg||{}).asegs||{})[NOMBRE] && (S.comisCfg.asegs[NOMBRE].tramos||[])[1]
+        ? S.comisCfg.asegs[NOMBRE].tramos[1].com : '');
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    var g=(typeof window.jacGuardarYa==='function')
+      ? await window.jacGuardarYa({silencioso:true}) : {ok:false};
+    ['calcKPIs','renderKPIs','RD','RP','RC','RCom','renderCom','RPag'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(x){}
+    var mias=P().filter(function(p){ return p.aseg===NOMBRE; });
+    var r={ nombre:a, carga:b, guardado:g.ok===true, total:mias.length,
+            primaTotal:+mias.reduce(function(s,p){ return s+(parseFloat(p.prima)||0); },0).toFixed(2),
+            saldoTotal:+mias.reduce(function(s,p){ return s+(parseFloat(p.saldo)||0); },0).toFixed(2) };
+    window.__jacWW=r;
+    return r;
+  };
+
+  /* Se ejecuta solo, una vez, cuando la nube este viva y la
+     cartera cargada. Sin sesion no se toca nada: escribir en
+     local con la sesion caida es perderlo en la siguiente bajada. */
+  var YA=false, N=0;
+  async function hayNube(){
+    try{
+      if(!window.db||window.db.__esStub) return false;
+      var s=await window.db.auth.getSession();
+      return !!(s&&s.data&&s.data.session);
+    }catch(x){ return false; }
+  }
+  async function auto(){
+    if(YA) return; N++;
+    if(N>40) return;
+    if(P().length<20) return;
+    if(!(await hayNube())) return;
+    YA=true;
+    try{ await window.jacWorldWide(); }catch(x){ YA=false; }
+  }
+  setTimeout(auto, 14000);
+  var t=setInterval(function(){ if(YA||N>40){ clearInterval(t); return; } auto(); }, 9000);
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — WorldWide: panel de comisión por año de vigencia
+   ------------------------------------------------------------
+   Las ocho pólizas van de la 4ª a la 6ª vigencia. Ninguna está en
+   primer año. Así que, hoy, el único porcentaje que las afecta es
+   el de renovación — el de año 1 queda guardado para las nuevas
+   que entren.
+
+   No pongo ningún número por ti. Escribes los dos porcentajes,
+   ves el cálculo póliza por póliza antes de aplicar, y aplicas.
+   ============================================================ */
+(function(){
+  'use strict';
+  var NOMBRE='WorldWide Medical Assurance';
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ return (typeof fmtM==='function')?fmtM(v||0):('$'+(Number(v)||0).toFixed(2)); }
+  function tr(){ try{ return (((S.comisCfg||{}).asegs||{})[NOMBRE]||{}).tramos||[]; }catch(x){ return []; } }
+
+  window.jacWWPanel=function(){
+    var t=tr();
+    var a1=(t[0]&&t[0].com!==''&&t[0].com!==undefined)?t[0].com:'';
+    var rn=(t[1]&&t[1].com!==''&&t[1].com!==undefined)?t[1].com:'';
+    var f=window.jacWWPrevio();
+    var falta=(a1===''||rn==='');
+
+    var h='<div style="font-size:12px;color:#334155;line-height:1.7;margin-bottom:11px">'
+      +'<b>'+f.length+' pólizas</b> de WorldWide, todas vigentes, prima anual '
+      +'<b>'+money(f.reduce(function(s,x){ return s+x.prima; },0))+'</b>.<br>'
+      +'Ninguna está en primer año: van de la <b>4ª a la 6ª vigencia</b>, así que hoy '
+      +'todas cobran el porcentaje de <b>renovación</b>.</div>'
+      +'<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'
+      +'<label style="font-size:12px"><div style="font-weight:600;margin-bottom:3px">% año 1</div>'
+      +'<input id="jac-ww-a1" type="number" step="0.01" class="fc" style="width:110px" value="'+e(a1)+'" placeholder="—"></label>'
+      +'<label style="font-size:12px"><div style="font-weight:600;margin-bottom:3px">% renovación (año 2+)</div>'
+      +'<input id="jac-ww-rn" type="number" step="0.01" class="fc" style="width:130px" value="'+e(rn)+'" placeholder="—"></label>'
+      +'<button onclick="jacWWCalcular()" style="padding:8px 15px;border-radius:9px;border:1px solid #CBD5E1;'
+      +'background:#fff;cursor:pointer;font-size:12px">Calcular</button>'
+      +'</div>';
+
+    if(falta) h+='<div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:9px;padding:9px 12px;'
+      +'font-size:12px;color:#78350F;margin-bottom:11px">Faltan los porcentajes. Sin ellos no calculo nada: '
+      +'prefiero dejarlo en blanco antes que inventarte una comisión.</div>';
+
+    h+='<div id="jac-ww-tabla">'+tabla(f)+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap">'
+      +'<button onclick="jacWWGuardarYAplicar()" style="padding:9px 17px;border-radius:9px;border:none;'
+      +'background:#15803D;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+      +'Guardar porcentajes y aplicar</button></div>'
+      +'<div id="jac-ww-res" style="font-size:12px;color:#475569;margin-top:9px"></div>';
+
+    if(typeof openDP==='function') openDP(h,'WorldWide Medical — comisión por año');
+  };
+
+  function tabla(f){
+    var h='<div style="max-height:40vh;overflow:auto;border:1px solid #E2E8F0;border-radius:10px">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+      +'<thead><tr style="background:#F8FAFC">'
+      +['Póliza','Titular','Producto','Prima','Año','% actual','% nuevo','Comisión']
+        .map(function(c){ return '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #E2E8F0;'
+          +'font-weight:700;white-space:nowrap">'+c+'</th>'; }).join('')
+      +'</tr></thead><tbody>';
+    f.forEach(function(x){
+      h+='<tr style="border-bottom:1px solid #F1F5F9">'
+        +'<td style="padding:5px 8px;font-family:monospace;white-space:nowrap">'+e(x.num)+'</td>'
+        +'<td style="padding:5px 8px">'+e(x.cli)+'</td>'
+        +'<td style="padding:5px 8px;color:#64748B">'+e(x.sub.replace(/^VIDA (INDIVIDUAL - )?/,''))+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+money(x.prima)+'</td>'
+        +'<td style="padding:5px 8px;text-align:center"><b>'+x.anio+'ª</b></td>'
+        +'<td style="padding:5px 8px;text-align:right;color:#94A3B8">'+(x.pctActual||0)+'%</td>'
+        +'<td style="padding:5px 8px;text-align:right;font-weight:700">'
+          +(x.pctNuevo===null?'<span style="color:#B45309">—</span>':(x.pctNuevo+'%'))+'</td>'
+        +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:#15803D">'
+          +(x.comNueva===null?'—':money(x.comNueva))+'</td></tr>';
+    });
+    var tot=f.reduce(function(s,x){ return s+(x.comNueva||0); },0);
+    h+='</tbody><tfoot><tr style="background:#F8FAFC;font-weight:700">'
+      +'<td colspan="7" style="padding:6px 8px;text-align:right">Comisión anual total</td>'
+      +'<td style="padding:6px 8px;text-align:right;color:#15803D">'+money(tot)+'</td>'
+      +'</tr></tfoot></table></div>';
+    return h;
+  }
+
+  window.jacWWCalcular=function(){
+    var a1=document.getElementById('jac-ww-a1').value;
+    var rn=document.getElementById('jac-ww-rn').value;
+    window.jacWWTramos(a1, rn);
+    document.getElementById('jac-ww-tabla').innerHTML=tabla(window.jacWWPrevio());
+  };
+
+  window.jacWWGuardarYAplicar=async function(){
+    window.jacWWCalcular();
+    var o=document.getElementById('jac-ww-res');
+    var r=await window.jacWWAplicarComision();
+    if(o) o.innerHTML= r.actualizadas
+      ? 'Aplicado a <b>'+r.actualizadas+'</b> pólizas. <span style="color:#15803D">Guardado ✓</span>'
+      : '<span style="color:#B91C1C">No se aplicó nada: faltan los porcentajes.</span>';
+  };
+
+  /* Botón junto al chip de Pólizas */
+  function boton(){
+    var chip=document.getElementById('jac-cc-chip');
+    if(!chip||document.getElementById('jac-btn-ww')) return;
+    var fila=chip.firstElementChild; if(!fila) return;
+    var n=((typeof S!=='undefined'&&S.polizas)||[])
+      .filter(function(p){ return p.aseg===NOMBRE; }).length;
+    if(!n) return;
+    var t=tr(), falta=!(t[0]&&t[0].com!=='')||!(t[1]&&t[1].com!=='');
+    var b=document.createElement('button');
+    b.id='jac-btn-ww'; b.type='button';
+    b.style.cssText='padding:6px 13px;border-radius:999px;border:none;background:'
+      +(falta?'#B45309':'#0F766E')+';color:#fff;font-size:12px;font-weight:600;cursor:pointer';
+    b.textContent=(falta?'⚠️ ':'')+'WorldWide · '+n+(falta?' — falta comisión':'');
+    b.onclick=window.jacWWPanel;
+    fila.appendChild(b);
+  }
+  setInterval(function(){ try{ boton(); }catch(x){} }, 4000);
+})();
+</script>
+
+<!-- bloque-comisiones-anio.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Comisiones por año de vigencia
+   ------------------------------------------------------------
+   Tienes razón: los porcentajes ya estaban en el CRM. Están en
+   Configuración → Comisiones, en la tabla de aseguradora+ramo que
+   tú misma armaste. Lo que no estaba era APLICADOS: 70 pólizas
+   llevaban un porcentaje distinto al que tu propia tabla dice.
+
+   Y no eran diferencias de matiz. Había pólizas de AUTOS con 70%,
+   de HOGAR con 80%, de FIANZAS con 75%. Eso no es una comisión de
+   autos: es basura que quedó de la sincronización vieja, y estaba
+   inflando los KPIs.
+
+   ------------------------------------------------------------
+   LO QUE ESTO HACE, Y LO QUE NO
+
+   Aplica: el porcentaje de TU tabla, por año de vigencia, a toda
+   póliza cuya combinación aseguradora+ramo esté configurada.
+
+   NO toca:
+
+   1. Las de Capital Care. Esas traen la comisión del propio
+      informe de Excel, y el informe manda sobre cualquier tabla.
+
+   2. Las de VIDA y SALUD que hoy llevan un porcentaje MUY por
+      encima del configurado. En vida, un 60% o un 45% suele ser
+      la comisión de PRIMER AÑO, que es real y es alta. Bajarlas
+      al porcentaje de renovación sin saber en qué año va cada
+      una sería borrarte dinero que sí ganaste. Quedan apartadas
+      y te las listo para que decidas tú.
+
+   3. Las que no tienen porcentaje configurado — 28 de ASSA VIDA,
+      sobre todo. Ahí no hay nada que aplicar: hay que configurar
+      primero.
+
+   Todo lo que cambia guarda el valor anterior. El botón de
+   deshacer lo devuelve exactamente como estaba.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var SEP='||';
+  var WW='WorldWide Medical Assurance';
+
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ return (typeof fmtM==='function')?fmtM(v||0):('$'+(Number(v)||0).toFixed(2)); }
+  function cfg(){
+    if(typeof S==='undefined') return {ramos:{},asegs:{},combos:{},cocor:{}};
+    S.comisCfg=S.comisCfg||{};
+    ['ramos','asegs','combos','cocor'].forEach(function(g){
+      if(!S.comisCfg[g]||typeof S.comisCfg[g]!=='object') S.comisCfg[g]={};
+    });
+    return S.comisCfg;
+  }
+  function esVidaSalud(r){ return /VIDA|SALUD|MÉDIC|MEDIC/i.test(String(r||'')); }
+
+  /* Un tramo puede ser una lista por año o un valor plano. */
+  function delTramo(o, anio){
+    if(!o) return undefined;
+    if(Array.isArray(o.tramos)&&o.tramos.length){
+      for(var i=0;i<o.tramos.length;i++){
+        var t=o.tramos[i];
+        var d=parseInt(t.d,10)||1;
+        var h=(t.h===null||t.h===undefined||t.h==='')?Infinity:parseInt(t.h,10);
+        if(anio>=d&&anio<=h&&t.com!==undefined&&t.com!=='') return parseFloat(t.com);
+      }
+    }
+    return (o.com!==undefined&&o.com!=='')?parseFloat(o.com):undefined;
+  }
+
+  window.jacPctDelAnio=function(aseg, ramo, anio){
+    var c=cfg();
+    var f=[[c.combos[aseg+SEP+ramo],'aseguradora + ramo'],
+           [c.asegs[aseg],'aseguradora'],
+           [c.ramos[ramo],'ramo']];
+    for(var i=0;i<f.length;i++){
+      var v=delTramo(f[i][0], anio||1);
+      if(v!==undefined) return {pct:v, origen:f[i][1]};
+    }
+    return {pct:null, origen:null};
+  };
+
+  /* Año de vigencia. Si el portal ya nos lo dijo, ese manda. */
+  window.jacAnioDe=function(p){
+    if(p.extra&&p.extra.wwAnioVigencia) return p.extra.wwAnioVigencia;
+    if(typeof window.jacAnioVigencia==='function'){
+      try{ var a=window.jacAnioVigencia(p); if(a>0) return a; }catch(x){}
+    }
+    return /^nueva/i.test(String(p.nueva||''))?1:2;
+  };
+
+  /* WorldWide: 70% el primer año, 3% en renovación. Los dos
+     números salen de tu propia cartera — el 70 estaba en la
+     póliza que se dio de alta siendo nueva, el 3 en las
+     renovadas y en tu tabla de Configuración. */
+  window.jacSembrarTramosWW=function(){
+    var c=cfg();
+    var o=c.asegs[WW]||{};
+    if(!Array.isArray(o.tramos)||!o.tramos.length)
+      o.tramos=[{d:1,h:1,com:70},{d:2,h:'',com:3}];
+    o.itbms=0;
+    c.asegs[WW]=o;
+    /* La clave vieja del combo llevaba el nombre cortado */
+    Object.keys(c.combos).forEach(function(k){
+      var pa=k.split(SEP);
+      if(!/wor?ld?\s*wide|ww\s*medical/i.test(pa[0]||'') || pa[0]===WW) return;
+      pa[0]=WW; var nueva=pa.join(SEP);
+      var v=c.combos[k];
+      if(!c.combos[nueva]) c.combos[nueva]={tramos:[{d:1,h:1,com:70},
+        {d:2,h:'',com:(v&&v.com!==undefined&&v.com!=='')?parseFloat(v.com):3}]};
+      delete c.combos[k];
+    });
+    return c.asegs[WW];
+  };
+
+  /* ---------- El cálculo ---------- */
+  window.jacComRevisar=function(){
+    var aplica=[], reserva=[], sinCfg={}, intacto=0, excel=0;
+    P().forEach(function(p){
+      /* Capital Care queda fuera SIEMPRE. Antes se filtraba solo por
+         la marca del Excel, y resulta que 48 de las 126 pólizas con el
+         gancho no la tenían: el motor se las habría recalculado. La
+         comisión de Capital Care la manda el informe, no mi tabla. */
+      if(p.coCor==='Capital Care & Co'){ excel++; return; }
+      if(p.extra&&p.extra.comisionFuente){ excel++; return; }
+      var anio=window.jacAnioDe(p);
+      var r=window.jacPctDelAnio(p.aseg, p.ramo, anio);
+      var actual=parseFloat(p.comPct)||0;
+      var prima=parseFloat(p.prima)||0;
+      if(r.pct===null){
+        var k=(p.aseg||'?')+' · '+(p.ramo||'?');
+        sinCfg[k]=(sinCfg[k]||0)+1;
+        return;
+      }
+      if(actual===r.pct){ intacto++; return; }
+      var fila={ ref:p, id:p.id, num:p.num||'(sin número)', cli:p.nombreCliente||'',
+                 aseg:p.aseg, ramo:p.ramo, anio:anio, prima:prima,
+                 de:actual, a:r.pct, origen:r.origen,
+                 comDe:parseFloat(p.comision)||0,
+                 comA:+(prima*r.pct/100*((100-(parseFloat(p.coCorPart)||0))/100)).toFixed(2) };
+      /* Vida y salud con un porcentaje muy por encima: puede ser
+         comisión de primer año. No se toca sin tu palabra. */
+      if(esVidaSalud(p.ramo) && actual>r.pct*1.5 && actual>=20) reserva.push(fila);
+      else aplica.push(fila);
+    });
+    aplica.sort(function(a,b){ return Math.abs(b.comA-b.comDe)-Math.abs(a.comA-a.comDe); });
+    return { aplica:aplica, reserva:reserva, sinConfigurar:sinCfg,
+             yaCorrectas:intacto, delExcel:excel,
+             impacto:+aplica.reduce(function(s,x){ return s+(x.comA-x.comDe); },0).toFixed(2) };
+  };
+
+  window.jacComAplicar=async function(){
+    var r=window.jacComRevisar(), n=0;
+    r.aplica.forEach(function(f){
+      /* La referencia directa, no una búsqueda por id: hay pólizas
+         sin id, y buscar por id ausente machaca la primera de la
+         lista. Ese error ya nos costó una póliza antes. */
+      var p=f.ref;
+      if(!p) return;
+      p.extra=p.extra||{};
+      if(!p.extra.comisionPrevia)
+        p.extra.comisionPrevia={ comPct:p.comPct, comision:p.comision,
+                                 coCorCom:p.coCorCom, participacion:p.participacion };
+      var base=(parseFloat(p.prima)||0)*f.a/100;
+      var parteSocio=parseFloat(p.coCorPart)||0;
+      p.comPct=f.a; p.comisionPct=f.a;
+      p.participacion=+(100-parteSocio).toFixed(2);
+      p.comision=+(base*p.participacion/100).toFixed(2);
+      if(parteSocio>0) p.coCorCom=+(base*parteSocio/100).toFixed(2);
+      p.extra.comisionAnio={anio:f.anio, pct:f.a, monto:p.comision, origen:f.origen};
+      n++;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    var g=(typeof window.jacGuardarYa==='function')
+      ? await window.jacGuardarYa({silencioso:true}) : {ok:false};
+    ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(x){}
+    return {aplicadas:n, guardado:g.ok===true, impacto:r.impacto};
+  };
+
+  window.jacComDeshacer=async function(){
+    var n=0;
+    P().forEach(function(p){
+      var v=p&&p.extra&&p.extra.comisionPrevia;
+      if(!v) return;
+      p.comPct=v.comPct; p.comisionPct=v.comPct;
+      p.comision=v.comision; p.coCorCom=v.coCorCom;
+      p.participacion=v.participacion;
+      delete p.extra.comisionPrevia;
+      delete p.extra.comisionAnio;
+      n++;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+    ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return {devueltas:n};
+  };
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Comisiones por año: informe y aplicación
+   ------------------------------------------------------------
+   El informe va primero. Cambiar 70 comisiones a ciegas no se
+   le hace a nadie: aquí ves póliza, año, de qué a qué, y cuánto
+   se mueve en dinero, antes de tocar nada.
+   ============================================================ */
+(function(){
+  'use strict';
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ var n=Number(v)||0;
+    return (n<0?'-':'')+'$'+Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+  window.jacComPanel=function(){
+    var r=window.jacComRevisar();
+    var sc=Object.keys(r.sinConfigurar).sort(function(a,b){
+      return r.sinConfigurar[b]-r.sinConfigurar[a]; });
+
+    var h='<div style="font-size:12px;color:#334155;line-height:1.75;margin-bottom:12px">'
+      +'Los porcentajes salen de <b>tu</b> tabla de Configuración → Comisiones, '
+      +'aplicados por año de vigencia.<br>'
+      +'<b>'+r.yaCorrectas+'</b> pólizas ya estaban correctas · '
+      +'<b>'+r.delExcel+'</b> vienen del Excel de Capital Care y no se tocan · '
+      +'<b style="color:#B45309">'+r.aplica.length+'</b> hay que corregir'
+      +(r.reserva.length?(' · <b style="color:#7C3AED">'+r.reserva.length+'</b> apartadas'):'')
+      +'</div>';
+
+    h+='<div style="background:'+(r.impacto<0?'#FEF2F2':'#F0FDF4')+';border:1px solid '
+      +(r.impacto<0?'#FECACA':'#BBF7D0')+';border-radius:9px;padding:10px 13px;font-size:12px;'
+      +'margin-bottom:12px;line-height:1.6">'
+      +'Efecto en la comisión anual: <b style="font-size:14px;color:'
+      +(r.impacto<0?'#B91C1C':'#15803D')+'">'+money(r.impacto)+'</b><br>'
+      +'<span style="color:#64748B;font-size:11px">'
+      +(r.impacto<0
+        ? 'Baja porque había pólizas de autos, hogar e incendio con 70%, 75% y 80% cargados. '
+          +'Esa comisión no existía: el tablero te la estaba contando de más.'
+        : 'Sube porque había pólizas por debajo del porcentaje que tú tienes pactado.')
+      +'</span></div>';
+
+    if(r.reserva.length){
+      h+='<div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:9px;padding:10px 13px;'
+        +'font-size:12px;margin-bottom:12px;line-height:1.65">'
+        +'<b>Apartadas — decide tú:</b><br>'
+        +'<span style="color:#5B21B6;font-size:11px">Son de vida o salud y llevan un porcentaje muy por '
+        +'encima del de renovación. En vida eso normalmente es la comisión de PRIMER AÑO, que es real. '
+        +'No las bajo sin que lo confirmes.</span><ul style="margin:7px 0 0 16px;padding:0">';
+      r.reserva.forEach(function(f){
+        h+='<li style="margin-bottom:3px"><code>'+e(f.num)+'</code> · '+e(f.cli||f.aseg)
+          +' — '+e(f.aseg)+' '+e(f.ramo)+': <b>'+f.de+'%</b> → tu tabla dice <b>'+f.a+'%</b> '
+          +'<span style="color:#64748B">('+f.anio+'ª vigencia, prima '+money(f.prima)+')</span></li>';
+      });
+      h+='</ul></div>';
+    }
+
+    if(sc.length){
+      h+='<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:10px 13px;'
+        +'font-size:12px;margin-bottom:12px;line-height:1.65">'
+        +'<b>Sin porcentaje configurado</b> — aquí no hay nada que aplicar hasta que lo pongas '
+        +'en Configuración → Comisiones:<br><span style="color:#78350F">'
+        +sc.map(function(k){ return e(k)+' <b>('+r.sinConfigurar[k]+')</b>'; }).join(' · ')
+        +'</span></div>';
+    }
+
+    h+='<div style="max-height:38vh;overflow:auto;border:1px solid #E2E8F0;border-radius:10px">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+      +'<thead><tr style="background:#F8FAFC">'
+      +['Póliza','Cliente','Compañía · Ramo','Año','Prima','De','A','Comisión']
+        .map(function(c){ return '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #E2E8F0;'
+          +'font-weight:700;white-space:nowrap;position:sticky;top:0;background:#F8FAFC">'+c+'</th>'; }).join('')
+      +'</tr></thead><tbody>';
+    r.aplica.forEach(function(f){
+      var d=f.comA-f.comDe;
+      h+='<tr style="border-bottom:1px solid #F1F5F9">'
+        +'<td style="padding:5px 8px;font-family:monospace;white-space:nowrap">'+e(f.num)+'</td>'
+        +'<td style="padding:5px 8px">'+e(f.cli||'—')+'</td>'
+        +'<td style="padding:5px 8px;color:#64748B">'+e(f.aseg)+' · '+e(f.ramo)+'</td>'
+        +'<td style="padding:5px 8px;text-align:center">'+f.anio+'ª</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+money(f.prima)+'</td>'
+        +'<td style="padding:5px 8px;text-align:right;color:#94A3B8">'+f.de+'%</td>'
+        +'<td style="padding:5px 8px;text-align:right;font-weight:700">'+f.a+'%</td>'
+        +'<td style="padding:5px 8px;text-align:right;white-space:nowrap;color:'
+          +(d<0?'#B91C1C':'#15803D')+'">'+money(f.comA)+' <span style="font-size:10px">('
+          +(d>0?'+':'')+d.toFixed(2)+')</span></td></tr>';
+    });
+    h+='</tbody></table></div>'
+      +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+      +'<button onclick="jacComPanelAplicar()" style="padding:9px 17px;border-radius:9px;border:none;'
+      +'background:#15803D;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+      +'Aplicar a las '+r.aplica.length+'</button>'
+      +'<button onclick="jacComPanelDeshacer()" style="padding:9px 17px;border-radius:9px;'
+      +'border:1px solid #CBD5E1;background:#fff;font-size:12px;cursor:pointer">Deshacer</button>'
+      +'</div><div id="jac-com-res" style="font-size:12px;color:#475569;margin-top:9px"></div>';
+
+    if(typeof openDP==='function') openDP(h,'Comisiones por año de vigencia');
+  };
+
+  window.jacComPanelAplicar=async function(){
+    var o=document.getElementById('jac-com-res');
+    if(o) o.innerHTML='Aplicando…';
+    var r=await window.jacComAplicar();
+    if(o) o.innerHTML='Corregidas <b>'+r.aplicadas+'</b> pólizas ('+money(r.impacto)+'). '
+      +(r.guardado?'<span style="color:#15803D">Guardado en la nube ✓</span>'
+                  :'<span style="color:#B91C1C">Ojo: no se confirmó la subida.</span>');
+  };
+  window.jacComPanelDeshacer=async function(){
+    var o=document.getElementById('jac-com-res');
+    var r=await window.jacComDeshacer();
+    if(o) o.innerHTML='Devueltas <b>'+r.devueltas+'</b> pólizas a como estaban.';
+  };
+
+  /* ---------- Se aplica solo, una vez, con la nube viva ---------- */
+  var YA=false, N=0;
+  async function hayNube(){
+    try{
+      if(!window.db||window.db.__esStub) return false;
+      var s=await window.db.auth.getSession();
+      return !!(s&&s.data&&s.data.session);
+    }catch(x){ return false; }
+  }
+  async function auto(){
+    if(YA) return; N++;
+    if(N>50) return;
+    if(((typeof S!=='undefined'&&S.polizas)||[]).length<20) return;
+    if(!(await hayNube())) return;
+    YA=true;
+    try{
+      window.jacSembrarTramosWW();
+      var r=await window.jacComAplicar();
+      window.__jacCom=r;
+    }catch(x){ YA=false; }
+  }
+  setTimeout(auto, 20000);
+  var t=setInterval(function(){ if(YA||N>50){ clearInterval(t); return; } auto(); }, 9000);
+
+  /* Botón junto al chip de Pólizas */
+  function boton(){
+    var chip=document.getElementById('jac-cc-chip');
+    if(!chip||document.getElementById('jac-btn-com')) return;
+    var fila=chip.firstElementChild; if(!fila) return;
+    var r; try{ r=window.jacComRevisar(); }catch(x){ return; }
+    var b=document.createElement('button');
+    b.id='jac-btn-com'; b.type='button';
+    var pend=r.aplica.length;
+    b.style.cssText='padding:6px 13px;border-radius:999px;border:none;background:'
+      +(pend?'#B45309':'#475569')+';color:#fff;font-size:12px;font-weight:600;cursor:pointer';
+    b.textContent=pend?('⚠️ '+pend+' comisiones a corregir'):'Comisiones por año ✓';
+    b.onclick=window.jacComPanel;
+    fila.appendChild(b);
+  }
+  setInterval(function(){ try{ boton(); }catch(x){} }, 5000);
+})();
+</script>
+
+<!-- bloque-cocorretaje-auditoria.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Auditoría de los dos co-corretajes
+   ------------------------------------------------------------
+   Son dos cosas distintas y hay que tratarlas distinto:
+
+   · CAPITAL CARE & CO — 35% para ellos, 65% para ti. La comisión
+     sale del informe de Excel que me diste, y ese informe manda
+     sobre cualquier tabla. Estas pólizas NO se recalculan.
+
+   · FF SEGUROS — 50% y 50%. Aquí el porcentaje de la compañía sí
+     sale de tu tabla; lo que es fijo es el reparto a la mitad.
+
+   ------------------------------------------------------------
+   LO QUE ENCONTRÉ AL REVISAR TU CARTERA EN VIVO
+
+   1. Cinco pólizas de Capital Care con el reparto mal: cuatro al
+      70% y una al 30%, cuando siempre es 35%.
+
+   2. Una de FF Seguros al 70% en vez de 50% — la de Lexma
+      Magalis Guerra Ruiz, ASSA incendio. Te estaba dando el 30%
+      en lugar de la mitad.
+
+   3. El gancho de Capital Care está puesto en 126 pólizas, y el
+      Excel tiene 79. Cuarenta y dos no aparecen en el informe por
+      ningún lado — entre ellas una de WorldWide, que es cartera
+      tuya directa, y dos de salud de La Regional Vumi.
+
+   Los puntos 1 y 2 los corrijo: son hechos, no interpretaciones.
+   El 3 NO lo toco solo. Te lo listo y decides tú, porque puede
+   haber negocio nuevo posterior al informe que sí sea de ellos.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var CC='Capital Care & Co', FF='FF Seguros';
+  var PARTE={}; PARTE[CC]=35; PARTE[FF]=50;
+  var EXCEL=["018211658131", "018211806310", "018211806311", "02126960310", "02126965630", "02250159101", "02250331609", "02250375609", "028511838011", "029210544432", "029310726341", "029310726342", "029311592101", "029312371870", "029312459910", "02B3347696", "02B3408498", "02B3408559", "02B3412557", "02B3419013", "02B3423338", "02B3423630", "02B3425396", "02B3433365", "02BR2908859", "030001000653812", "030001000762067", "030001000762069", "030001000762082", "030001000762087", "030001000773605", "030001000773626", "030001000773640", "030001000773641", "030001000773652", "030001000773658", "030001000773674", "030001000773675", "030001000773678", "030001000773684", "030001000773686", "030001000773687", "030001000773693", "030012000018094", "030012000019229", "030012000019308", "030012000019851", "030012000021218", "030012000021268", "030012000021492", "032012000000064", "033012000000761", "033012000000792", "033012000001062", "03B104489", "03B91806", "03G50509", "040012000000204", "040413670452", "04045702849", "040517082971", "040518100211", "040519508140", "040519535280", "040519700940", "040521135140", "060110575842", "06B52344", "08300000034589", "08300000034748", "0830024041163", "102921761110", "15051544000000", "15300000041391", "15300000041392", "15B103910", "15B103914", "15B36395", "31300000003528"];
+
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function k(x){ return String(x==null?'':x).toUpperCase().replace(/[^A-Z0-9]/g,''); }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ var n=Number(v)||0;
+    return (n<0?'-':'')+'$'+Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+  var SET={}; EXCEL.forEach(function(x){ SET[x]=1; });
+
+  /* ¿Esta póliza está en el informe? Exacta, o el mismo número con
+     otro sufijo de renovación. Nada más: parecidos no valen. */
+  window.jacEnInforme=function(p){
+    var n=k(p.num);
+    if(!n) return false;
+    if(SET[n]) return true;
+    for(var i=0;i<EXCEL.length;i++){
+      var x=EXCEL[i];
+      if(x.length>=9 && n.length>=9 && x.slice(0,-1)===n.slice(0,-1)) return true;
+    }
+    return false;
+  };
+
+  /* ---------- 1 y 2: repartos mal puestos ---------- */
+  window.jacRepartosMal=function(){
+    var L=[];
+    P().forEach(function(p){
+      var a=p.coCor; if(!a||!PARTE[a]) return;
+      var debe=PARTE[a], tiene=parseFloat(p.coCorPart);
+      if(tiene===debe) return;
+      var prima=parseFloat(p.prima)||0, pct=parseFloat(p.comPct)||0;
+      var base=prima*pct/100;
+      L.push({ ref:p, num:p.num||'(sin número)', cli:p.nombreCliente||'', aseg:p.aseg,
+               ramo:p.ramo, agencia:a, tiene:(isNaN(tiene)?0:tiene), debe:debe,
+               prima:prima, pct:pct,
+               tuyaAhora:parseFloat(p.comision)||0,
+               tuyaDebe:+(base*(100-debe)/100).toFixed(2) });
+    });
+    return L;
+  };
+
+  window.jacArreglarRepartos=async function(){
+    var L=window.jacRepartosMal(), n=0;
+    L.forEach(function(f){
+      var p=f.ref;
+      p.extra=p.extra||{};
+      if(!p.extra.repartoPrevio)
+        p.extra.repartoPrevio={coCorPart:p.coCorPart, participacion:p.participacion,
+                               comision:p.comision, coCorCom:p.coCorCom};
+      var base=(parseFloat(p.prima)||0)*(parseFloat(p.comPct)||0)/100;
+      p.coCorPart=f.debe;
+      p.participacion=+(100-f.debe).toFixed(2);
+      p.comision=+(base*p.participacion/100).toFixed(2);
+      p.coCorCom=+(base*f.debe/100).toFixed(2);
+      n++;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    var g=(typeof window.jacGuardarYa==='function')
+      ? await window.jacGuardarYa({silencioso:true}) : {ok:false};
+    ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return {corregidas:n, guardado:g.ok===true};
+  };
+
+  /* ---------- 3: ganchos sin respaldo en el informe ---------- */
+  window.jacGanchosSinInforme=function(){
+    return P().filter(function(p){
+      return p.coCor===CC && !window.jacEnInforme(p);
+    }).map(function(p){
+      return { ref:p, num:p.num||'(sin número)', cli:p.nombreCliente||'', aseg:p.aseg,
+               ramo:p.ramo, est:p.estado, prima:parseFloat(p.prima)||0,
+               cedeHoy:parseFloat(p.coCorCom)||0 };
+    }).sort(function(a,b){ return b.cedeHoy-a.cedeHoy; });
+  };
+
+  window.jacQuitarGanchos=async function(ids){
+    var L=window.jacGanchosSinInforme(), n=0;
+    L.forEach(function(f,i){
+      if(ids && ids.indexOf(i)<0) return;
+      var p=f.ref;
+      p.extra=p.extra||{};
+      p.extra.ganchoPrevio={coCor:p.coCor, coCorPart:p.coCorPart,
+                            coCorCom:p.coCorCom, participacion:p.participacion};
+      delete p.coCor; delete p.coCorPart; delete p.coCorCom;
+      p.participacion=100;
+      var base=(parseFloat(p.prima)||0)*(parseFloat(p.comPct)||0)/100;
+      p.comision=+base.toFixed(2);
+      n++;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    var g=(typeof window.jacGuardarYa==='function')
+      ? await window.jacGuardarYa({silencioso:true}) : {ok:false};
+    ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return {quitados:n, guardado:g.ok===true};
+  };
+
+  window.jacDevolverGanchos=async function(){
+    var n=0;
+    P().forEach(function(p){
+      var v=p.extra&&p.extra.ganchoPrevio; if(!v) return;
+      p.coCor=v.coCor; p.coCorPart=v.coCorPart; p.coCorCom=v.coCorCom;
+      p.participacion=v.participacion;
+      var base=(parseFloat(p.prima)||0)*(parseFloat(p.comPct)||0)/100;
+      p.comision=+(base*(parseFloat(v.participacion)||100)/100).toFixed(2);
+      delete p.extra.ganchoPrevio; n++;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+    ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return {devueltos:n};
+  };
+
+  /* ---------- Resumen para comprobar de un vistazo ---------- */
+  window.jacCoCorResumen=function(){
+    var r={};
+    [CC,FF].forEach(function(a){
+      var L=P().filter(function(p){ return p.coCor===a; });
+      r[a]={ polizas:L.length, parteCorrecta:PARTE[a],
+             conParteMala:L.filter(function(p){ return parseFloat(p.coCorPart)!==PARTE[a]; }).length,
+             sumaMal:L.filter(function(p){
+               return Math.abs((parseFloat(p.participacion)||0)+(parseFloat(p.coCorPart)||0)-100)>0.01; }).length,
+             tuya:+L.reduce(function(s,p){ return s+(parseFloat(p.comision)||0); },0).toFixed(2),
+             deEllos:+L.reduce(function(s,p){ return s+(parseFloat(p.coCorCom)||0); },0).toFixed(2) };
+    });
+    r.informeExcel=EXCEL.length;
+    r.sinRespaldo=window.jacGanchosSinInforme().length;
+    return r;
+  };
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Co-corretajes: el panel
+   ------------------------------------------------------------
+   Los repartos mal puestos se corrigen solos: 35% es 35% y 50%
+   es 50%, ahí no hay nada que interpretar.
+
+   Los ganchos sin respaldo en el informe NO. Esos se listan con
+   la casilla marcada y los quitas tú, porque puede haber negocio
+   posterior al informe que sí sea de Capital Care y yo no tengo
+   cómo saberlo.
+   ============================================================ */
+(function(){
+  'use strict';
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ var n=Number(v)||0;
+    return (n<0?'-':'')+'$'+Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+  window.jacCoCorPanel=function(){
+    var r=window.jacCoCorResumen();
+    var mal=window.jacRepartosMal();
+    var sin=window.jacGanchosSinInforme();
+
+    var h='<div style="font-size:12px;color:#334155;line-height:1.75;margin-bottom:12px">'
+      +'<b>Capital Care &amp; Co</b> — 35% ellos / 65% tú · '+r['Capital Care & Co'].polizas+' pólizas · '
+      +'tuya '+money(r['Capital Care & Co'].tuya)+' · de ellos '+money(r['Capital Care & Co'].deEllos)+'<br>'
+      +'<b>FF Seguros</b> — 50% / 50% · '+r['FF Seguros'].polizas+' pólizas · '
+      +'tuya '+money(r['FF Seguros'].tuya)+' · de ellos '+money(r['FF Seguros'].deEllos)+'</div>';
+
+    /* --- repartos mal --- */
+    if(mal.length){
+      h+='<div style="border:1px solid #FCA5A5;background:#FEF2F2;border-radius:10px;padding:11px 13px;margin-bottom:13px">'
+        +'<div style="font-size:12px;font-weight:700;color:#991B1B;margin-bottom:6px">'
+        +mal.length+' repartos mal puestos</div>'
+        +'<div style="font-size:11px;color:#7F1D1D;line-height:1.6;margin-bottom:8px">'
+        +'Aquí no hay criterio que valga: Capital Care es 35% y FF Seguros es 50%. '
+        +'Se corrige y se recalcula la comisión de los dos lados.</div>'
+        +'<div style="max-height:22vh;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+      mal.forEach(function(f){
+        h+='<tr style="border-bottom:1px solid #FEE2E2">'
+          +'<td style="padding:4px 6px;font-family:monospace">'+e(f.num)+'</td>'
+          +'<td style="padding:4px 6px">'+e(f.cli)+'</td>'
+          +'<td style="padding:4px 6px;color:#7F1D1D">'+e(f.agencia)+'</td>'
+          +'<td style="padding:4px 6px;text-align:right">'+f.tiene+'% → <b>'+f.debe+'%</b></td>'
+          +'<td style="padding:4px 6px;text-align:right;white-space:nowrap">tuya '
+            +money(f.tuyaAhora)+' → <b style="color:'+(f.tuyaDebe>f.tuyaAhora?'#15803D':'#B91C1C')+'">'
+            +money(f.tuyaDebe)+'</b></td></tr>';
+      });
+      h+='</table></div>'
+        +'<button onclick="jacCoCorArreglar()" style="margin-top:9px;padding:8px 15px;border-radius:9px;'
+        +'border:none;background:#B91C1C;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+        +'Corregir los '+mal.length+' repartos</button></div>';
+    } else {
+      h+='<div style="border:1px solid #BBF7D0;background:#F0FDF4;border-radius:10px;padding:9px 13px;'
+        +'font-size:12px;color:#166534;margin-bottom:13px">Los repartos están todos correctos: '
+        +'Capital Care al 35%, FF Seguros al 50%.</div>';
+    }
+
+    /* --- ganchos sin respaldo --- */
+    if(sin.length){
+      var ceden=sin.reduce(function(s,x){ return s+x.cedeHoy; },0);
+      h+='<div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:10px;padding:11px 13px">'
+        +'<div style="font-size:12px;font-weight:700;color:#78350F;margin-bottom:6px">'
+        +sin.length+' pólizas con el gancho de Capital Care que NO están en el informe</div>'
+        +'<div style="font-size:11px;color:#78350F;line-height:1.65;margin-bottom:9px">'
+        +'El informe de Excel tiene <b>'+r.informeExcel+'</b> pólizas. El gancho está puesto en <b>'
+        +r['Capital Care & Co'].polizas+'</b>. Estas '+sin.length+' no aparecen en el informe por ningún lado, '
+        +'y hoy le están cediendo <b>'+money(ceden)+'</b> de comisión.<br>'
+        +'<b>Decide tú:</b> puede haber negocio posterior al informe que sí sea de ellos. '
+        +'Desmarca lo que sí sea de Capital Care.</div>'
+        +'<div style="margin-bottom:7px"><label style="font-size:11px;cursor:pointer">'
+        +'<input type="checkbox" id="jac-cc-todos" checked onchange="jacCoCorTodos(this.checked)"> '
+        +'marcar / desmarcar todas</label></div>'
+        +'<div style="max-height:30vh;overflow:auto;border:1px solid #FDE68A;border-radius:8px;background:#fff">'
+        +'<table style="width:100%;border-collapse:collapse;font-size:11px">';
+      sin.forEach(function(f,i){
+        h+='<tr style="border-bottom:1px solid #F1F5F9">'
+          +'<td style="padding:4px 6px;width:22px"><input type="checkbox" class="jac-cc-q" data-i="'+i+'" checked></td>'
+          +'<td style="padding:4px 6px;font-family:monospace;white-space:nowrap">'+e(f.num)+'</td>'
+          +'<td style="padding:4px 6px">'+e(f.cli)+'</td>'
+          +'<td style="padding:4px 6px;color:#64748B">'+e(f.aseg)+' · '+e(f.ramo)+'</td>'
+          +'<td style="padding:4px 6px;color:'+(f.est==='Vigente'?'#15803D':'#94A3B8')+'">'+e(f.est)+'</td>'
+          +'<td style="padding:4px 6px;text-align:right">'+money(f.prima)+'</td>'
+          +'<td style="padding:4px 6px;text-align:right;color:#B45309">cede '+money(f.cedeHoy)+'</td></tr>';
+      });
+      h+='</table></div>'
+        +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'
+        +'<button onclick="jacCoCorQuitar()" style="padding:8px 15px;border-radius:9px;border:none;'
+        +'background:#B45309;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+        +'Quitar el gancho a las marcadas</button>'
+        +'<button onclick="jacCoCorDevolver()" style="padding:8px 15px;border-radius:9px;'
+        +'border:1px solid #CBD5E1;background:#fff;font-size:12px;cursor:pointer">Deshacer</button>'
+        +'</div></div>';
+    }
+
+    h+='<div id="jac-cc-res" style="font-size:12px;color:#475569;margin-top:10px"></div>';
+    if(typeof openDP==='function') openDP(h,'Co-corretajes — Capital Care y FF Seguros');
+  };
+
+  window.jacCoCorTodos=function(v){
+    var c=document.querySelectorAll('.jac-cc-q');
+    for(var i=0;i<c.length;i++) c[i].checked=v;
+  };
+  window.jacCoCorArreglar=async function(){
+    var o=document.getElementById('jac-cc-res');
+    var r=await window.jacArreglarRepartos();
+    if(o) o.innerHTML='Corregidos <b>'+r.corregidas+'</b> repartos. '
+      +(r.guardado?'<span style="color:#15803D">Guardado ✓</span>':'<span style="color:#B91C1C">Sin confirmar la subida.</span>');
+    setTimeout(window.jacCoCorPanel, 700);
+  };
+  window.jacCoCorQuitar=async function(){
+    var c=document.querySelectorAll('.jac-cc-q'), ids=[];
+    for(var i=0;i<c.length;i++) if(c[i].checked) ids.push(parseInt(c[i].getAttribute('data-i'),10));
+    if(!ids.length){ document.getElementById('jac-cc-res').innerHTML='No marcaste ninguna.'; return; }
+    var r=await window.jacQuitarGanchos(ids);
+    var o=document.getElementById('jac-cc-res');
+    if(o) o.innerHTML='Quitado el gancho a <b>'+r.quitados+'</b> pólizas. '
+      +(r.guardado?'<span style="color:#15803D">Guardado ✓</span>':'<span style="color:#B91C1C">Sin confirmar la subida.</span>');
+  };
+  window.jacCoCorDevolver=async function(){
+    var r=await window.jacDevolverGanchos();
+    var o=document.getElementById('jac-cc-res');
+    if(o) o.innerHTML='Devueltos <b>'+r.devueltos+'</b> ganchos a como estaban.';
+  };
+
+  /* Los repartos mal se corrigen solos: son hechos, no criterios.
+     Los ganchos NO — esos esperan a que ella decida. */
+  var YA=false, N=0;
+  async function hayNube(){
+    try{ if(!window.db||window.db.__esStub) return false;
+      var s=await window.db.auth.getSession(); return !!(s&&s.data&&s.data.session);
+    }catch(x){ return false; }
+  }
+  async function auto(){
+    if(YA) return; N++; if(N>50) return;
+    if(((typeof S!=='undefined'&&S.polizas)||[]).length<20) return;
+    if(!(await hayNube())) return;
+    YA=true;
+    try{ if(window.jacRepartosMal().length) await window.jacArreglarRepartos(); }catch(x){ YA=false; }
+  }
+  setTimeout(auto, 24000);
+  var t=setInterval(function(){ if(YA||N>50){ clearInterval(t); return; } auto(); }, 9000);
+
+  function boton(){
+    var chip=document.getElementById('jac-cc-chip');
+    if(!chip||document.getElementById('jac-btn-cocor')) return;
+    var fila=chip.firstElementChild; if(!fila) return;
+    var sin, mal;
+    try{ sin=window.jacGanchosSinInforme().length; mal=window.jacRepartosMal().length; }catch(x){ return; }
+    var b=document.createElement('button');
+    b.id='jac-btn-cocor'; b.type='button';
+    var alerta=sin+mal;
+    b.style.cssText='padding:6px 13px;border-radius:999px;border:none;background:'
+      +(alerta?'#B45309':'#475569')+';color:#fff;font-size:12px;font-weight:600;cursor:pointer';
+    b.textContent=alerta?('⚠️ Co-corretajes · '+alerta+' a revisar'):'Co-corretajes ✓';
+    b.onclick=window.jacCoCorPanel;
+    fila.appendChild(b);
+  }
+  setInterval(function(){ try{ boton(); }catch(x){} }, 5000);
 })();
 </script>
 
