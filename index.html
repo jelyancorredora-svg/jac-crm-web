@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AQ';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AR';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -18075,7 +18075,11 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     return d.toISOString().slice(0,10);
   }
 
-  window.jacVencidas=function(){
+  /* Se llamaba jacVencidas y pisaba la del núcleo, que devuelve las
+     pólizas con estado Vencida y la usan los KPIs del tablero en tres
+     sitios (líneas 3617, 3740 y 6777). Al machacarla, esos contadores
+     recibían mi lista de {p, sugerida} en vez de pólizas. Renombrada. */
+  window.jacListaVencidas=function(){
     return P().filter(function(p){ return String(p.estado||'').toLowerCase()==='vencida'; })
       .map(function(p){
         return { p:p, sugerida:clienteEnExcel(p),
@@ -18088,7 +18092,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   };
 
   window.jacPanelVencidas=function(){
-    var L=window.jacVencidas();
+    var L=window.jacListaVencidas();
     if(!L.length){ alert('No hay pólizas vencidas.'); return; }
     var sug=L.filter(function(x){ return x.sugerida; }).length;
 
@@ -18149,7 +18153,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   window.jacVencSel=function(modo){
     var chks=document.querySelectorAll('.jac-venc-chk');
     var sug={};
-    window.jacVencidas().forEach(function(x){ if(x.sugerida) sug[x.p.id]=1; });
+    window.jacListaVencidas().forEach(function(x){ if(x.sugerida) sug[x.p.id]=1; });
     for(var i=0;i<chks.length;i++){
       var id=chks[i].getAttribute('data-id');
       chks[i].checked = (modo==='todas') ? true : (modo==='ninguna' ? false : !!sug[id]);
@@ -20996,7 +21000,11 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   }
 
   /* ---------- aplicar ---------- */
-  window.jacImportarPortal = async function(opts){
+  /* Se llamaba jacImportarPortal y pisaba a la del CRM, que ya
+     existía con otra firma: la del núcleo recibe un destino
+     ('is_cartera') y esta recibe un objeto. Al machacarla dejé
+     muerto el importador viejo de Configuración. Renombrada. */
+  window.jacImportarTabla = async function(opts){
     opts=opts||{};
     var aseg=opts.aseguradora||'';
     var filas=opts.filas||[];
@@ -21144,7 +21152,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
         document.getElementById('jac-imp-aplicar').style.display='none'; return; }
       LEIDO=r;
       var aseg=document.getElementById('jac-imp-aseg').value.trim();
-      var prev=aseg?window.jacImportarPortal({aseguradora:aseg, filas:r.filas, soloVer:true}):null;
+      var prev=aseg?window.jacImportarTabla({aseguradora:aseg, filas:r.filas, soloVer:true}):null;
       Promise.resolve(prev).then(function(pr){
         var h='Leídas <b>'+r.filas.length+'</b> filas.<br>'
           +'<span style="color:#15803D">Columnas reconocidas:</span> '+r.columnas.join(' · ')
@@ -21176,7 +21184,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       var aseg=document.getElementById('jac-imp-aseg').value.trim();
       if(!LEIDO||!aseg){ o.innerHTML='<span style="color:#B91C1C">Primero lee la tabla y pon la aseguradora.</span>'; return; }
       this.disabled=true; this.textContent='Aplicando…';
-      var r=await window.jacImportarPortal({aseguradora:aseg, filas:LEIDO.filas});
+      var r=await window.jacImportarTabla({aseguradora:aseg, filas:LEIDO.filas});
       window.__jacImport=r;
       this.disabled=false; this.textContent='2 · Aplicar al CRM';
       o.innerHTML='<b>Importado.</b> Encontradas <b>'+r.encontradas+'</b> de '+r.filas
