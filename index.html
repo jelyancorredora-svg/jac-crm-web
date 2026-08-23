@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-BD';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-BF';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -26121,6 +26121,12 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   };
 
   function poner(){
+    /* DESACTIVADO. Este pegaba los botones buscando las filas por
+       el texto y exigiendo que tuvieran enlace de WhatsApp, asi que
+       las filas sin telefono se quedaban sin botones. Ahora los
+       botones los dibuja el propio pintor de alertas, con los ids
+       de verdad. Ver el bloque "Alertas: botones en TODAS". */
+    if(window.__jacAlertasPegar !== true) return;
     var pane=document.getElementById('cal-pane-alertas');
     if(!pane || pane.style.display==='none') return;
     var filas=[].filter.call(pane.querySelectorAll('div'), function(d){
@@ -27375,6 +27381,635 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     var pg=document.getElementById('pg-pros');
     if(pg && pg.classList.contains('on')){ try{ poner(); }catch(e){} }
   }, 2000);
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - Alertas: botones en TODAS, y que funcionen
+   ------------------------------------------------------------
+   QUE ESTABA MAL, Y POR QUE
+
+   Los botones se pegaban despues, buscando las filas por el
+   texto. La regla decia: "una fila de alerta es la que tiene un
+   enlace de WhatsApp". Y ahi murio: la mayoria de las filas no
+   traen telefono, asi que no tenian enlace de WhatsApp, asi que
+   no recibian botones. Por eso en la pantalla salia una sola
+   fila con botones y todas las demas sin nada.
+
+   Peor todavia: cuando si los pegaba, tenia que adivinar de que
+   poliza hablaba la fila leyendo el texto con una expresion
+   regular. Si no acertaba, los botones salian a medias o no
+   hacian nada. De ahi los errores.
+
+   LA SOLUCION
+
+   Se deja de adivinar. Ahora los botones los dibuja el mismo
+   codigo que dibuja la alerta, que ya tiene el objeto real en la
+   mano: sabe el id de la poliza, del cliente, de la tarea. Cada
+   fila lleva su id escrito encima (data-jac-id) y cada boton
+   apunta a un id de verdad, no a un texto parecido.
+
+   Resultado: todas las filas tienen sus botones, y cada boton
+   abre exactamente lo que dice.
+
+   Ademas cada alerta muestra la informacion completa: cliente,
+   numero de poliza, aseguradora, ramo, la cuota con su
+   frecuencia y las fechas.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* el bloque viejo pegaba botones por texto: se apaga */
+  window.__jacAlertasPegar = false;
+
+  function E(){
+    try{ if(window.S && window.S.polizas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v) return v; }catch(e){}
+    return null;
+  }
+  function esc2(s){ return (typeof esc==='function') ? esc(s) :
+    String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function money(v){ var n=parseFloat(v); if(!isFinite(n)) n=0;
+    return (typeof fmtM==='function') ? fmtM(n) : ('$'+n.toFixed(2)); }
+  function q(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+  function tel(x){ return String(x||'').replace(/\D/g,''); }
+
+  function vistas(){
+    try{ return JSON.parse(localStorage.getItem('jacAlertasVistas')||'{}'); }catch(e){ return {}; }
+  }
+  function guardarVistas(v){
+    try{ localStorage.setItem('jacAlertasVistas', JSON.stringify(v)); }catch(e){}
+  }
+  window.jacAlertaAtendida=function(clave){
+    var v=vistas(); v[clave]=new Date().toISOString().slice(0,10); guardarVistas(v);
+    var f=document.querySelector('[data-jac-alerta="'+clave+'"]');
+    if(f){ f.style.opacity='.45'; f.style.filter='grayscale(1)'; }
+    if(typeof toast==='function') toast('Alerta marcada como atendida','ok');
+  };
+  window.jacAlertaReabrir=function(clave){
+    var v=vistas(); delete v[clave]; guardarVistas(v);
+    var f=document.querySelector('[data-jac-alerta="'+clave+'"]');
+    if(f){ f.style.opacity=''; f.style.filter=''; }
+    if(typeof toast==='function') toast('Alerta reabierta','ok');
+  };
+
+  /* ---------- acciones ---------- */
+  window.jacAlVerPoliza=function(id){
+    if(typeof OP==='function') OP(id);
+    else if(typeof toast==='function') toast('No se pudo abrir la póliza','err');
+  };
+  window.jacAlVerCliente=function(id){
+    if(typeof OC==='function') OC(id);
+    else if(typeof toast==='function') toast('No se pudo abrir el cliente','err');
+  };
+  window.jacAlVerTarea=function(id){
+    if(typeof OT==='function') OT(id);
+    else if(typeof toast==='function') toast('No se pudo abrir la tarea','err');
+  };
+  window.jacAlCobro=function(polId){
+    if(typeof OPag==='function'){ OPag(); 
+      setTimeout(function(){
+        var s=document.getElementById('pag-pol')||document.getElementById('pg-pol-sel');
+        if(s){ try{ s.value=polId; }catch(e){} }
+      },150);
+    } else if(typeof toast==='function') toast('No se pudo abrir el cobro','err');
+  };
+  window.jacAlTareaDe=function(polId){
+    var st=E(); if(!st) return;
+    var p=(st.polizas||[]).filter(function(x){ return x.id===polId; })[0];
+    if(!p){ if(typeof toast==='function') toast('Póliza no encontrada','err'); return; }
+    if(!Array.isArray(st.tareas)) st.tareas=[];
+    var cli=(typeof GC==='function'?GC(p.clienteId):null)||{};
+    st.tareas.push({
+      id:'t'+Date.now().toString(36)+Math.floor(Math.random()*1000).toString(36),
+      titulo:'Renovar · '+(p.nombreCliente||cli.nombre||'sin cliente')+' · póliza '+(p.num||'sin número'),
+      desc:[(p.aseg||''),(p.ramo||''),
+            (p.letraPrima>0?('cuota '+money(p.letraPrima)+' '+String(p.periodo||'').toLowerCase()):''),
+            (p.total>0?('total '+money(p.total)):''),
+            ('vence '+(p.fechaFin||'—'))].filter(Boolean).join(' · '),
+      tipoRel:'poliza', relId:p.id, clienteId:p.clienteId||'',
+      etapaTarea:'Por Hacer', prioridad:'Alta',
+      fechaLimite:p.fechaFin||new Date().toISOString().slice(0,10),
+      estado:'Pendiente'
+    });
+    window.__jacSucio=true;
+    try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+    if(typeof window.jacGuardarYa==='function'){ try{ window.jacGuardarYa({silencioso:true}); }catch(e){} }
+    ['RTar','calRenderAllTareas'].forEach(function(f){
+      try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
+    if(typeof toast==='function') toast('Tarea creada','ok');
+  };
+  window.jacAlTareaHecha=function(id){
+    var st=E(); if(!st) return;
+    var t=(st.tareas||[]).filter(function(x){ return x.id===id; })[0];
+    if(!t) return;
+    t.etapaTarea='Hecho'; t.estado='Completada';
+    t.fechaCompletada=new Date().toISOString().slice(0,10);
+    window.__jacSucio=true;
+    try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+    if(typeof window.jacGuardarYa==='function'){ try{ window.jacGuardarYa({silencioso:true}); }catch(e){} }
+    if(typeof window.jacAlertasRender==='function') window.jacAlertasRender();
+    ['RTar','calRenderAllTareas'].forEach(function(f){
+      try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
+    if(typeof toast==='function') toast('Tarea completada','ok');
+  };
+
+  /* ---------- los botones ---------- */
+  var BS='padding:4px 10px;border-radius:7px;border:1px solid #CBD5E1;background:#fff;'
+        +'font-size:11px;cursor:pointer;margin:3px 4px 0 0;white-space:nowrap;font-weight:600';
+  function btn(txt, color, accion){
+    return '<button type="button" style="'+BS+';border-color:'+color+';color:'+color+'" '
+      +'onclick="event.stopPropagation();'+accion+'">'+txt+'</button>';
+  }
+  function enlace(txt, color, href){
+    return '<a href="'+href+'" target="_blank" style="'+BS+';border-color:'+color+';color:'+color
+      +';text-decoration:none;display:inline-block" onclick="event.stopPropagation()">'+txt+'</a>';
+  }
+  function cierre(clave){
+    return btn('&#10003; Atendida','#15803D','jacAlertaAtendida(\''+q(clave)+'\')')
+         + btn('&#8634;','#64748B','jacAlertaReabrir(\''+q(clave)+'\')');
+  }
+
+  function fila(clave, cuerpo, botones){
+    var apagada=!!vistas()[clave];
+    return '<div data-jac-alerta="'+esc2(clave)+'" style="background:#fff;border:1px solid #E2E8F0;'
+      +'border-left:3px solid var(--jac-al-c);border-radius:8px;padding:9px 12px;font-size:11.5px;'
+      +'line-height:1.55'+(apagada?';opacity:.45;filter:grayscale(1)':'')+'">'
+      + cuerpo
+      + '<div style="display:flex;flex-wrap:wrap;margin-top:6px">'+botones+'</div>'
+      + '</div>';
+  }
+
+  function grupo(titulo, color, items, hacerFila){
+    if(!items || !items.length) return '';
+    var h='<div style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px;'
+      +'margin-bottom:8px"><span style="width:9px;height:9px;border-radius:50%;background:'+color+'"></span>'
+      +'<b style="font-size:13px">'+titulo+'</b>'
+      +'<span style="background:'+color+'22;color:'+color+';border-radius:10px;padding:1px 8px;'
+      +'font-size:11px;font-weight:800">'+items.length+'</span></div>'
+      +'<div style="--jac-al-c:'+color+';display:flex;flex-direction:column;gap:6px">';
+    items.slice(0,60).forEach(function(x,i){ h+=hacerFila(x,i); });
+    if(items.length>60) h+='<div style="font-size:10px;color:#94A3B8;padding:4px 2px">y '
+      +(items.length-60)+' más…</div>';
+    return h+'</div></div>';
+  }
+
+  function cuando(d){
+    if(d<0) return '<b style="color:#DC2626">venció hace '+Math.abs(d)+' día'+(Math.abs(d)===1?'':'s')+'</b>';
+    if(d===0) return '<b style="color:#DC2626">hoy</b>';
+    if(d<=7)  return '<b style="color:#D97706">en '+d+' día'+(d===1?'':'s')+'</b>';
+    return 'en '+d+' días';
+  }
+
+  /* datos completos de una poliza para la ficha de la alerta */
+  function fichaPoliza(p, cli){
+    var l=[];
+    l.push('<b>'+esc2(p.nombreCliente||cli.nombre||'(sin cliente)')+'</b>'
+      +' <span style="color:#64748B">· '+esc2(p.aseg||'—')+' · '+esc2(p.ramo||'—')+'</span>');
+    var linea2=[];
+    linea2.push('Póliza <b>'+esc2(p.num||'(sin número)')+'</b>');
+    if(p.letraPrima>0) linea2.push('cuota '+money(p.letraPrima)
+      +(p.periodo?' '+esc2(String(p.periodo).toLowerCase()):''));
+    if(p.total>0) linea2.push('total '+money(p.total));
+    if(p.fechaInicio) linea2.push('desde '+esc2(p.fechaInicio));
+    l.push('<span style="color:#475569">'+linea2.join(' · ')+'</span>');
+    return l.join('<br>');
+  }
+
+  /* ---------- el pintor ---------- */
+  window.jacAlertasRender=function(){
+    var el=document.getElementById('cal-alertas-body'); if(!el) return;
+    var st=E(); if(!st) return;
+    var a=window.jacAlertas();
+
+    var b=document.getElementById('cal-alertas-badge');
+    if(b){ if(a.total){ b.style.display=''; b.textContent=a.total; } else b.style.display='none'; }
+    var sub=document.getElementById('cal-alertas-sub');
+    if(sub) sub.textContent=a.total ? (a.total+' cosas requieren tu atención') : 'Todo al día';
+
+    function pol(id){ return (st.polizas||[]).filter(function(x){ return x.id===id; })[0]||null; }
+    function cliDe(p){
+      if(!p) return {};
+      if(typeof GC==='function'){ var c=GC(p.clienteId); if(c&&c.id) return c; }
+      return (st.clientes||[]).filter(function(x){ return x.id===p.clienteId; })[0]||{};
+    }
+
+    var h='';
+
+    /* ---- Renovaciones ---- */
+    h+=grupo('🔄 Renovaciones (30 días)','#F59E0B',a.renovaciones,function(x){
+      var p=pol(x.id); if(!p) return '';
+      var c=cliDe(p);
+      var t=tel(c.cel||c.tel||p.celCliente||x.tel);
+      var clave='ren_'+x.id;
+      var cuerpo=fichaPoliza(p,c)
+        +'<br><span style="color:#475569">Vence <b>'+esc2(x.fin)+'</b> ('+cuando(x.d)+')</span>';
+      var bt=btn('📋 Ver póliza','#1D4ED8','jacAlVerPoliza(\''+q(p.id)+'\')');
+      if(c.id) bt+=btn('👤 Ver cliente','#0F766E','jacAlVerCliente(\''+q(c.id)+'\')');
+      if(t) bt+=enlace('💬 WhatsApp','#059669','https://wa.me/507'+t+'?text='
+        +encodeURIComponent('Estimado/a '+(p.nombreCliente||c.nombre||'')+', le recordamos que su póliza '
+          +(p.num||'')+' de '+(p.aseg||'')+' vence el '+x.fin+'. Quedo atenta para su renovación. — JAC Seguros'));
+      if(c.email) bt+=enlace('✉️ Correo','#7C3AED','mailto:'+encodeURIComponent(c.email)
+        +'?subject='+encodeURIComponent('Renovación póliza '+(p.num||'')));
+      bt+=btn('📌 Crear tarea','#B45309','jacAlTareaDe(\''+q(p.id)+'\')');
+      bt+=cierre(clave);
+      return fila(clave, cuerpo, bt);
+    });
+
+    /* ---- Pagos ---- */
+    h+=grupo('💵 Pagos pendientes','#DC2626',a.pagos,function(x){
+      var p=pol(x.id); if(!p) return '';
+      var c=cliDe(p);
+      var t=tel(c.cel||c.tel||p.celCliente);
+      var clave='pag_'+x.id;
+      var tr=x.tramos;
+      var cuerpo=fichaPoliza(p,c)
+        +'<br><span style="color:#475569">Saldo <b style="color:#DC2626">'+money(x.monto)+'</b>'
+        +(x.d!=null?' · '+cuando(x.d):'')+'</span>'
+        +(tr?'<br><span style="color:#64748B;font-size:10.5px">0-30: '+money(tr.d0_30)
+            +' · 31-60: '+money(tr.d31_60)+' · 61-90: '+money(tr.d61_90)
+            +' · +90: '+money(tr.d90plus)+'</span>':'');
+      var bt=btn('📋 Ver póliza','#1D4ED8','jacAlVerPoliza(\''+q(p.id)+'\')');
+      if(c.id) bt+=btn('👤 Ver cliente','#0F766E','jacAlVerCliente(\''+q(c.id)+'\')');
+      bt+=btn('💵 Registrar cobro','#15803D','jacAlCobro(\''+q(p.id)+'\')');
+      if(t) bt+=enlace('💬 WhatsApp','#059669','https://wa.me/507'+t+'?text='
+        +encodeURIComponent('Estimado/a '+(p.nombreCliente||c.nombre||'')+', le recordamos el saldo pendiente de '
+          +money(x.monto)+' de su póliza '+(p.num||'')+' ('+(p.aseg||'')+'). — JAC Seguros'));
+      bt+=btn('📌 Crear tarea','#B45309','jacAlTareaDe(\''+q(p.id)+'\')');
+      bt+=cierre(clave);
+      return fila(clave, cuerpo, bt);
+    });
+
+    /* ---- Tareas vencidas ---- */
+    h+=grupo('✅ Tareas vencidas','#8B5CF6',a.tareas,function(x){
+      var t=(st.tareas||[]).filter(function(y){ return y.id===x.id; })[0]||{};
+      var c=t.clienteId ? ((typeof GC==='function'?GC(t.clienteId):null)||{}) : {};
+      var p=t.relId ? pol(t.relId) : null;
+      var clave='tar_'+x.id;
+      var cuerpo='<b>'+esc2(x.txt)+'</b>'
+        +(x.prio?' <span style="color:#64748B">['+esc2(x.prio)+']</span>':'')
+        +(t.desc?'<br><span style="color:#475569">'+esc2(t.desc)+'</span>':'')
+        +((c.nombre||p)?'<br><span style="color:#64748B">'
+            +(c.nombre?esc2(c.nombre):'')
+            +(p?(c.nombre?' · ':'')+'póliza '+esc2(p.num||'(sin número)'):'')+'</span>':'')
+        +'<br><span style="color:#475569">Vencía '+esc2(t.fechaLimite||'—')+' · '+cuando(x.d)+'</span>';
+      var bt=btn('✏️ Abrir tarea','#1D4ED8','jacAlVerTarea(\''+q(x.id)+'\')')
+            +btn('✓ Marcar hecha','#15803D','jacAlTareaHecha(\''+q(x.id)+'\')');
+      if(p) bt+=btn('📋 Ver póliza','#1D4ED8','jacAlVerPoliza(\''+q(p.id)+'\')');
+      if(c.id) bt+=btn('👤 Ver cliente','#0F766E','jacAlVerCliente(\''+q(c.id)+'\')');
+      bt+=cierre(clave);
+      return fila(clave, cuerpo, bt);
+    });
+
+    /* ---- Notas ---- */
+    h+=grupo('📝 Notas vencidas','#0EA5E9',a.notas,function(x){
+      var clave='not_'+x.id;
+      return fila(clave, '<b>'+esc2(x.txt)+'</b><br><span style="color:#475569">'+cuando(x.d)+'</span>',
+        cierre(clave));
+    });
+
+    /* ---- Cumpleaños ---- */
+    h+=grupo('🎂 Cumpleaños (7 días)','#EC4899',a.cumples,function(x){
+      var c=(st.clientes||[]).filter(function(y){ return y.id===x.id; })[0]||{};
+      var t=tel(c.cel||c.tel||x.tel);
+      var clave='cum_'+x.id;
+      var cuerpo='<b>'+esc2(x.nom)+'</b>'
+        +(x.edad>0&&x.edad<120?' <span style="color:#64748B">· cumple '+x.edad+'</span>':'')
+        +'<br><span style="color:#475569">'+cuando(x.d)+'</span>';
+      var bt='';
+      if(c.id) bt+=btn('👤 Ver cliente','#0F766E','jacAlVerCliente(\''+q(c.id)+'\')');
+      if(t) bt+=enlace('🎉 Felicitar','#059669','https://wa.me/507'+t+'?text='
+        +encodeURIComponent('¡Feliz cumpleaños, '+(c.nombre||x.nom)+'! 🎂 Le deseamos un día muy especial. — Jely An Castro · JAC Seguros'));
+      if(c.email) bt+=enlace('✉️ Correo','#7C3AED','mailto:'+encodeURIComponent(c.email)
+        +'?subject='+encodeURIComponent('¡Feliz cumpleaños!'));
+      bt+=cierre(clave);
+      return fila(clave, cuerpo, bt);
+    });
+
+    if(!h) h='<div style="text-align:center;padding:40px 10px;color:#94A3B8">'
+      +'<div style="font-size:30px">✨</div>'
+      +'<div style="font-size:12px;margin-top:6px">Nada pendiente. Todo al día.</div></div>';
+    el.innerHTML=h;
+  };
+
+  /* si el panel ya esta abierto, repintarlo con la version nueva */
+  setTimeout(function(){
+    try{
+      var pane=document.getElementById('cal-pane-alertas');
+      if(pane && pane.style.display!=='none') window.jacAlertasRender();
+    }catch(e){}
+  }, 3000);
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - La agenda deja de brincar
+   ------------------------------------------------------------
+   QUE PASABA, MEDIDO
+
+   Con la pestana de Tareas abierta y sin tocar nada, en 20
+   segundos el tablero se volvia a dibujar entero 4 veces. Cada
+   vez se borran las tarjetas y se vuelven a crear con sus
+   botones: eso es el brinco. Si estaba a media pagina, el scroll
+   se iba; si tenia un desplegable abierto, se cerraba.
+
+   DE DONDE SALIAN ESOS REPINTADOS
+
+   Hay un vigilante que cada 20 segundos comprueba si la conexion
+   en vivo esta despierta. Si no lo esta, sincroniza. Y cada
+   sincronizacion repinta la agenda entera. Se le suman el
+   repintado de cada guardado y el de cada aviso de la nube.
+
+   El vigilante esta bien: es lo que mantiene la agenda al dia
+   entre el telefono y la computadora. Lo que estaba mal es
+   repintar aunque no haya cambiado nada.
+
+   LA SOLUCION
+
+   Antes de repintar se compara una firma de los datos que se ven
+   en esa pestana. Si la firma es la misma, no se repinta: no hay
+   nada nuevo que mostrar. Solo se repinta cuando de verdad
+   cambio algo.
+
+   Ademas nunca se repinta mientras usted esta trabajando: si el
+   cursor esta dentro de la agenda, si hay un desplegable abierto,
+   si esta arrastrando una tarjeta o si hay texto seleccionado, el
+   repintado espera. Y cuando toca repintar de verdad, se guarda y
+   se devuelve la posicion del scroll.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function E(){
+    try{ if(window.S && window.S.tareas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v) return v; }catch(e){}
+    return null;
+  }
+
+  /* ---------- firma de lo que se ve ----------
+     Lleva los datos Y el estado de la pantalla: que pestana esta
+     abierta, que mes se mira y que filtro de tareas esta puesto.
+     Sin eso, cambiar de pestana no cambiaria la firma y el
+     guardia se comeria el repintado que si hacia falta. */
+  function firma(){
+    var st=E(); if(!st) return '';
+    var t=st.tareas||[], p=[];
+
+    /* pestana visible */
+    var pes='';
+    [].forEach.call(document.querySelectorAll('[id^="cal-pane-"]'), function(el){
+      if(el.style.display!=='none' && el.offsetParent!==null) pes+=el.id+',';
+    });
+    p.push('P:'+pes);
+    /* mes que se esta mirando */
+    try{
+      var my=document.getElementById('cal-month-year');
+      p.push('M:'+(my?(my.textContent||'').trim():''));
+    }catch(e){ p.push('M:'); }
+    /* filtro Mias / Automaticas / Todas */
+    try{ p.push('V:'+(typeof window.jacVistaActual==='function'?window.jacVistaActual():'')); }catch(e){}
+    /* vista del tablero de tareas (lista o kanban) */
+    try{ p.push('TV:'+(typeof TV!=='undefined'?TV:'')); }catch(e){}
+
+    p.push('T'+t.length);
+    for(var i=0;i<t.length;i++){
+      var x=t[i];
+      p.push(x.id+'|'+(x.titulo||'')+'|'+(x.etapaTarea||'')+'|'+(x.estado||'')
+            +'|'+(x.fechaLimite||'')+'|'+(x.prioridad||''));
+    }
+    var extra=['calMetas','calNotas','calReuniones','calDiario','notas'];
+    for(var j=0;j<extra.length;j++){
+      var a=st[extra[j]];
+      if(Array.isArray(a)){
+        p.push(extra[j]+':'+a.length);
+        for(var k=0;k<a.length;k++){
+          var y=a[k]||{};
+          p.push((y.id||k)+'~'+(y.texto||y.titulo||'')+'~'+(y.hecha?1:0)+'~'+(y.fecha||''));
+        }
+      }
+    }
+    /* barato y suficiente: longitud + suma rodante */
+    var s=p.join(';'), h=0;
+    for(var m=0;m<s.length;m++){ h=((h<<5)-h+s.charCodeAt(m))|0; }
+    return s.length+':'+h;
+  }
+
+  /* ---------- esta trabajando? ---------- */
+  function ocupada(){
+    var panel=document.getElementById('cal-panel') || document.getElementById('pg-cal');
+    if(!panel) return false;
+    var a=document.activeElement;
+    if(a && a!==document.body && panel.contains(a)){
+      var tg=(a.tagName||'').toUpperCase();
+      if(tg==='INPUT'||tg==='TEXTAREA'||tg==='SELECT'||a.isContentEditable) return true;
+    }
+    if(panel.querySelector('select:focus, [open], [aria-expanded="true"]')) return true;
+    if(window.__jacArrastrando) return true;
+    try{
+      var sel=window.getSelection();
+      if(sel && !sel.isCollapsed && sel.rangeCount &&
+         panel.contains(sel.getRangeAt(0).commonAncestorContainer)) return true;
+    }catch(e){}
+    return false;
+  }
+
+  /* mientras arrastra una tarjeta, nada se repinta */
+  document.addEventListener('dragstart', function(){ window.__jacArrastrando=true; }, true);
+  document.addEventListener('dragend',   function(){ window.__jacArrastrando=false; }, true);
+  document.addEventListener('drop',      function(){
+    window.__jacArrastrando=false;
+    /* un soltar SI cambia los datos: se deja repintar enseguida */
+    window.__jacFirmaAgenda=null;
+  }, true);
+
+  /* ---------- scroll: guardar y devolver ---------- */
+  function scrolls(){
+    var out=[];
+    var panel=document.getElementById('cal-panel') || document.getElementById('pg-cal');
+    if(!panel) return out;
+    out.push({el:document.scrollingElement||document.documentElement,
+              y:(document.scrollingElement||document.documentElement).scrollTop, x:0});
+    [].forEach.call(panel.querySelectorAll('*'), function(el){
+      if(el.scrollTop>0 || el.scrollLeft>0) out.push({el:el, y:el.scrollTop, x:el.scrollLeft});
+    });
+    return out;
+  }
+  function devolver(lista){
+    lista.forEach(function(s){
+      try{ if(s.el && s.el.isConnected){ s.el.scrollTop=s.y; if(s.x) s.el.scrollLeft=s.x; } }catch(e){}
+    });
+  }
+
+  /* ---------- el guardia ---------- */
+  var pendiente=false;
+
+  function debeRepintar(){
+    /* si esta trabajando dentro de la agenda, se espera. Se borra la
+       firma para que el siguiente intento repinte sin falta. */
+    if(ocupada()){ window.__jacFirmaAgenda=null; return false; }
+    var f=firma();
+    if(f && f===window.__jacFirmaAgenda) return false;
+    return true;
+  }
+  function marcar(){ window.__jacFirmaAgenda=firma(); }
+
+  window.jacAgendaDebeRepintar=debeRepintar;
+  window.jacAgendaFirma=firma;
+  window.jacAgendaOcupada=ocupada;
+
+  function envolverPintor(nombre){
+    var f=window[nombre];
+    if(typeof f!=='function' || f.__jacEstable) return false;
+    var nuevo=function(){
+      /* Si no ha cambiado NADA de lo que se ve, repintar no aporta
+         nada y solo hace brincar la pantalla. Da igual quien lo
+         pida: la firma incluye la pestana, el mes y el filtro, asi
+         que cualquier cosa que el usuario cambie la cambia tambien. */
+      if(!debeRepintar()){
+        window.__jacAgendaAhorrados=(window.__jacAgendaAhorrados||0)+1;
+        return;
+      }
+      var s=scrolls();
+      var r=f.apply(this, arguments);
+      marcar();
+      /* devolver el scroll en el siguiente cuadro, ya redibujado */
+      if(typeof requestAnimationFrame==='function') requestAnimationFrame(function(){ devolver(s); });
+      else setTimeout(function(){ devolver(s); }, 0);
+      return r;
+    };
+    nuevo.__jacEstable=1;
+    window[nombre]=nuevo;
+    return true;
+  }
+
+  /* Solo se envuelve el pintor de la pestana. Los de dentro
+     (renderTarK, RTar...) se dejan libres: si se frenaran tambien,
+     un boton que repinta solo su lista dejaria de responder. */
+  function instalar(){
+    ['calRenderCurrentPane'].forEach(envolverPintor);
+  }
+
+  instalar();
+  var n=0;
+  (function reintentar(){ try{ instalar(); }catch(e){} if(++n<20) setTimeout(reintentar, 1000); })();
+
+  /* ---------- diagnostico ---------- */
+  window.jacAgendaEstabilidad=function(){
+    return { firmaActual:firma(), ultimaFirma:window.__jacFirmaAgenda||null,
+             repintadosAhorrados:window.__jacAgendaAhorrados||0,
+             ocupada:ocupada(), arrastrando:!!window.__jacArrastrando };
+  };
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM - Fuera WA Masivo, los avisos pasan a automaticos
+   ------------------------------------------------------------
+   POR QUE SE QUITA
+
+   WA Masivo era trabajo manual disfrazado: entrar, elegir a
+   quien, escribir y mandar. Justo lo contrario de lo que hace
+   falta. Y lo util que tenia -avisar de vencimientos, de cobros
+   atrasados y de cumpleanos- ya sale solo por dos sitios:
+
+     · Las notificaciones del navegador, que revisan cada 30
+       minutos y avisan de cumpleanos de hoy y de manana,
+       polizas que vencen en 7 dias, cobros vencidos y tareas
+       pasadas de fecha.
+     · El panel de Alertas de la agenda, donde cada fila ya trae
+       su boton de WhatsApp con el mensaje escrito, listo para
+       mandar de una pulsacion.
+
+   QUE PASA CON LOS ENLACES VIEJOS
+
+   No se rompe ninguno. Todo lo que llevaba a WA Masivo -el menu
+   de arriba, el de abajo en el telefono- ahora abre el panel de
+   Alertas, que es donde vive lo mismo pero ya resuelto.
+
+   La pantalla en si no se borra del archivo: se esconde. Asi, si
+   algun dia hace falta recuperarla, esta entera.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function irAAlertas(){
+    try{ if(typeof SH==='function') SH('cal'); }catch(e){}
+    setTimeout(function(){
+      try{ if(typeof calTab==='function') calTab('alertas'); }catch(e){}
+      setTimeout(function(){
+        try{ if(typeof window.jacAlertasRender==='function') window.jacAlertasRender(); }catch(e){}
+      }, 250);
+    }, 350);
+  }
+  window.jacIrAAlertas=irAAlertas;
+
+  function quitarDelMenu(){
+    var n=0;
+    [].forEach.call(document.querySelectorAll('nav a, .bni, a[onclick], button[onclick]'), function(el){
+      var oc=el.getAttribute('onclick')||'';
+      if(!/SH\(['"]wam['"]\)/.test(oc)) return;
+      if(el.matches('nav a') || el.classList.contains('bni')){
+        if(el.parentElement){ el.parentElement.removeChild(el); n++; }
+      }
+    });
+    return n;
+  }
+
+  function esconderPantalla(){
+    var pg=document.getElementById('pg-wam');
+    if(!pg) return false;
+    pg.classList.remove('on');
+    pg.setAttribute('data-jac-retirado','1');
+    if(!document.getElementById('jac-wam-css')){
+      var s=document.createElement('style');
+      s.id='jac-wam-css';
+      s.textContent='#pg-wam{display:none!important}';
+      document.head.appendChild(s);
+    }
+    return true;
+  }
+
+  function envolverSH(){
+    if(typeof window.SH!=='function' || window.SH.__jacWam) return false;
+    var orig=window.SH;
+    var nueva=function(id){
+      if(id==='wam'){ irAAlertas(); return; }
+      return orig.apply(this, arguments);
+    };
+    nueva.__jacWam=1;
+    window.SH=nueva;
+    return true;
+  }
+
+  /* las notificaciones automaticas: si ya dio permiso, se encienden
+     solas y se quedan encendidas */
+  function avisosEnMarcha(){
+    try{
+      if(!('Notification' in window)) return;
+      if(Notification.permission!=='granted') return;
+      if(typeof window.jacAvisosEncender==='function') window.jacAvisosEncender();
+    }catch(e){}
+  }
+
+  function arrancar(){
+    quitarDelMenu();
+    esconderPantalla();
+    envolverSH();
+    avisosEnMarcha();
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arrancar);
+  else arrancar();
+  var n=0;
+  (function reintentar(){ try{ arrancar(); }catch(e){} if(++n<12) setTimeout(reintentar, 1000); })();
 })();
 </script>
 
