@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AM';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AO';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -22650,6 +22650,1128 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       +(alerta?'#B45309':'#475569')+';color:#fff;font-size:12px;font-weight:600;cursor:pointer';
     b.textContent=alerta?('⚠️ Co-corretajes · '+alerta+' a revisar'):'Co-corretajes ✓';
     b.onclick=window.jacCoCorPanel;
+    fila.appendChild(b);
+  }
+  setInterval(function(){ try{ boton(); }catch(x){} }, 5000);
+})();
+</script>
+
+
+<!-- bloque-assa.html -->
+
+<script>
+/* ============================================================
+   JAC CRM - ASSA: cartera de vida y salud, con la comision REAL
+   ------------------------------------------------------------
+   De donde sale: del Estado de Cuenta de Comisiones de ASSA.
+   Recorri las 48 liquidaciones y saque 520 movimientos de dos
+   anos - agosto 2024 a agosto 2026 - con el porcentaje que ASSA
+   le pago a ella en cada uno.
+
+   Esto no es una tabla que yo supuse. Es lo que ASSA pago.
+
+   ------------------------------------------------------------
+   LA ESCALA DE ASSA EN VIDA, QUE ERA EL HUECO GRANDE DEL CRM
+
+   Vida universal (polizas 14B, 14G, 14BG):
+       ano 1: 60%   ano 2: 10%   ano 3 en adelante: 2%
+
+   Vida tradicional (polizas 60B):
+       ano 1: 45%   ano 2: 10%   ano 3 en adelante: 5%
+
+   Las transiciones se ven una por una en el historial: la de
+   Patricia Martez paso de 60% a 10% el 22/12/2025; la de Carlos
+   Gonzalez de 45% a 10% el 08/09/2025; la de Manuel Tunon de 10%
+   a 5% el 01/10/2025.
+
+   Salud (polizas 70B): 10% plano.
+   La 60G de Ada Luz Camargo paga 1%.
+
+   ------------------------------------------------------------
+   COMO SE APLICA
+
+   A cada poliza NO se le pone la escala: se le pone el
+   porcentaje que ASSA le esta pagando HOY a esa poliza concreta.
+   Es mas exacto que cualquier tramo, porque es el dato real.
+
+   La escala queda guardada en Configuracion para el negocio
+   nuevo que entre, que ahi si hace falta.
+
+   Estas polizas quedan marcadas con su origen, asi que el motor
+   de comisiones por ano NO se las toca despues.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var ASEG='ASSA';
+  var CARTERA=[
+ {
+  "num": "60G4565",
+  "cli": "ADA LUZ CAMARGO FALCON",
+  "ced": "04-736-1335",
+  "cod": "00000002911087",
+  "prod": "VIDA TRADICIONAL",
+  "fam": "60G",
+  "ini": "2025-12-04",
+  "fin": "2026-12-04",
+  "cuota": 43.53,
+  "anual": 522.36,
+  "idepol": 5427265,
+  "pct": 1.0,
+  "movs": 24,
+  "cobrada": 995.04,
+  "hon": 9.84,
+  "seq": "1@2024-09-02"
+ },
+ {
+  "num": "70B32260",
+  "cli": "ADA LUZ CAMARGO FALCON",
+  "ced": "04-736-1335",
+  "cod": "00000002911087",
+  "prod": "SALUD",
+  "fam": "70B",
+  "ini": "2026-06-24",
+  "fin": "2027-06-24",
+  "cuota": 328.88,
+  "anual": 3946.56,
+  "idepol": 6694468,
+  "pct": 10.0,
+  "movs": 24,
+  "cobrada": 7033.71,
+  "hon": 703.35,
+  "seq": "10@2024-09-02"
+ },
+ {
+  "num": "14G19735",
+  "cli": "ADDEMAR MOISES ROMERO GONZALEZ",
+  "ced": "08-812-1859",
+  "cod": "00000003264780",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2025-10-10",
+  "fin": "2026-10-10",
+  "cuota": 40.0,
+  "anual": 480.0,
+  "idepol": 5443325,
+  "pct": 2.0,
+  "movs": 18,
+  "cobrada": 720.0,
+  "hon": 14.4,
+  "seq": "2@2024-09-16"
+ },
+ {
+  "num": "14G20469",
+  "cli": "ALEJANDRO ANTONIO FRAUCA PALACIOS",
+  "ced": "08-845-663",
+  "cod": "00000003231615",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2026-02-24",
+  "fin": "2027-02-24",
+  "cuota": 56.0,
+  "anual": 672.0,
+  "idepol": 5444167,
+  "pct": 2.0,
+  "movs": 16,
+  "cobrada": 448.0,
+  "hon": 8.96,
+  "seq": "2@2024-08-23"
+ },
+ {
+  "num": "14B102984",
+  "cli": "ALEX ALVAREZ MARTINEZ",
+  "ced": "E-8-206756",
+  "cod": "00000004084581",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14B",
+  "ini": "2023-08-18",
+  "fin": "2107-08-18",
+  "cuota": 50.0,
+  "anual": 600.0,
+  "idepol": 5870058,
+  "pct": 2.0,
+  "movs": 25,
+  "cobrada": 1200.0,
+  "hon": 252.41,
+  "seq": "60@2024-08-19>10@2025-01-17>9.48@2026-06-17>2@2026-07-17"
+ },
+ {
+  "num": "14G19805",
+  "cli": "AMBAR ZULAIKA VON LINDEMAN RAMIREZ",
+  "ced": "PE-10-1385",
+  "cod": "00000003983362",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2025-10-24",
+  "fin": "2026-10-24",
+  "cuota": 34.0,
+  "anual": 408.0,
+  "idepol": 5443397,
+  "pct": 2.0,
+  "movs": 16,
+  "cobrada": 544.0,
+  "hon": 10.88,
+  "seq": "2@2024-08-20"
+ },
+ {
+  "num": "70B41561",
+  "cli": "ANA GABRIELA JORDAN CAMARGO",
+  "ced": "04-828-812",
+  "cod": "00000004193135",
+  "prod": "SALUD",
+  "fam": "70B",
+  "ini": "2026-02-19",
+  "fin": "2027-02-19",
+  "cuota": 288.76,
+  "anual": 3465.12,
+  "idepol": 6617035,
+  "pct": 10.0,
+  "movs": 2,
+  "cobrada": 137.5,
+  "hon": 13.76,
+  "seq": "10@2026-02-19"
+ },
+ {
+  "num": "60B73056",
+  "cli": "CARLOS ALFREDO GONZALEZ SANCHEZ",
+  "ced": "08-846-1661",
+  "cod": "00000003074254",
+  "prod": "VIDA TRADICIONAL",
+  "fam": "60B",
+  "ini": "2024-09-09",
+  "fin": "2056-09-09",
+  "cuota": 21.67,
+  "anual": 260.04,
+  "idepol": 6185090,
+  "pct": 10.0,
+  "movs": 23,
+  "cobrada": 474.72,
+  "hon": 134.14,
+  "seq": "45@2024-09-09>10@2025-09-08"
+ },
+ {
+  "num": "14G17837",
+  "cli": "CARLOS IVAN LUNA CORTEZ",
+  "ced": "07-122-404",
+  "cod": "00000002893273",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2025-10-28",
+  "fin": "2026-10-28",
+  "cuota": 44.5,
+  "anual": 534.0,
+  "idepol": 5441341,
+  "pct": 2.0,
+  "movs": 24,
+  "cobrada": 1068.0,
+  "hon": 21.36,
+  "seq": "2@2024-08-19"
+ },
+ {
+  "num": "60B80248",
+  "cli": "DEYANIRA PINTO MONTERO",
+  "ced": "04-771-1782",
+  "cod": "00000004209946",
+  "prod": "VIDA TRADICIONAL",
+  "fam": "60B",
+  "ini": "2026-04-21",
+  "fin": "2057-04-21",
+  "cuota": 12.1,
+  "anual": 145.2,
+  "idepol": 6693764,
+  "pct": 45.0,
+  "movs": 4,
+  "cobrada": 46.08,
+  "hon": 20.72,
+  "seq": "45@2026-04-21"
+ },
+ {
+  "num": "14G19737",
+  "cli": "ERIC ARMANDO GUERRERO ARROCHA",
+  "ced": "08-365-209",
+  "cod": "00000003222034",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2025-10-11",
+  "fin": "2026-10-11",
+  "cuota": 240.0,
+  "anual": 2880.0,
+  "idepol": 5443327,
+  "pct": 2.0,
+  "movs": 16,
+  "cobrada": 1080.0,
+  "hon": 21.6,
+  "seq": "2@2024-09-13"
+ },
+ {
+  "num": "14B76364",
+  "cli": "ERIKA ANNE GRAY SOLEY",
+  "ced": "PE-10-1325",
+  "cod": "00000004102970",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14B",
+  "ini": "2024-01-19",
+  "fin": "2103-01-19",
+  "cuota": 69.33,
+  "anual": 831.96,
+  "idepol": 6006994,
+  "pct": 10.0,
+  "movs": 21,
+  "cobrada": 1367.32,
+  "hon": 646.72,
+  "seq": "60@2024-09-16>10@2025-12-15"
+ },
+ {
+  "num": "14G17078",
+  "cli": "JAIME ADOLFO CASTRO PEREZ",
+  "ced": "07-119-688",
+  "cod": "00000003253708",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2026-06-26",
+  "fin": "2027-06-26",
+  "cuota": 235.0,
+  "anual": 2820.0,
+  "idepol": 5440582,
+  "pct": 2.0,
+  "movs": 12,
+  "cobrada": 1645.0,
+  "hon": 32.9,
+  "seq": "2@2024-09-02"
+ },
+ {
+  "num": "14BG1916",
+  "cli": "JOSE ANGEL PATIÑO HERRERA",
+  "ced": "04-730-1029",
+  "cod": "00000003285733",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14BG",
+  "ini": "2026-01-28",
+  "fin": "2027-01-28",
+  "cuota": 185.0,
+  "anual": 2220.0,
+  "idepol": 5415896,
+  "pct": 2.0,
+  "movs": 16,
+  "cobrada": 1572.5,
+  "hon": 31.45,
+  "seq": "2@2024-08-27"
+ },
+ {
+  "num": "14G18443",
+  "cli": "JOSE LUIS RIOS PEREZ",
+  "ced": "07-702-488",
+  "cod": "00000003033863",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2026-03-04",
+  "fin": "2027-03-04",
+  "cuota": 146.0,
+  "anual": 1752.0,
+  "idepol": 5441950,
+  "pct": 2.0,
+  "movs": 14,
+  "cobrada": 2044.0,
+  "hon": 40.88,
+  "seq": "2@2024-10-02"
+ },
+ {
+  "num": "14G16565",
+  "cli": "KARLA VERUSKA CHERIGO QUEZADA",
+  "ced": "08-767-48",
+  "cod": "00000003289225",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2026-03-28",
+  "fin": "2027-03-28",
+  "cuota": 104.75,
+  "anual": 1257.0,
+  "idepol": 5440069,
+  "pct": 2.0,
+  "movs": 23,
+  "cobrada": 1014.5,
+  "hon": 20.31,
+  "seq": "2@2024-09-04"
+ },
+ {
+  "num": "14BG1869",
+  "cli": "LEXMA MAGALIS GUERRA RUIZ",
+  "ced": "08-812-1753",
+  "cod": "00000003290303",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14BG",
+  "ini": "2026-01-19",
+  "fin": "2027-01-19",
+  "cuota": 64.5,
+  "anual": 774.0,
+  "idepol": 5415706,
+  "pct": 2.0,
+  "movs": 24,
+  "cobrada": 1548.0,
+  "hon": 30.96,
+  "seq": "2@2024-08-19"
+ },
+ {
+  "num": "60B71264",
+  "cli": "MANUEL ANTONIO TUNON DE SAN MARTIN",
+  "ced": "08-807-1763",
+  "cod": "00000004086600",
+  "prod": "VIDA TRADICIONAL",
+  "fam": "60B",
+  "ini": "2023-09-01",
+  "fin": "2060-09-01",
+  "cuota": 19.36,
+  "anual": 232.32,
+  "idepol": 5877662,
+  "pct": 5.0,
+  "movs": 23,
+  "cobrada": 445.28,
+  "hon": 33.95,
+  "seq": "10@2024-09-02>5@2025-10-01"
+ },
+ {
+  "num": "60B70109",
+  "cli": "MARUSKA MELISSA CANTORAL MONTENEGRO",
+  "ced": "07-705-53",
+  "cod": "00000004036751",
+  "prod": "VIDA TRADICIONAL",
+  "fam": "60B",
+  "ini": "2022-11-07",
+  "fin": "2058-11-07",
+  "cuota": 16.04,
+  "anual": 192.48,
+  "idepol": 5635488,
+  "pct": 5.0,
+  "movs": 24,
+  "cobrada": 366.72,
+  "hon": 19.78,
+  "seq": "10@2024-09-07>5@2024-11-06"
+ },
+ {
+  "num": "70B41562",
+  "cli": "MELANIE CECILIA JORDAN CAMARGO",
+  "ced": "04-822-897",
+  "cod": "00000004193139",
+  "prod": "SALUD",
+  "fam": "70B",
+  "ini": "2026-02-26",
+  "fin": "2027-02-26",
+  "cuota": 360.95,
+  "anual": 4331.4,
+  "idepol": 6617048,
+  "pct": 10.0,
+  "movs": 1,
+  "cobrada": 68.75,
+  "hon": 6.88,
+  "seq": "10@2026-06-05"
+ },
+ {
+  "num": "60B39250",
+  "cli": "MILKA LIZBETH GONZALEZ BARRIOS",
+  "ced": "07-702-86",
+  "cod": "00000003266186",
+  "prod": "VIDA TRADICIONAL",
+  "fam": "60B",
+  "ini": "2020-11-13",
+  "fin": "2051-11-13",
+  "cuota": 0.0,
+  "anual": 0.0,
+  "idepol": 4987132,
+  "pct": 5.0,
+  "movs": 12,
+  "cobrada": 134.43,
+  "hon": 6.7,
+  "seq": "5@2024-09-16"
+ },
+ {
+  "num": "14G17694",
+  "cli": "MORAIMA RIOS PEREZ",
+  "ced": "06-703-2019",
+  "cod": "00000003988646",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2025-10-08",
+  "fin": "2026-10-08",
+  "cuota": 50.0,
+  "anual": 600.0,
+  "idepol": 5441198,
+  "pct": 2.0,
+  "movs": 24,
+  "cobrada": 1199.8,
+  "hon": 24.0,
+  "seq": "2@2024-09-09"
+ },
+ {
+  "num": "14G20429",
+  "cli": "OCTAVIO AUGUSTO FRAUCA PALACIOS",
+  "ced": "08-800-1395",
+  "cod": "00000003981996",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2026-02-22",
+  "fin": "2027-02-22",
+  "cuota": 85.5,
+  "anual": 1026.0,
+  "idepol": 5444107,
+  "pct": 2.0,
+  "movs": 19,
+  "cobrada": 598.0,
+  "hon": 11.96,
+  "seq": "2@2024-08-21"
+ },
+ {
+  "num": "14G19958",
+  "cli": "OLDEMAR ULISES LESCURE GILKES",
+  "ced": "08-774-1591",
+  "cod": "00000003985634",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2025-11-25",
+  "fin": "2026-11-25",
+  "cuota": 48.5,
+  "anual": 582.0,
+  "idepol": 5443591,
+  "pct": 2.0,
+  "movs": 11,
+  "cobrada": 629.0,
+  "hon": 12.58,
+  "seq": "2@2024-12-11"
+ },
+ {
+  "num": "14G19738",
+  "cli": "OLGA LUCIA GOMEZ",
+  "ced": "E-8-92456",
+  "cod": "00000003986312",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2025-10-11",
+  "fin": "2026-10-11",
+  "cuota": 66.0,
+  "anual": 792.0,
+  "idepol": 5443328,
+  "pct": 2.0,
+  "movs": 21,
+  "cobrada": 693.0,
+  "hon": 13.86,
+  "seq": "2@2024-09-16"
+ },
+ {
+  "num": "60B46557",
+  "cli": "PABLO LUIS GONZALEZ HERRERA",
+  "ced": "08-963-2367",
+  "cod": "00000003968870",
+  "prod": "VIDA TRADICIONAL",
+  "fam": "60B",
+  "ini": "2022-09-20",
+  "fin": "2062-09-20",
+  "cuota": 17.12,
+  "anual": 205.44,
+  "idepol": 5599914,
+  "pct": 5.0,
+  "movs": 22,
+  "cobrada": 391.2,
+  "hon": 20.49,
+  "seq": "10@2024-08-16>5@2024-09-16"
+ },
+ {
+  "num": "14B103845",
+  "cli": "PATRICIA YILENI MARTEZ VILLARREAL",
+  "ced": "08-845-2470",
+  "cod": "00000004101001",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14B",
+  "ini": "2023-12-22",
+  "fin": "2111-12-22",
+  "cuota": 57.5,
+  "anual": 690.0,
+  "idepol": 5976267,
+  "pct": 10.0,
+  "movs": 17,
+  "cobrada": 460.0,
+  "hon": 189.78,
+  "seq": "60@2024-08-21>10@2025-12-22"
+ },
+ {
+  "num": "14G19728",
+  "cli": "SHERIL NAZARETH BOHORQUEZ GUTIERREZ",
+  "ced": "E-8-175981",
+  "cod": "00000002931653",
+  "prod": "VIDA UNIVERSAL",
+  "fam": "14G",
+  "ini": "2025-10-07",
+  "fin": "2026-10-07",
+  "cuota": 53.0,
+  "anual": 636.0,
+  "idepol": 5443318,
+  "pct": 2.0,
+  "movs": 17,
+  "cobrada": 901.0,
+  "hon": 18.02,
+  "seq": "2@2024-09-16"
+ },
+ {
+  "num": "60B43944",
+  "cli": "VICTOR NAGAKANE ARGUETA",
+  "ced": "08-867-1780",
+  "cod": "00000003976381",
+  "prod": "VIDA TRADICIONAL",
+  "fam": "60B",
+  "ini": "2022-02-15",
+  "fin": "2062-02-15",
+  "cuota": 15.25,
+  "anual": 183.0,
+  "idepol": 5375146,
+  "pct": 5.0,
+  "movs": 16,
+  "cobrada": 232.32,
+  "hon": 11.68,
+  "seq": "5@2024-09-16"
+ }
+];
+
+  function P(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.polizas))S.polizas=[]; return S.polizas; }
+  function C(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.clientes))S.clientes=[]; return S.clientes; }
+  function k(x){ return String(x==null?'':x).toUpperCase().replace(/[^A-Z0-9]/g,''); }
+  function nid(p){ return (p||'as')+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36); }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ var n=Number(v)||0;
+    return (n<0?'-':'')+'$'+Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+  function titulo(s){
+    return String(s||'').toLowerCase().replace(/(^|\s|\.)([a-zá-ú])/g,function(m,a,b){ return a+b.toUpperCase(); })
+      .replace(/\s+/g,' ').trim();
+  }
+  function ramoDe(f){ return (f.prod==='SALUD')?'SALUD/MÉDICOS':'VIDA'; }
+
+  /* La escala, para el negocio nuevo */
+  window.jacASSATramos=function(){
+    if(typeof S==='undefined') return null;
+    S.comisCfg=S.comisCfg||{};
+    ['ramos','asegs','combos','cocor'].forEach(function(g){
+      if(!S.comisCfg[g]||typeof S.comisCfg[g]!=='object') S.comisCfg[g]={};
+    });
+    /* El CRM indexa por aseguradora||ramo. Vida universal y vida
+       tradicional comparten ramo VIDA pero tienen escalas distintas;
+       se deja la universal, que es la mayoria, y la tradicional queda
+       resuelta poliza a poliza con su porcentaje real. */
+    S.comisCfg.combos['ASSA||VIDA']={ tramos:[{d:1,h:1,com:60},{d:2,h:2,com:10},{d:3,h:'',com:2}],
+      nota:'Vida universal. La tradicional (60B) va 45/10/5 y está puesta póliza a póliza.' };
+    S.comisCfg.combos['ASSA||SALUD/MÉDICOS']={ com:10 };
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    return S.comisCfg.combos['ASSA||VIDA'];
+  };
+
+  function cliente(f){
+    var kk=k(f.ced), hit=null;
+    if(kk) hit=C().filter(function(c){ return k(c.cedula)===kk; })[0];
+    if(!hit){
+      var kn=k(f.cli);
+      hit=C().filter(function(c){ return k(c.nombre)===kn; })[0];
+    }
+    if(!hit){
+      var pal=String(f.cli).toUpperCase().split(/\s+/).filter(function(w){ return w.length>3; });
+      if(pal.length>=2) hit=C().filter(function(c){
+        var N=String(c.nombre||'').toUpperCase(), v=0;
+        pal.forEach(function(w){ if(N.indexOf(w)>=0) v++; });
+        return v>=Math.min(3,pal.length);
+      })[0];
+    }
+    if(!hit){
+      hit={ id:nid('ca'), nombre:titulo(f.cli), cedula:f.ced, tipo:'Natural',
+            estadoCli:'Activo', estadoComercial:'Cliente' };
+      C().push(hit); hit.__nuevo=true;
+    }
+    if(!hit.cedula && f.ced) hit.cedula=f.ced;
+    hit.extra=hit.extra||{};
+    hit.extra.assaCodCliente=f.cod;
+    return hit;
+  }
+
+  window.jacASSACargar=function(){
+    var r={creadas:[], actualizadas:[], clientesNuevos:0, saltadas:[]};
+    CARTERA.forEach(function(f){
+      var p=P().filter(function(x){ return k(x.num)===k(f.num); })[0];
+      /* Si la póliza está en co-corretaje NO se toca: ese reparto y esa
+         comisión los manda el informe de la agencia, no ASSA. */
+      if(p && p.coCor){ r.saltadas.push(f.num); return; }
+      var cli=cliente(f);
+      if(cli.__nuevo){ r.clientesNuevos++; delete cli.__nuevo; }
+      if(!p){ p={id:nid('pa'), num:f.num}; P().push(p); r.creadas.push(f.num); }
+      else r.actualizadas.push(f.num);
+
+      p.aseg=ASEG; p.aseguradora=ASEG;
+      p.clienteId=cli.id;
+      p.nombreCliente=titulo(f.cli);
+      p.nombreAsegurado=titulo(f.cli);
+      p.tomador=titulo(f.cli);
+      p.cedCliente=f.ced; p.docAsegurado=f.ced;
+      p.ramo=ramoDe(f); p.subramo=f.prod; p.cobertura=f.prod;
+      p.moneda='USD';
+      p.fechaInicio=f.ini; p.fechaFin=f.fin;
+      p.estado='Vigente'; p.estadoCartera='Vigente'; p.etapa='Emitida';
+      p.prima=f.anual; p.total=f.anual;
+      p.itbmsPct=0; p.itbms=0;
+      p.letraPrima=f.cuota; p.cuotaMensual=f.cuota; p.numPagos=12;
+      p.formaPago='Mensual'; p.periodo='Mensual';
+      p.vendedor='Jely An Castro Pérez';
+      p.participacion=100;
+      /* El porcentaje REAL que ASSA paga hoy por esta póliza */
+      if(f.pct!==null && f.pct!==undefined){
+        p.comPct=f.pct; p.comisionPct=f.pct;
+        p.comision=+(f.anual*f.pct/100).toFixed(2);
+      }
+      p.extra=p.extra||{};
+      p.extra.comisionFuente='Estado de cuenta ASSA';
+      p.extra.assaIdepol=f.idepol;
+      p.extra.assaFamilia=f.fam;
+      p.extra.assaPctHoy=f.pct;
+      p.extra.assaEscalaVista=f.seq;
+      p.extra.assaMovimientos=f.movs;
+      p.extra.assaPrimaCobrada2a=f.cobrada;
+      p.extra.assaHonorarios2a=f.hon;
+      p.extra.assaConsultado=new Date().toISOString().slice(0,10);
+    });
+    return r;
+  };
+
+  window.jacASSA=async function(){
+    window.jacASSATramos();
+    var r=window.jacASSACargar();
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    var g=(typeof window.jacGuardarYa==='function')
+      ? await window.jacGuardarYa({silencioso:true}) : {ok:false};
+    ['calcKPIs','renderKPIs','RD','RP','RC','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(x){}
+    var mias=P().filter(function(p){ return p.aseg===ASEG
+      && p.extra && p.extra.comisionFuente==='Estado de cuenta ASSA'; });
+    var out={ carga:r, guardado:g.ok===true, total:mias.length,
+      prima:+mias.reduce(function(s,p){ return s+(parseFloat(p.prima)||0); },0).toFixed(2),
+      comision:+mias.reduce(function(s,p){ return s+(parseFloat(p.comision)||0); },0).toFixed(2) };
+    window.__jacASSA=out;
+    return out;
+  };
+
+  window.jacASSAResumen=function(){
+    var fam={};
+    CARTERA.forEach(function(f){
+      var k2=f.fam+' · '+f.prod;
+      fam[k2]=fam[k2]||{n:0,pcts:{},prima:0,com:0};
+      fam[k2].n++; fam[k2].prima+=f.anual; fam[k2].com+=f.anual*(f.pct||0)/100;
+      fam[k2].pcts[f.pct]=(fam[k2].pcts[f.pct]||0)+1;
+    });
+    Object.keys(fam).forEach(function(k3){ fam[k3].prima=+fam[k3].prima.toFixed(2);
+      fam[k3].com=+fam[k3].com.toFixed(2); });
+    return { polizas:CARTERA.length, familias:fam,
+      primaAnual:+CARTERA.reduce(function(s,f){ return s+f.anual; },0).toFixed(2),
+      comisionAnual:+CARTERA.reduce(function(s,f){ return s+f.anual*(f.pct||0)/100; },0).toFixed(2),
+      cobrado2anios:+CARTERA.reduce(function(s,f){ return s+(f.cobrada||0); },0).toFixed(2),
+      honorarios2anios:+CARTERA.reduce(function(s,f){ return s+(f.hon||0); },0).toFixed(2) };
+  };
+
+  /* Se aplica solo, una vez, con la nube viva */
+  var YA=false, N=0;
+  async function hayNube(){
+    try{ if(!window.db||window.db.__esStub) return false;
+      var s=await window.db.auth.getSession(); return !!(s&&s.data&&s.data.session);
+    }catch(x){ return false; }
+  }
+  async function auto(){
+    if(YA) return; N++; if(N>50) return;
+    if(P().length<20) return;
+    if(!(await hayNube())) return;
+    YA=true;
+    try{ await window.jacASSA(); }catch(x){ YA=false; }
+  }
+  setTimeout(auto, 28000);
+  var t=setInterval(function(){ if(YA||N>50){ clearInterval(t); return; } auto(); }, 9000);
+})();
+</script>
+
+
+<!-- bloque-pagos-auditoria.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Auditoría de pagos y cuotas
+   ------------------------------------------------------------
+   LO QUE ESTÁ PASANDO, CON NÚMEROS
+
+   De sus 281 pólizas vigentes, que suman $125,617 de prima:
+
+     · pagado registrado ....... $21,537
+     · saldo registrado ........ $20,154
+     · suma .................... $41,691
+     · falta por explicar ...... $83,926
+
+   Y **184 pólizas tienen pagado = 0 y saldo = 0 a la vez**. No es
+   que estén al día: es que nunca se les registró nada. Solo 39 de
+   281 cuadran (pagado + saldo = prima).
+
+   Además la forma de pago está escrita de seis maneras distintas:
+   MENSUAL (81), Mensual (8), Fraccionado (113), Contado (21),
+   ANUAL (14) y 44 en blanco. "Fraccionado" ni siquiera dice cada
+   cuánto se paga.
+
+   ------------------------------------------------------------
+   LO QUE HACE ESTO
+
+   1. Unifica la forma de pago en cuatro: Mensual, Trimestral,
+      Semestral y Anual. "Contado" pasa a Anual (un solo pago).
+      "Fraccionado" mira el periodo; si no lo dice, se toma
+      MENSUAL —que es la mayoría de su cartera, como usted dice—
+      y queda MARCADA como supuesta, para que la revise.
+
+   2. Arma el calendario de cuotas de cada póliza desde su fecha
+      de inicio, y aplica su regla:
+
+         todo lo vencido hace más de 90 días ....... COBRADO
+         lo vencido en los últimos 90 días ......... PENDIENTE
+
+      Así el tramo de "más de 90 días" queda vacío, que es
+      exactamente lo que pidió.
+
+   3. Genera los cobros pendientes con su fecha de vencimiento
+      real, para que la antigüedad de 0-30 / 31-60 / 61-90 salga
+      sola en Agenda y en Cobros.
+
+   ------------------------------------------------------------
+   LO QUE NO TOCA
+
+   · WorldWide. Esas ocho traen las facturas pendientes reales
+     del portal, con su número de factura. Un cálculo mío sería
+     peor que el dato de la compañía.
+   · Los cobros que usted metió a mano. Solo administra los que
+     genera este bloque, que van marcados con referencia CUO-.
+   · Las pólizas sin fecha de inicio (18) o sin prima (31). Ahí no
+     hay con qué calcular; se listan aparte.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var DIAS_GRACIA = 90;
+  var MARCA = 'CUO-';
+
+  function P(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.polizas))S.polizas=[]; return S.polizas; }
+  function G(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.pagos))S.pagos=[]; return S.pagos; }
+  function n(v){ return parseFloat(v)||0; }
+  function U(x){ return String(x==null?'':x).toUpperCase().trim(); }
+  function nid(p){ return (p||'cu')+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36); }
+  function hoy(){ var d=new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function menosDias(iso, k){
+    var p=String(iso).split('-'); var d=new Date(+p[0], +p[1]-1, +p[2]);
+    d.setDate(d.getDate()-k);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function masMeses(iso, m){
+    var p=String(iso).split('-'); if(p.length!==3) return null;
+    var a=+p[0], me=+p[1]-1, di=+p[2];
+    var d=new Date(a, me+m, 1);
+    var ultimo=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+    d.setDate(Math.min(di, ultimo));
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function esISO(x){ return /^\d{4}-\d{2}-\d{2}$/.test(String(x||'')); }
+
+  /* ---------- 1. La frecuencia, unificada ---------- */
+  var TABLA=[
+    [/MENSUAL|MENSUALES|MES\b/, 12, 'Mensual'],
+    [/TRIMESTRAL|TRIMESTRE/,     4, 'Trimestral'],
+    [/SEMESTRAL|SEMESTRE/,       2, 'Semestral'],
+    [/ANUAL|CONTADO|ANUALIDAD/,  1, 'Anual']
+  ];
+  function leer(txt){
+    var t=U(txt); if(!t) return null;
+    for(var i=0;i<TABLA.length;i++) if(TABLA[i][0].test(t)) return {nc:TABLA[i][1], et:TABLA[i][2]};
+    return null;
+  }
+
+  window.jacFrecuencia=function(p){
+    /* Se mira lo más específico primero: el periodo suele ser más
+       fiable que la forma de pago, donde vive el "Fraccionado". */
+    var r = leer(p.periodo) || leer(p.formaPago);
+    if(r) return {nc:r.nc, et:r.et, supuesta:false, motivo:'del propio registro'};
+
+    /* "Fraccionado" sin periodo: dice que se paga a plazos pero no
+       cada cuánto. El número de pagos, si es creíble, lo resuelve. */
+    var np=parseInt(p.numPagos,10);
+    if(np===12) return {nc:12, et:'Mensual',    supuesta:false, motivo:'12 pagos'};
+    if(np===4)  return {nc:4,  et:'Trimestral', supuesta:false, motivo:'4 pagos'};
+    if(np===2)  return {nc:2,  et:'Semestral',  supuesta:false, motivo:'2 pagos'};
+
+    /* Sin nada fiable: mensual, que es la mayoría de su cartera.
+       Queda marcada como supuesta para que la revise. */
+    return {nc:12, et:'Mensual', supuesta:true,
+            motivo: U(p.formaPago)==='FRACCIONADO' ? 'fraccionado sin periodo' : 'sin forma de pago' };
+  };
+
+  /* ---------- 2. El calendario de cuotas ---------- */
+  window.jacCuotasDe=function(p){
+    var f=window.jacFrecuencia(p);
+    var prima=n(p.prima);
+    if(!esISO(p.fechaInicio) || !(prima>0)) return null;
+    var paso=12/f.nc;
+    var cuota=+(prima/f.nc).toFixed(2);
+    var H=hoy(), corte=menosDias(H, DIAS_GRACIA);
+    var lista=[];
+    for(var k=0;k<f.nc;k++){
+      var v=masMeses(p.fechaInicio, Math.round(paso*k));
+      if(!v) break;
+      /* Nunca más allá del fin de vigencia */
+      if(esISO(p.fechaFin) && v>p.fechaFin) break;
+      lista.push({k:k+1, vence:v, monto:cuota,
+        estado: (v>H) ? 'futura' : (v<=corte ? 'cobrada' : 'pendiente')});
+    }
+    /* El redondeo se ajusta en la última, para que sumen la prima */
+    if(lista.length===f.nc && lista.length){
+      var suma=lista.reduce(function(s,x){ return s+x.monto; },0);
+      var dif=+(prima-suma).toFixed(2);
+      if(Math.abs(dif)>=0.01) lista[lista.length-1].monto=+(lista[lista.length-1].monto+dif).toFixed(2);
+    }
+    var cob=lista.filter(function(x){ return x.estado==='cobrada'; });
+    var pen=lista.filter(function(x){ return x.estado==='pendiente'; });
+    return { frec:f, cuota:cuota, cuotas:lista,
+             pagado:+cob.reduce(function(s,x){ return s+x.monto; },0).toFixed(2),
+             saldo:+pen.reduce(function(s,x){ return s+x.monto; },0).toFixed(2),
+             pendientes:pen, cobradas:cob.length };
+  };
+
+  /* ---------- 3. La auditoría (no escribe nada) ---------- */
+  function elegible(p){
+    if(String(p.estado||'').toLowerCase()!=='vigente') return 'no vigente';
+    if(p.extra && p.extra.wwPendientes) return 'WorldWide: facturas reales del portal';
+    if(!esISO(p.fechaInicio)) return 'sin fecha de inicio';
+    if(!(n(p.prima)>0)) return 'sin prima';
+    return null;
+  }
+
+  /* Todas las elegibles con su cálculo. La aplicación trabaja sobre
+     esto, no sobre la lista de cambios: si solo reconstruyera las que
+     cambian, al aplicar dos veces borraría los cobros de las que ya
+     estaban bien y no los volvería a crear. */
+  window.jacTodasLasCuotas=function(){
+    var out=[];
+    P().forEach(function(p){
+      if(elegible(p)) return;
+      var c=window.jacCuotasDe(p);
+      if(c) out.push({ref:p, calc:c});
+    });
+    return out;
+  };
+
+  window.jacAuditarPagos=function(){
+    var cambia=[], iguales=0, fuera={}, supuestas=[], frec={};
+    P().forEach(function(p){
+      var no=elegible(p);
+      if(no){ (fuera[no]=fuera[no]||[]).push(p.num||'(sin número)'); return; }
+      var c=window.jacCuotasDe(p);
+      if(!c) return;
+      frec[c.frec.et]=(frec[c.frec.et]||0)+1;
+      if(c.frec.supuesta) supuestas.push({num:p.num||'(sin número)', cli:p.nombreCliente||'',
+        aseg:p.aseg, prima:n(p.prima), motivo:c.frec.motivo});
+      var apg=n(p.pagado), asa=n(p.saldo);
+      if(Math.abs(apg-c.pagado)<0.01 && Math.abs(asa-c.saldo)<0.01){ iguales++; return; }
+      cambia.push({ ref:p, num:p.num||'(sin número)', cli:p.nombreCliente||'', aseg:p.aseg,
+        ramo:p.ramo, prima:n(p.prima), frec:c.frec.et, supuesta:c.frec.supuesta,
+        cuota:c.cuota, ini:p.fechaInicio,
+        pagAntes:apg, pagDespues:c.pagado, salAntes:asa, salDespues:c.saldo,
+        nPend:c.pendientes.length, calc:c });
+    });
+    cambia.sort(function(a,b){ return (b.salDespues-b.salAntes)-(a.salDespues-a.salAntes); });
+    return { cambian:cambia, yaCuadran:iguales, fuera:fuera, supuestas:supuestas, frecuencias:frec,
+      totPagado:+cambia.reduce(function(s,x){ return s+x.pagDespues; },0).toFixed(2),
+      totSaldo:+cambia.reduce(function(s,x){ return s+x.salDespues; },0).toFixed(2),
+      pendientesAGenerar:cambia.reduce(function(s,x){ return s+x.nPend; },0) };
+  };
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Pagos: aplicar, deshacer y ver el informe
+   ============================================================ */
+(function(){
+  'use strict';
+  var MARCA='CUO-';
+
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function G(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.pagos))S.pagos=[]; return S.pagos; }
+  function n(v){ return parseFloat(v)||0; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function nid(p){ return (p||'cu')+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36); }
+  function money(v){ var q=Number(v)||0;
+    return (q<0?'-':'')+'$'+Math.abs(q).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+  window.jacAplicarPagos=async function(){
+    var r=window.jacAuditarPagos(), nP=0, nC=0;
+
+    /* Fuera los cobros que generó este bloque la vez anterior.
+       Los suyos y los de WorldWide no se tocan. */
+    var antes=G().length;
+    S.pagos=G().filter(function(g){ return String(g.referencia||'').indexOf(MARCA)!==0; });
+    var borrados=antes-S.pagos.length;
+
+    window.jacTodasLasCuotas().forEach(function(f){
+      var p=f.ref;                       /* referencia directa, nunca búsqueda por id */
+      var c=f.calc;
+      p.extra=p.extra||{};
+      if(!p.extra.pagosPrevio)
+        p.extra.pagosPrevio={ pagado:p.pagado, saldo:p.saldo,
+                              formaPago:p.formaPago, periodo:p.periodo, numPagos:p.numPagos,
+                              letraPrima:p.letraPrima };
+      p.pagado=c.pagado;
+      p.saldo=c.saldo;
+      p.formaPago=c.frec.et; p.periodo=c.frec.et;
+      p.numPagos=c.frec.nc;
+      p.letraPrima=c.cuota;
+      if(c.frec.nc===12) p.cuotaMensual=c.cuota;
+      p.extra.cuotaCalculada={ frecuencia:c.frec.et, nCuotas:c.frec.nc, cuota:c.cuota,
+        supuesta:c.frec.supuesta, motivo:c.frec.motivo, cobradas:c.cobradas,
+        pendientes:c.pendientes.length, corteDias:90,
+        calculado:new Date().toISOString().slice(0,10) };
+      nP++;
+      /* Un cobro por cada cuota pendiente, con su vencimiento real */
+      c.pendientes.forEach(function(q){
+        G().push({ id:nid('cu'), clienteId:p.clienteId||'', polizaId:p.id||'',
+          cliente:p.nombreCliente||'', aseg:p.aseg||'', ramo:p.ramo||'',
+          monto:q.monto, fecha:q.vence, estado:'Pendiente',
+          metodo:p.medioPago||p.medio||'', periodo:c.frec.et,
+          cuota:'Cuota '+q.k+' de '+c.frec.nc,
+          referencia:MARCA+(p.num||p.id)+'-'+q.k,
+          notas:'Cuota calculada del calendario de pagos' });
+        nC++;
+      });
+    });
+
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    var g=(typeof window.jacGuardarYa==='function')
+      ? await window.jacGuardarYa({silencioso:true}) : {ok:false};
+    ['calcKPIs','renderKPIs','RD','RP','RPag','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(x){}
+    return { polizas:nP, cobrosGenerados:nC, cobrosViejosBorrados:borrados, guardado:g.ok===true };
+  };
+
+  window.jacDeshacerPagos=async function(){
+    var nP=0;
+    P().forEach(function(p){
+      var v=p&&p.extra&&p.extra.pagosPrevio; if(!v) return;
+      p.pagado=v.pagado; p.saldo=v.saldo;
+      p.formaPago=v.formaPago; p.periodo=v.periodo;
+      p.numPagos=v.numPagos; p.letraPrima=v.letraPrima;
+      delete p.extra.pagosPrevio; delete p.extra.cuotaCalculada;
+      nP++;
+    });
+    var antes=G().length;
+    S.pagos=G().filter(function(g2){ return String(g2.referencia||'').indexOf(MARCA)!==0; });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+    ['calcKPIs','renderKPIs','RD','RP','RPag','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return { polizas:nP, cobrosBorrados:antes-G().length };
+  };
+
+  /* ---------------- El informe ---------------- */
+  window.jacPagosAuditoria=function(){
+    var r=window.jacAuditarPagos();
+    var fu=Object.keys(r.fuera);
+
+    var h='<div style="font-size:12px;color:#334155;line-height:1.75;margin-bottom:12px">'
+      +'Las cuotas se arman desde la fecha de inicio de cada póliza y su frecuencia. '
+      +'Su regla: <b>todo lo vencido hace más de 90 días pasa a cobrado</b>, y solo queda '
+      +'pendiente lo de los últimos 90 días. Así el tramo de «más de 90» queda vacío.</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:13px">'
+      +[['Pólizas a corregir', r.cambian.length, '#B45309'],
+        ['Ya cuadraban', r.yaCuadran, '#15803D'],
+        ['Pasa a cobrado', money(r.totPagado), '#15803D'],
+        ['Queda pendiente', money(r.totSaldo), '#B45309']]
+       .map(function(c){ return '<div style="border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px">'
+         +'<div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.4px">'+c[0]+'</div>'
+         +'<div style="font-size:18px;font-weight:800;color:'+c[2]+';margin-top:3px">'+c[1]+'</div></div>'; }).join('')
+      +'</div>';
+
+    h+='<div style="font-size:12px;color:#475569;margin-bottom:12px">Frecuencias que quedan: '
+      +Object.keys(r.frecuencias).map(function(k){ return '<b>'+e(k)+'</b> '+r.frecuencias[k]; }).join(' · ')
+      +' — y se generan <b>'+r.pendientesAGenerar+'</b> cobros pendientes con su fecha de vencimiento.</div>';
+
+    if(r.supuestas.length){
+      h+='<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 13px;'
+        +'font-size:12px;margin-bottom:12px;line-height:1.65">'
+        +'<b>'+r.supuestas.length+' pólizas donde supuse mensual</b><br>'
+        +'<span style="color:#78350F;font-size:11px">No dicen cada cuánto se paga. Tomé mensual porque es '
+        +'la mayoría de su cartera, pero si alguna es trimestral o semestral corríjala en su ficha y vuelva '
+        +'a aplicar — el cálculo se rehace solo.</span>'
+        +'<div style="max-height:16vh;overflow:auto;margin-top:7px;font-size:11px">'
+        +r.supuestas.slice(0,40).map(function(s){ return '<div style="padding:2px 0"><code>'+e(s.num)+'</code> · '
+          +e(s.cli||s.aseg)+' — '+money(s.prima)+' <span style="color:#94A3B8">('+e(s.motivo)+')</span></div>'; }).join('')
+        +(r.supuestas.length>40?('<div style="color:#94A3B8;padding-top:4px">…y '+(r.supuestas.length-40)+' más</div>'):'')
+        +'</div></div>';
+    }
+
+    if(fu.length){
+      h+='<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:10px 13px;'
+        +'font-size:12px;margin-bottom:12px;line-height:1.7"><b>No se tocan:</b><br>'
+        +fu.map(function(k){ return '<span style="color:#475569">'+e(k)+': <b>'+r.fuera[k].length+'</b></span>'; }).join(' · ')
+        +'</div>';
+    }
+
+    h+='<div style="max-height:34vh;overflow:auto;border:1px solid #E2E8F0;border-radius:10px">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#F8FAFC">'
+      +['Póliza','Cliente','Frecuencia','Prima','Cuota','Cobrado','Pendiente','Cuotas']
+       .map(function(c){ return '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #E2E8F0;'
+         +'font-weight:700;white-space:nowrap;position:sticky;top:0;background:#F8FAFC">'+c+'</th>'; }).join('')
+      +'</tr></thead><tbody>';
+    r.cambian.slice(0,250).forEach(function(f){
+      h+='<tr style="border-bottom:1px solid #F1F5F9">'
+        +'<td style="padding:5px 8px;font-family:monospace;white-space:nowrap">'+e(f.num)+'</td>'
+        +'<td style="padding:5px 8px">'+e(f.cli||'—')+'<div style="font-size:10px;color:#94A3B8">'+e(f.aseg||'')+'</div></td>'
+        +'<td style="padding:5px 8px">'+e(f.frec)+(f.supuesta?' <span style="color:#B45309" title="supuesta">*</span>':'')+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+money(f.prima)+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+money(f.cuota)+'</td>'
+        +'<td style="padding:5px 8px;text-align:right;color:#15803D">'+money(f.pagAntes)+' → <b>'+money(f.pagDespues)+'</b></td>'
+        +'<td style="padding:5px 8px;text-align:right;color:#B45309">'+money(f.salAntes)+' → <b>'+money(f.salDespues)+'</b></td>'
+        +'<td style="padding:5px 8px;text-align:center">'+f.nPend+'</td></tr>';
+    });
+    h+='</tbody></table></div>'
+      +(r.cambian.length>250?('<div style="font-size:11px;color:#94A3B8;padding:5px 2px">Se muestran 250 de '+r.cambian.length+'. Se aplican todas.</div>'):'')
+      +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+      +'<button onclick="jacPagosAplicar()" style="padding:9px 17px;border-radius:9px;border:none;'
+      +'background:#15803D;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+      +'Aplicar a las '+r.cambian.length+'</button>'
+      +'<button onclick="jacPagosDeshacer()" style="padding:9px 17px;border-radius:9px;'
+      +'border:1px solid #CBD5E1;background:#fff;font-size:12px;cursor:pointer">Deshacer</button>'
+      +'</div><div id="jac-pag-res" style="font-size:12px;color:#475569;margin-top:9px"></div>';
+
+    if(typeof openDP==='function') openDP(h,'Auditoría de pagos y cuotas');
+  };
+
+  window.jacPagosAplicar=async function(){
+    var o=document.getElementById('jac-pag-res');
+    if(o) o.innerHTML='Aplicando…';
+    var r=await window.jacAplicarPagos();
+    if(o) o.innerHTML='Corregidas <b>'+r.polizas+'</b> pólizas · generados <b>'+r.cobrosGenerados
+      +'</b> cobros pendientes'+(r.cobrosViejosBorrados?(' · sustituidos '+r.cobrosViejosBorrados+' del cálculo anterior'):'')
+      +'. '+(r.guardado?'<span style="color:#15803D">Guardado ✓</span>'
+                       :'<span style="color:#B91C1C">Sin confirmar la subida.</span>');
+  };
+  window.jacPagosDeshacer=async function(){
+    var r=await window.jacDeshacerPagos();
+    var o=document.getElementById('jac-pag-res');
+    if(o) o.innerHTML='Devueltas <b>'+r.polizas+'</b> pólizas y borrados <b>'+r.cobrosBorrados+'</b> cobros calculados.';
+  };
+
+  /* Botón junto al chip de Pólizas */
+  function boton(){
+    var chip=document.getElementById('jac-cc-chip');
+    if(!chip||document.getElementById('jac-btn-pag')) return;
+    var fila=chip.firstElementChild; if(!fila) return;
+    var r; try{ r=window.jacAuditarPagos(); }catch(x){ return; }
+    var b=document.createElement('button');
+    b.id='jac-btn-pag'; b.type='button';
+    b.style.cssText='padding:6px 13px;border-radius:999px;border:none;background:'
+      +(r.cambian.length?'#B45309':'#475569')+';color:#fff;font-size:12px;font-weight:600;cursor:pointer';
+    b.textContent=r.cambian.length?('⚠️ '+r.cambian.length+' pólizas sin cuotas cuadradas'):'Pagos cuadrados ✓';
+    b.onclick=window.jacPagosAuditoria;
     fila.appendChild(b);
   }
   setInterval(function(){ try{ boton(); }catch(x){} }, 5000);
