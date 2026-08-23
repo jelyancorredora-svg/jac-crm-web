@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AP';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AQ';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -23887,11 +23887,20 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
    ['FIANZAS/ROBO/SUSTRACCIÓN', ['FIANZA','FIANZAS','FIANZAS/ROBO/SUSTRACCION']]
   ].forEach(function(par){ par[1].forEach(function(v){ RAMO[llave(v)]=par[0]; }); });
 
+  /* Cerrojo: La Regional de Seguros y La Regional de Seguros VUMI
+     son DOS compañías distintas — una de autos y otra de salud.
+     Nada que lleve VUMI se toca jamás, escriba quien escriba la
+     lista de arriba en el futuro. */
+  function protegida(s){ return llave(s).indexOf('VUMI')>=0; }
+
   function canon(v, tabla){
     var s=String(v||'').trim(); if(!s) return null;
+    if(protegida(s)) return null;
     var c=tabla[llave(s)];
+    if(c && protegida(c)) return null;
     return (c && c!==s) ? c : (c||null);
   }
+  window.jacEsProtegida=protegida;
   window.jacCanonAseg=function(v){ return canon(v, ASEG); };
   window.jacCanonRamo=function(v){ return canon(v, RAMO); };
 
