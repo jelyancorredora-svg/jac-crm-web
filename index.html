@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AR';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AT';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -15907,10 +15907,10 @@ document.addEventListener('click', function(e){
     var bs='padding:8px 14px;border-radius:8px;border:none;color:#fff;cursor:pointer;font-size:13px;margin:0 8px 8px 0';
     d.innerHTML='<div class="ch"><h3>\uD83D\uDCC4 Reportes de aseguradoras</h3></div>'
       +'<div style="padding:12px 16px">'
-      +'<p style="color:#6b7280;font-size:13px;margin:0 0 12px">Vuelve a poner el CRM al d\u00eda con lo que dicen las aseguradoras: vigencias, primas, % de comisi\u00f3n y compa\u00f1\u00eda. Nunca retrocede una vigencia que en el CRM ya va m\u00e1s adelante. Se puede correr las veces que quieras.</p>'
+      +'<p style="color:#6b7280;font-size:13px;margin:0 0 12px">Vuelve a poner el CRM al d\u00eda con lo que dicen las aseguradoras: vigencias, primas y % de comisi\u00f3n. Cruza <b>por n\u00famero de p\u00f3liza</b>, nunca por cliente. Nunca retrocede una vigencia que en el CRM ya va m\u00e1s adelante. Se puede correr las veces que quieras.</p>'+'<div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:9px;padding:9px 12px;font-size:12px;color:#4C1D95;line-height:1.65;margin:0 0 12px">'+'<b>Aplicar archivos de portales</b> lee tres archivos <b>independientes</b> y aplica cada uno a sus propias p\u00f3lizas. No las mezcla ni las une:<br>'+'\u00b7 <b>iSeguros</b> (C\u00eda Internacional de Seguros) \u2014 tu cartera de <b>vida</b><br>'+'\u00b7 <b>BlueCross</b> (BCBS Panam\u00e1) \u2014 tu cartera de <b>salud</b><br>'+'\u00b7 <b>UNIVIVIR</b> \u2014 compa\u00f1\u00eda aparte, con su propia cartera'+'</div>'
       +'<button id="jac-btn-todo"      style="'+bs+';background:#15803D;font-weight:700">\u25B6 Actualizar todo</button>'
       +'<button id="jac-btn-cc"        style="'+bs+';background:#0F766E;font-weight:700">\uD83E\uDD1D Co-corretaje CAPITAL CARE</button>'
-      +'<button id="jac-btn-portales"  style="'+bs+';background:#7C3AED">UniVivir, iSeguros y BlueCross</button>'
+      +'<button id="jac-btn-portales"  style="'+bs+';background:#7C3AED">Aplicar archivos de portales</button>'
       +'<button id="jac-btn-auditar"   style="'+bs+';background:#B45309">Auditar y corregir</button>'
       +'<button id="jac-btn-completar" style="'+bs+';background:#0891B2">Completar faltantes</button>'
       +'<button id="jac-btn-verarch"   style="'+bs+';background:#64748B">Ver qu\u00e9 hay archivado</button>'
@@ -24280,6 +24280,376 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       +(pend?'#B45309':'#475569')+';color:#fff;font-size:12px;font-weight:600;cursor:pointer';
     b.textContent='Capital Care · informe '+r.informe+(pend?(' — '+pend+' a revisar'):' ✓');
     b.onclick=window.jacPanelCC;
+    fila.appendChild(b);
+  }
+  setInterval(function(){ try{ boton(); }catch(x){} }, 5000);
+})();
+</script>
+
+
+<!-- bloque-renovaciones.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Cadenas de renovación
+   ------------------------------------------------------------
+   El caso: una misma póliza que al renovarse va cambiando el
+   último tramo del número — 04-04-570284-8, luego -9; o
+   033-012-000000761-000000, luego -000005. Son la misma póliza,
+   pero en el CRM figuran como dos.
+
+   ------------------------------------------------------------
+   POR QUÉ ESTO NO ES TAN SENCILLO COMO PARECE
+
+   La regla obvia —«quitar el último tramo con guion»— agrupa mal.
+   Al probarla contra tu cartera juntó:
+
+     · 20 pólizas de UNIVIVIR de 20 clientes DISTINTOS, porque
+       todas empiezan por 1-9- y el resto es el número de póliza,
+       no un contador.
+     · 17 de Cía Internacional salud, todas 16-1-.
+     · Las 8 de WorldWide, WPSR- y WVP-.
+
+   Si llego a fusionar eso te borro media cartera. Así que la
+   regla lleva tres cerrojos:
+
+     1. El contador tiene que ser PEQUEÑO (0 a 99). Un número de
+        cuatro o cinco cifras no es un contador de renovaciones:
+        es el número de póliza.
+     2. La base tiene que tener al menos 7 caracteres. "1-9" o
+        "16-1" son prefijos de compañía, no bases.
+     3. Todas las de la cadena tienen que compartir compañía,
+        ramo Y titular. Si algo no coincide, va a revisar, no se
+        fusiona.
+
+   ------------------------------------------------------------
+   QUÉ SE CONSERVA
+
+   Se queda la de renovación más avanzada, como pediste. Pero
+   antes de quitar las viejas les rescata lo que la nueva no
+   tenga: el gancho de co-corretaje, la cédula, el correo, el
+   teléfono, el porcentaje de comisión. Hay dos casos en tu
+   cartera donde la vieja lleva el gancho de Capital Care y la
+   nueva no — sin este rescate perderías ese co-corretaje.
+
+   Y las que se quitan quedan guardadas enteras dentro de la que
+   sobrevive, así que deshacer las devuelve exactamente igual.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function P(){ if(typeof S==='undefined')return[]; if(!Array.isArray(S.polizas))S.polizas=[]; return S.polizas; }
+  function n(v){ return parseFloat(v)||0; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ var q=Number(v)||0;
+    return (q<0?'-':'')+'$'+Math.abs(q).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+  function lim(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9-]/g,''); }
+  function nom(s){ return String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^A-Z ]/g,' ').replace(/\s+/g,' ').trim(); }
+  function pal(s){ var o={}; nom(s).split(' ').forEach(function(w){ if(w.length>2) o[w]=1; }); return o; }
+  function mismaPersona(a,b){
+    var A=pal(a), B=pal(b);
+    var ka=Object.keys(A), kb=Object.keys(B);
+    if(!ka.length||!kb.length) return false;
+    var c=0; ka.forEach(function(w){ if(B[w]) c++; });
+    return c>=2 || c===Math.min(ka.length,kb.length);
+  }
+
+  /* Los tres cerrojos */
+  window.jacTrozoRenovacion=function(num){
+    var s=lim(num);
+    var m=/^(.*)-(\d{1,6})$/.exec(s); if(!m) return null;
+    var base=m[1], suf=m[2], val=parseInt(suf,10);
+    if(base.replace(/[^A-Z0-9]/g,'').length < 7) return null;  /* base muy corta: es un prefijo */
+    if(!(val>=0 && val<=99)) return null;                       /* no es un contador */
+    return {base:base, ren:val, suf:suf};
+  };
+
+  window.jacCadenasRenovacion=function(){
+    var g={};
+    P().forEach(function(p){
+      var q=window.jacTrozoRenovacion(p.num); if(!q) return;
+      (g[q.base]=g[q.base]||[]).push({p:p, ren:q.ren, suf:q.suf});
+    });
+    var claras=[], revisar=[];
+    Object.keys(g).forEach(function(b){
+      var L=g[b]; if(L.length<2) return;
+      L.sort(function(a,c){ return c.ren-a.ren; });
+      var asg={}, rmo={};
+      L.forEach(function(x){ asg[String(x.p.aseg||'')]=1; rmo[String(x.p.ramo||'')]=1; });
+      var unaCia=Object.keys(asg).length===1, unRamo=Object.keys(rmo).length===1;
+      var persona=true;
+      for(var i=1;i<L.length;i++)
+        if(!mismaPersona(L[0].p.nombreCliente, L[i].p.nombreCliente)) persona=false;
+      /* El NÚMERO manda. Un cliente tiene muchas pólizas, de ramos y
+         compañías distintas, y todas con numeración diferente; por eso
+         no se agrupa por cliente sino por número base. Si además algo
+         no cuadra, se avisa y esa cadena viene DESMARCADA, pero no se
+         esconde: la decide ella. */
+      var motivos=[];
+      if(!unaCia) motivos.push('compañías distintas');
+      if(!unRamo) motivos.push('ramos distintos');
+      if(!persona) motivos.push('el titular está escrito distinto');
+      var reg={ base:b, n:L.length, gana:L[0], quitar:L.slice(1),
+        aseg:L[0].p.aseg, ramo:L[0].p.ramo, cli:L[0].p.nombreCliente,
+        motivos:motivos,
+        filas:L.map(function(x){ return {ref:x.p, num:x.p.num, ren:x.ren, cli:x.p.nombreCliente,
+          aseg:x.p.aseg, ramo:x.p.ramo, ini:x.p.fechaInicio||'', fin:x.p.fechaFin||'',
+          prima:n(x.p.prima), est:x.p.estado||'', cc:x.p.coCor||'', com:n(x.p.comision)}; }) };
+      /* ¿qué se rescataría de las viejas? */
+      reg.rescate=[];
+      var CAMPOS=['coCor','coCorPart','coCorCom','cedCliente','celCliente','emailCliente',
+        'comPct','comisionPct','clienteId','vendedor','medioPago','formaPago','sumaAsegurada',
+        'valorRiesgo','beneficiario','riesgo','cobertura','subramo'];
+      CAMPOS.forEach(function(c){
+        var vg=reg.gana.p[c];
+        if(vg!==undefined && vg!==null && vg!=='' && !(typeof vg==='number'&&vg===0)) return;
+        for(var i=0;i<reg.quitar.length;i++){
+          var v=reg.quitar[i].p[c];
+          if(v!==undefined && v!==null && v!=='' && !(typeof v==='number'&&v===0)){
+            reg.rescate.push({campo:c, valor:v, de:reg.quitar[i].p.num}); break;
+          }
+        }
+      });
+      /* Compañía distinta es lo único que descarta de plano: dos
+         compañías no comparten número de póliza. Lo demás entra con
+         aviso. */
+      reg.avisos=motivos;
+      reg.segura=(motivos.length===0);
+      (unaCia?claras:revisar).push(reg);
+    });
+    claras.sort(function(a,b){
+      if(a.segura!==b.segura) return a.segura?-1:1;
+      return String(a.cli||'').localeCompare(String(b.cli||''));
+    });
+    return { claras:claras, revisar:revisar,
+      conAviso:claras.filter(function(x){ return !x.segura; }).length,
+      seQuitan:claras.reduce(function(s,x){ return s+x.quitar.length; },0),
+      primaDuplicada:+claras.reduce(function(s,x){
+        return s+x.quitar.reduce(function(q,y){ return q+n(y.p.prima); },0); },0).toFixed(2),
+      comisionDuplicada:+claras.reduce(function(s,x){
+        return s+x.quitar.reduce(function(q,y){ return q+n(y.p.comision); },0); },0).toFixed(2) };
+  };
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Renovaciones: fusionar, deshacer y el informe
+   ------------------------------------------------------------
+   Esto BORRA pólizas, así que no corre solo nunca. Se mira el
+   informe, se marca lo que se quiere, y se confirma.
+   ============================================================ */
+(function(){
+  'use strict';
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function n(v){ return parseFloat(v)||0; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ var q=Number(v)||0;
+    return (q<0?'-':'')+'$'+Math.abs(q).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+  window.jacUnificarRenovaciones=async function(indices){
+    var r=window.jacCadenasRenovacion();
+    var fusionadas=0, quitadas=0, aQuitar=[];
+    r.claras.forEach(function(c,i){
+      if(indices && indices.indexOf(i)<0) return;
+      var g=c.gana.p;
+      g.extra=g.extra||{};
+      /* Rescatar de las viejas lo que a la nueva le falte */
+      var rescatado={};
+      c.rescate.forEach(function(x){ g[x.campo]=x.valor; rescatado[x.campo]=x.valor; });
+      /* Guardar las viejas ENTERAS, para poder deshacer sin perder nada */
+      g.extra.polizasAbsorbidas=(g.extra.polizasAbsorbidas||[]).concat(
+        c.quitar.map(function(y){ return JSON.parse(JSON.stringify(y.p)); }));
+      g.extra.cadenaRenovacion={ base:c.base,
+        numeros:c.filas.map(function(f){ return f.num; }),
+        renovaciones:c.filas.map(function(f){ return f.ren; }),
+        conservada:g.num, rescatado:rescatado,
+        unificado:new Date().toISOString().slice(0,10) };
+      /* Si la conservada no dice cuántas renovaciones lleva, se anota.
+         Se apunta que lo pusimos nosotros, para que deshacer lo quite
+         y la cartera quede EXACTAMENTE como estaba. */
+      if(g.numRenovacion===undefined||g.numRenovacion===null||g.numRenovacion===''){
+        g.numRenovacion=c.gana.ren;
+        g.extra.__renAnotada=true;
+      }
+      c.quitar.forEach(function(y){ aQuitar.push(y.p); });
+      quitadas+=c.quitar.length; fusionadas++;
+    });
+    if(aQuitar.length){
+      var fuera={}; aQuitar.forEach(function(p){ fuera[p.id||p.num]=1; });
+      S.polizas=P().filter(function(p){ return !fuera[p.id||p.num]; });
+      /* Los cobros y pagos de las quitadas se pasan a la que queda */
+      r.claras.forEach(function(c,i){
+        if(indices && indices.indexOf(i)<0) return;
+        var idG=c.gana.p.id;
+        c.quitar.forEach(function(y){
+          ((typeof S!=='undefined'&&S.pagos)||[]).forEach(function(pg){
+            if(pg.polizaId===y.p.id) pg.polizaId=idG;
+          });
+        });
+      });
+    }
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    var ok=(typeof window.jacGuardarYa==='function')
+      ? await window.jacGuardarYa({silencioso:true}) : {ok:false};
+    ['calcKPIs','renderKPIs','RD','RP','RPag','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(x){}
+    return {cadenas:fusionadas, quitadas:quitadas, quedan:P().length, guardado:ok.ok===true};
+  };
+
+  window.jacDeshacerRenovaciones=async function(){
+    var vueltas=0;
+    P().forEach(function(g){
+      var abs=g&&g.extra&&g.extra.polizasAbsorbidas;
+      if(!abs||!abs.length) return;
+      abs.forEach(function(p){ P().push(p); vueltas++; });
+      /* devolver los campos rescatados a como estaban */
+      var c=g.extra.cadenaRenovacion;
+      if(c&&c.rescatado) Object.keys(c.rescatado).forEach(function(k){ delete g[k]; });
+      if(g.extra.__renAnotada){ delete g.numRenovacion; delete g.extra.__renAnotada; }
+      delete g.extra.polizasAbsorbidas;
+      delete g.extra.cadenaRenovacion;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+    ['calcKPIs','renderKPIs','RD','RP','RPag','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return {devueltas:vueltas, quedan:P().length};
+  };
+
+  /* ---------------- El informe ---------------- */
+  window.jacPanelRenovaciones=function(){
+    var r=window.jacCadenasRenovacion();
+    if(!r.claras.length && !r.revisar.length){
+      if(typeof openDP==='function') openDP('<div style="font-size:12px;color:#334155;line-height:1.7">'
+        +'No queda ninguna cadena de renovación por unificar.</div>','Cadenas de renovación');
+      return;
+    }
+    var h='<div style="font-size:12px;color:#334155;line-height:1.75;margin-bottom:12px">'
+      +'Una misma póliza que al renovarse cambia el último tramo del número. Se queda la '
+      +'<b>renovación más avanzada</b> y las anteriores se retiran.</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:13px">'
+      +[['Cadenas', r.claras.length, '#B45309'],
+        ['Pólizas que se retiran', r.seQuitan, '#B91C1C'],
+        ['Prima duplicada', money(r.primaDuplicada), '#B91C1C'],
+        ['Comisión duplicada', money(r.comisionDuplicada), '#B91C1C']]
+       .map(function(c){ return '<div style="border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px">'
+         +'<div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.4px">'+c[0]+'</div>'
+         +'<div style="font-size:18px;font-weight:800;color:'+c[2]+';margin-top:3px">'+c[1]+'</div></div>'; }).join('')
+      +'</div>'
+      +'<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:9px 12px;'
+      +'font-size:11px;color:#78350F;line-height:1.6;margin-bottom:12px">'
+      +'Esto <b>retira pólizas</b>. Antes de quitarlas, a la que se queda se le rescata lo que le falte '
+      +'—gancho de co-corretaje, cédula, contacto, porcentaje— y las retiradas quedan guardadas enteras '
+      +'dentro de ella. El botón de deshacer las devuelve exactas.</div>'
+      +'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:9px;padding:9px 12px;'
+      +'font-size:11px;color:#1E3A8A;line-height:1.6;margin-bottom:11px">'
+      +'<b>Se agrupa por NÚMERO, nunca por cliente.</b> Un cliente tuyo tiene varias pólizas, '
+      +'de ramos y compañías distintas, y cada una con su numeración. Lo que identifica una '
+      +'póliza es su número: misma base, distinto contador de renovación.'
+      +(r.conAviso?('<br><b>'+r.conAviso+'</b> vienen <b>sin marcar</b> porque algo no cuadra del todo.'):'')
+      +'</div>'
+      +'<div style="margin-bottom:7px"><label style="font-size:11px;cursor:pointer">'
+      +'<input type="checkbox" id="jac-ren-todas" checked onchange="jacRenTodas(this.checked)"> '
+      +'marcar / desmarcar todas</label></div>'
+      +'<div style="max-height:38vh;overflow:auto;border:1px solid #E2E8F0;border-radius:10px;padding:8px">';
+
+    r.claras.forEach(function(c,i){
+      var av=(c.avisos&&c.avisos.length)?c.avisos:null;
+      h+='<div style="border-bottom:1px solid #F1F5F9;padding:7px 4px 9px;margin-bottom:5px;'
+        +(av?'background:#FFFBEB;border-radius:8px':'')+'">'
+        +'<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">'
+        +'<input type="checkbox" class="jac-ren" data-i="'+i+'"'+(av?'':' checked')
+        +' style="margin-top:3px;accent-color:'+(av?'#B45309':'#16A34A')+'">'
+        +'<span style="flex:1"><b style="font-size:12px">'+e(c.cli||'(sin titular)')+'</b>'
+        +'<span style="color:#64748B;font-size:11px"> · '+e(c.aseg)+' · '+e(c.ramo)+'</span>'
+        +'<div style="font-family:monospace;font-size:11px;color:#475569;margin-top:2px">'
+        +'nº base <b>'+e(c.base)+'</b></div>'
+        +(av?('<div style="font-size:11px;color:#92400E;background:#FDE68A;border-radius:6px;'
+             +'padding:3px 8px;margin-top:4px"><b>Ojo:</b> '+e(av.join(' y '))
+             +'. Viene sin marcar — míralo tú.</div>'):'');
+      c.filas.forEach(function(f,j){
+        var vive=j===0;
+        h+='<div style="font-size:11px;margin-top:4px;padding:3px 7px;border-radius:6px;'
+          +(vive?'background:#F0FDF4;border-left:3px solid #16A34A':'background:#FEF2F2;border-left:3px solid #FCA5A5')+'">'
+          +'<code style="font-weight:700">'+e(f.num)+'</code> '
+          +'<span style="color:'+(vive?'#15803D':'#B91C1C')+';font-weight:700">'
+          +(vive?'SE QUEDA (renovación '+f.ren+')':'se retira (renovación '+f.ren+')')+'</span>'
+          +'<span style="color:#64748B"> · '+e(f.est)+' · '+e(f.ini)+' → '+e(f.fin)
+          +' · '+money(f.prima)+(f.cc?(' · <span style="color:#1D4ED8">'+e(f.cc)+'</span>'):'')+'</span></div>';
+      });
+      if(c.rescate.length){
+        h+='<div style="font-size:11px;color:#1E3A8A;margin-top:5px;background:#EFF6FF;'
+          +'border-radius:6px;padding:4px 8px">Se rescata de la retirada: '
+          +c.rescate.map(function(x){ return '<b>'+e(x.campo)+'</b>'; }).join(', ')+'</div>';
+      }
+      h+='</span></label></div>';
+    });
+    h+='</div>';
+
+    if(r.revisar.length){
+      h+='<div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:10px 13px;'
+        +'font-size:12px;margin-top:12px;line-height:1.65">'
+        +'<b>'+r.revisar.length+' que NO fusiono nunca</b><br>'
+        +'<span style="color:#5B21B6;font-size:11px">Comparten número base pero son de '
+        +'<b>compañías distintas</b>, y dos compañías no comparten número de póliza. '
+        +'Eso es otra cosa, no una renovación.</span>';
+      r.revisar.forEach(function(c){
+        h+='<div style="margin-top:6px;font-size:11px"><b>'+e(c.motivos.join(' y '))+':</b><br>'
+          +c.filas.map(function(f){ return '<code>'+e(f.num)+'</code> · '+e(f.cli)+' · '
+            +e(f.aseg)+' · '+e(f.ramo)+' · '+e(f.est); }).join('<br>')+'</div>';
+      });
+      h+='</div>';
+    }
+
+    h+='<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+      +'<button onclick="jacRenAplicar()" style="padding:9px 17px;border-radius:9px;border:none;'
+      +'background:#B45309;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+      +'Unificar las marcadas</button>'
+      +'<button onclick="jacRenDeshacer()" style="padding:9px 17px;border-radius:9px;'
+      +'border:1px solid #CBD5E1;background:#fff;font-size:12px;cursor:pointer">Deshacer</button>'
+      +'</div><div id="jac-ren-res" style="font-size:12px;color:#475569;margin-top:9px"></div>';
+
+    if(typeof openDP==='function') openDP(h,'Cadenas de renovación');
+  };
+
+  window.jacRenTodas=function(v){
+    var c=document.querySelectorAll('.jac-ren');
+    for(var i=0;i<c.length;i++) c[i].checked=v;
+  };
+  window.jacRenAplicar=async function(){
+    var c=document.querySelectorAll('.jac-ren'), ids=[];
+    for(var i=0;i<c.length;i++) if(c[i].checked) ids.push(parseInt(c[i].getAttribute('data-i'),10));
+    var o=document.getElementById('jac-ren-res');
+    if(!ids.length){ if(o) o.innerHTML='No marcaste ninguna.'; return; }
+    if(o) o.innerHTML='Unificando…';
+    var r=await window.jacUnificarRenovaciones(ids);
+    if(o) o.innerHTML='Unificadas <b>'+r.cadenas+'</b> cadenas · retiradas <b>'+r.quitadas
+      +'</b> pólizas · quedan <b>'+r.quedan+'</b>. '
+      +(r.guardado?'<span style="color:#15803D">Guardado ✓</span>'
+                  :'<span style="color:#B91C1C">Sin confirmar la subida.</span>');
+  };
+  window.jacRenDeshacer=async function(){
+    var r=await window.jacDeshacerRenovaciones();
+    var o=document.getElementById('jac-ren-res');
+    if(o) o.innerHTML='Devueltas <b>'+r.devueltas+'</b> pólizas · quedan <b>'+r.quedan+'</b>.';
+  };
+
+  /* Botón junto al chip de Pólizas. NO corre solo: esto borra. */
+  function boton(){
+    var chip=document.getElementById('jac-cc-chip');
+    if(!chip||document.getElementById('jac-btn-ren')) return;
+    var fila=chip.firstElementChild; if(!fila) return;
+    var r; try{ r=window.jacCadenasRenovacion(); }catch(x){ return; }
+    if(!r.claras.length && !r.revisar.length) return;
+    var b=document.createElement('button');
+    b.id='jac-btn-ren'; b.type='button';
+    b.style.cssText='padding:6px 13px;border-radius:999px;border:none;background:#7C3AED;'
+      +'color:#fff;font-size:12px;font-weight:600;cursor:pointer';
+    b.textContent='🔗 '+r.claras.length+' cadenas de renovación';
+    b.onclick=window.jacPanelRenovaciones;
     fila.appendChild(b);
   }
   setInterval(function(){ try{ boton(); }catch(x){} }, 5000);
