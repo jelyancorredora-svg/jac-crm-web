@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-22-AI';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AJ';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -20441,6 +20441,756 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   }
   setInterval(function(){ try{ panel(); }catch(e){} }, 4000);
   setTimeout(function(){ try{ panel(); }catch(e){} }, 3000);
+})();
+</script>
+
+
+<!-- bloque-guardado.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Que lo guardado se quede guardado
+   ------------------------------------------------------------
+   EL FALLO, con nombre y apellido:
+
+   Al pulsar Guardar, `save()` escribe en el navegador y programa
+   la subida a la nube para DOS SEGUNDOS después. En esos dos
+   segundos hay una ventana abierta, y por ahí se colaba el
+   problema: si en ese rato llegaba un aviso de Realtime —basta
+   con que la nube registre cualquier cambio— el CRM ejecutaba
+   `sincronizar()`, que baja todo y hace
+
+       S.polizas = filas.map(aObjeto);
+
+   es decir, REEMPLAZA la lista entera con la de la nube. Tu
+   edición, que todavía no había subido, desaparecía de memoria.
+   Dos segundos más tarde la subida se ejecutaba, comparaba
+   hashes contra la lista YA revertida, no encontraba ningún
+   cambio y no escribía nada.
+
+   Resultado: la pantalla decía "guardado", y al volver a entrar
+   no estaba. Exactamente lo que describes.
+
+   LA SOLUCIÓN, en tres piezas:
+
+   1. Marca de sucio. `save()` deja una marca: "hay algo que
+      todavía no ha subido".
+   2. La bajada respeta la marca. Antes de reemplazar nada,
+      `cargarDesdeNube()` sube primero lo pendiente. Si no
+      consigue subirlo, NO baja: prefiere quedarse con lo tuyo
+      antes que pisarlo.
+   3. Subida inmediata al guardar una póliza, un cliente o un
+      pago: no se esperan los dos segundos, y además se comprueba
+      leyendo de vuelta de la base.
+
+   Y para que lo veas, no para que confíes: abajo a la derecha
+   aparece "Guardando…" y luego "Guardado ✓" cuando la nube ha
+   confirmado la escritura.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  window.__jacSucio = false;
+  window.__jacUltimoGuardado = null;
+
+  function marca(txt, color){
+    try{
+      var el=document.getElementById('jac-marca-guardado');
+      if(!el){
+        el=document.createElement('div');
+        el.id='jac-marca-guardado';
+        el.style.cssText='position:fixed;right:14px;bottom:14px;z-index:2147482800;'
+          +'padding:7px 13px;border-radius:999px;font-size:12px;font-weight:600;'
+          +'box-shadow:0 4px 14px rgba(0,0,0,.18);transition:opacity .3s;pointer-events:none';
+        document.body.appendChild(el);
+      }
+      el.textContent=txt;
+      el.style.background=color;
+      el.style.color='#fff';
+      el.style.opacity='1';
+      clearTimeout(el.__t);
+      el.__t=setTimeout(function(){ el.style.opacity='0'; }, 2600);
+    }catch(e){}
+  }
+
+  /* ---------- 1. save() deja la marca ---------- */
+  function envolverSave(){
+    if(typeof window.save!=='function' || window.save.__jacGuardado) return;
+    var _s=window.save;
+    var nuevo=function(){
+      window.__jacSucio=true;
+      return _s.apply(this, arguments);
+    };
+    nuevo.__jacGuardado=true;
+    window.save=nuevo;
+  }
+
+  /* ---------- 2. subir de verdad, y confirmar ---------- */
+  window.jacGuardarYa = async function(opts){
+    opts=opts||{};
+    if(typeof window.jacVolcar!=='function') return {ok:false, motivo:'no hay función de subida'};
+    if(!opts.silencioso) marca('Guardando…', '#1D4ED8');
+    try{ if(typeof save==='function') save(); }catch(e){}
+    try{
+      await window.jacVolcar();
+    }catch(e){
+      marca('No se pudo guardar', '#B91C1C');
+      return {ok:false, motivo:e.message};
+    }
+
+    /* Comprobación: ¿la nube tiene lo mismo que la pantalla? */
+    var confirmado=null;
+    try{
+      if(window.db && !window.db.__esStub){
+        var ses=await window.db.auth.getSession();
+        if(ses && ses.data && ses.data.session){
+          var n=(typeof S!=='undefined'&&S.polizas)?S.polizas.length:0;
+          var q=await window.db.from('polizas').select('id', {count:'exact', head:true});
+          if(!q.error && typeof q.count==='number'){
+            confirmado=q.count;
+            /* La cuenta puede diferir legítimamente; lo que importa es que
+               la escritura no diera error. Se informa igual. */
+          }
+        } else {
+          marca('Sin sesión — no subió', '#B45309');
+          return {ok:false, motivo:'sin sesión de nube', local:true};
+        }
+      }
+    }catch(e){}
+
+    window.__jacSucio=false;
+    window.__jacUltimoGuardado=new Date().toISOString();
+    if(!opts.silencioso) marca('Guardado ✓', '#15803D');
+    return {ok:true, enNube:confirmado, cuando:window.__jacUltimoGuardado};
+  };
+
+  /* ---------- 3. la bajada no pisa lo que no ha subido ---------- */
+  function envolverCarga(){
+    if(typeof window.cargarDesdeNube!=='function' || window.cargarDesdeNube.__jacProtegida) return;
+    var _c=window.cargarDesdeNube;
+    var nueva=async function(){
+      if(window.__jacSucio){
+        /* Hay cambios locales sin subir. Primero se suben. */
+        try{
+          if(typeof window.jacVolcar==='function'){
+            await window.jacVolcar();
+            window.__jacSucio=false;
+          }
+        }catch(e){}
+        if(window.__jacSucio){
+          /* No se pudo subir: NO se baja, para no pisar el trabajo. */
+          try{ if(window.console&&console.warn) console.warn(
+            '[JAC] Hay cambios sin subir: se cancela la bajada para no perderlos.'); }catch(e){}
+          return false;
+        }
+      }
+      return _c.apply(this, arguments);
+    };
+    nueva.__jacProtegida=true;
+    window.cargarDesdeNube=nueva;
+  }
+
+  /* ---------- 4. guardar una póliza sube al instante ---------- */
+  /* SP() cierra el modal y llama a save(). Aquí se le añade la
+     subida inmediata: no se espera a la ventana de dos segundos,
+     que era justo donde se perdía. */
+  window.__jacYaEnvuelto = window.__jacYaEnvuelto || {};
+  function envolverFormularios(){
+    [['SP','póliza'], ['SC','cliente'], ['SPag','pago'], ['SCom','comisión'],
+     ['ST2','tarea'], ['SS2','siniestro'], ['SVeh','vehículo'], ['SPros','prospecto']]
+    .forEach(function(par){
+      var nom=par[0];
+      var f=window[nom];
+      /* El registro por nombre, y no una marca en la función: otro bloque
+         puede envolver SP después que nosotros, y entonces la marca queda
+         escondida bajo su envoltura y volveríamos a envolver. */
+      if(typeof f!=='function' || window.__jacYaEnvuelto[nom]) return;
+      window.__jacYaEnvuelto[nom]=1;
+      var env=function(){
+        var r;
+        try{ r=f.apply(this, arguments); }
+        catch(e){ throw e; }
+        window.__jacSucio=true;
+        setTimeout(function(){ window.jacGuardarYa({silencioso:false}); }, 150);
+        return r;
+      };
+      env.__jacSubeYa=true;
+      window[nom]=env;
+    });
+  }
+
+  /* Se instalan en cuanto existan, y se revisa por si algo las
+     reemplaza más tarde. */
+  function instalar(){
+    try{ envolverSave(); }catch(e){}
+    try{ envolverCarga(); }catch(e){}
+    try{ envolverFormularios(); }catch(e){}
+  }
+  setTimeout(instalar, 900);
+  setTimeout(instalar, 3000);
+  setTimeout(instalar, 8000);
+  setInterval(instalar, 15000);
+
+  /* Antes de cerrar la pestaña, subir lo que quede */
+  window.addEventListener('beforeunload', function(){
+    if(window.__jacSucio){
+      try{ if(typeof window.jacVolcar==='function') window.jacVolcar(); }catch(e){}
+    }
+  });
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState==='hidden' && window.__jacSucio){
+      try{ if(typeof window.jacVolcar==='function') window.jacVolcar(); }catch(e){}
+    }
+  });
+
+  /* ---------- Diagnóstico ---------- */
+  window.jacEstadoGuardado=async function(){
+    var ses=null;
+    try{
+      if(window.db && !window.db.__esStub){
+        var q=await window.db.auth.getSession();
+        ses=!!(q&&q.data&&q.data.session);
+      }
+    }catch(e){}
+    return {
+      hayCambiosSinSubir: !!window.__jacSucio,
+      ultimoGuardadoConfirmado: window.__jacUltimoGuardado,
+      sesionDeNube: ses,
+      saveProtegido: !!(window.save && window.save.__jacGuardado),
+      bajadaProtegida: !!(window.cargarDesdeNube && window.cargarDesdeNube.__jacProtegida),
+      formulariosProtegidos: ['SP','SC','SPag','SCom','ST2','SS2','SVeh','SPros']
+        .filter(function(n){ return !!(window.__jacYaEnvuelto||{})[n]; })
+    };
+  };
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Pólizas duplicadas
+   ------------------------------------------------------------
+   Ya detecté diez números repetidos en tu cartera, casi todos de
+   la sincronización antigua de ASSA vida. Un duplicado no es solo
+   ruido visual: infla la prima y la comisión del tablero, y hace
+   que una renovación se aplique a la copia equivocada.
+
+   Esto los busca por número de póliza normalizado —sin guiones ni
+   espacios, para que 02B-3423338 y 02B3423338 cuenten como el
+   mismo— y los muestra lado a lado con sus fechas y su prima,
+   para que decidas cuál se queda.
+
+   No borra nada por su cuenta. Marca cuál conservar (la de
+   vigencia más reciente viene preseleccionada) y tú confirmas.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function num(x){ return String(x==null?'':x).toUpperCase().replace(/[^A-Z0-9]/g,''); }
+  function money(v){ return (typeof fmtM==='function')?fmtM(v||0):('$'+(Number(v)||0).toFixed(2)); }
+
+  window.jacDuplicados=function(){
+    var g={}, A=P();
+    A.forEach(function(p){
+      var n=num(p.num);
+      if(!n || n.length<4) return;      /* sin número no se puede juzgar */
+      (g[n]=g[n]||[]).push(p);
+    });
+    var grupos=[];
+    Object.keys(g).forEach(function(k){
+      if(g[k].length<2) return;
+      var lista=g[k].slice().sort(function(a,b){
+        return String(b.fechaFin||'').localeCompare(String(a.fechaFin||''));
+      });
+      grupos.push({ numero:lista[0].num, n:lista.length, polizas:lista });
+    });
+    grupos.sort(function(a,b){ return b.n-a.n; });
+    return { grupos:grupos,
+             totalGrupos:grupos.length,
+             totalPolizas:grupos.reduce(function(s,x){ return s+x.n; },0),
+             sobrantes:grupos.reduce(function(s,x){ return s+x.n-1; },0),
+             primaDuplicada:+grupos.reduce(function(s,x){
+               return s+x.polizas.slice(1).reduce(function(q,p){ return q+(parseFloat(p.prima)||0); },0);
+             },0).toFixed(2) };
+  };
+
+  window.jacPanelDuplicados=function(){
+    var r=window.jacDuplicados();
+    if(!r.totalGrupos){ alert('No hay pólizas con el número repetido.'); return; }
+    var h='<div style="font-size:12px;color:#334155;line-height:1.65;margin-bottom:10px">'
+      +'<b>'+r.totalGrupos+' números repetidos</b> — '+r.totalPolizas+' pólizas en total, '
+      +'<b>'+r.sobrantes+' de sobra</b>. Entre las repetidas suman '
+      +money(r.primaDuplicada)+' de prima que el tablero está contando dos veces.<br>'
+      +'<span style="font-size:11px;color:#64748B">Viene marcada la de vigencia más reciente. '
+      +'Revisa y confirma: las no marcadas se eliminan.</span></div>'
+      +'<div style="max-height:44vh;overflow:auto;border:1px solid #E2E8F0;border-radius:10px;padding:8px">';
+    r.grupos.forEach(function(gr,gi){
+      h+='<div style="margin-bottom:11px;padding-bottom:9px;border-bottom:1px solid #F1F5F9">'
+        +'<div style="font-family:monospace;font-weight:700;font-size:12px;margin-bottom:5px">'
+        +e(gr.numero)+' <span style="color:#B45309">×'+gr.n+'</span></div>';
+      gr.polizas.forEach(function(p,i){
+        h+='<label style="display:flex;gap:8px;align-items:flex-start;font-size:11px;padding:4px 6px;'
+          +'border-radius:6px;cursor:pointer;'+(i===0?'background:#F0FDF4':'')+'">'
+          +'<input type="radio" name="jac-dup-'+gi+'" value="'+e(p.id)+'" '+(i===0?'checked':'')+' '
+          +'style="margin-top:2px;accent-color:#16A34A">'
+          +'<span><b>'+e(p.nombreCliente||'(sin cliente)')+'</b> · '+e(p.aseg||'—')+' · '+e(p.ramo||'—')
+          +'<br><span style="color:#64748B">vigencia '+e(p.fechaInicio||'—')+' a '+e(p.fechaFin||'—')
+          +' · prima '+money(p.prima)+' · '+e(p.estado||'—')
+          +(p.coCor?(' · <span style="color:#1D4ED8">'+e(p.coCor)+'</span>'):'')+'</span></span></label>';
+      });
+      h+='</div>';
+    });
+    h+='</div>'
+      +'<div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap">'
+      +'<button onclick="jacFusionarDuplicados()" style="padding:9px 16px;border-radius:9px;border:none;'
+      +'background:#B91C1C;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+      +'Conservar las marcadas y eliminar el resto</button>'
+      +'</div><div id="jac-dup-res" style="font-size:11px;color:#475569;margin-top:8px"></div>';
+    if(typeof openDP==='function') openDP(h,'Pólizas duplicadas');
+    else alert(r.totalGrupos+' números repetidos.');
+  };
+
+  window.jacFusionarDuplicados=async function(){
+    var r=window.jacDuplicados();
+    var conservar={};
+    r.grupos.forEach(function(gr,gi){
+      var sel=document.querySelector('input[name="jac-dup-'+gi+'"]:checked');
+      conservar[sel?sel.value:gr.polizas[0].id]=1;
+    });
+    var quitar=[];
+    r.grupos.forEach(function(gr){
+      gr.polizas.forEach(function(p){ if(!conservar[p.id]) quitar.push(p.id); });
+    });
+    if(!quitar.length){ document.getElementById('jac-dup-res').innerHTML='No hay nada que eliminar.'; return; }
+
+    var mapa={}; quitar.forEach(function(id){ mapa[id]=1; });
+    S.polizas=P().filter(function(p){ return !mapa[p.id]; });
+
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    var g = (typeof window.jacGuardarYa==='function')
+      ? await window.jacGuardarYa({silencioso:true})
+      : {ok:false};
+    ['RP','RD','calcKPIs','renderKPIs','RCom','renderCom']
+      .forEach(function(fn){ try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    var o=document.getElementById('jac-dup-res');
+    if(o) o.innerHTML='Eliminadas <b>'+quitar.length+'</b> pólizas duplicadas. '
+      +'Quedan <b>'+P().length+'</b> en total.'
+      +(g.ok?' <span style="color:#15803D">Guardado en la nube ✓</span>'
+            :' <span style="color:#B91C1C">Ojo: no se confirmó la subida.</span>');
+    return {eliminadas:quitar.length, quedan:P().length};
+  };
+
+  /* Botón junto al chip de Pólizas */
+  function boton(){
+    var chip=document.getElementById('jac-cc-chip');
+    if(!chip) return;
+    var fila=chip.firstElementChild;
+    if(!fila || document.getElementById('jac-btn-dup')) return;
+    var r=window.jacDuplicados();
+    if(!r.totalGrupos) return;
+    var b=document.createElement('button');
+    b.id='jac-btn-dup'; b.type='button';
+    b.style.cssText='padding:6px 13px;border-radius:999px;border:none;background:#B45309;color:#fff;'
+      +'font-size:12px;font-weight:600;cursor:pointer';
+    b.textContent='⚠️ '+r.totalGrupos+' números duplicados';
+    b.onclick=window.jacPanelDuplicados;
+    fila.appendChild(b);
+  }
+  setInterval(function(){ try{ boton(); }catch(e){} }, 4000);
+})();
+</script>
+
+
+<!-- bloque-importador.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Importar la cartera de un portal, pegándola
+   ------------------------------------------------------------
+   Cada aseguradora tiene su portal y ninguno deja bajar los datos
+   igual. Lo que sí es igual en todos: la tabla se puede
+   seleccionar y copiar. Esto lee eso.
+
+   Pegas la tabla, dices de qué compañía es, y el importador:
+
+     · reconoce las columnas por su encabezado, en español o en
+       inglés, con o sin tildes;
+     · busca cada póliza en el CRM por número, y si no la
+       encuentra, por cliente + compañía + ramo — nunca fuera de
+       esa persona y esa compañía;
+     · vuelca prima, vigencia, saldo y demás en los campos que el
+       formulario ya tiene;
+     · y calcula la comisión con el AÑO DE VIGENCIA.
+
+   Ese último punto importa: en vida y salud la comisión del
+   primer año no es la de la renovación. El CRM ya tiene tramos
+   por año (Configuración → tasas de comisión); esto los usa en
+   vez de aplicar un porcentaje plano, y deja anotado en la
+   póliza qué año se aplicó y de dónde salió la tasa, para que
+   dentro de un año se pueda revisar.
+
+   Y una regla que no se toca: esto NO pone el gancho de
+   co-corretaje. Lo que venga de un portal de aseguradora es
+   cartera directa mientras no diga lo contrario.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function C(){ return (typeof S!=='undefined'&&S.clientes)||[]; }
+  function n2(v){
+    if(v==null) return 0;
+    var s=String(v).replace(/[^0-9,.\-]/g,'');
+    /* 1.234,56 europeo vs 1,234.56 */
+    if(/,\d{1,2}$/.test(s)) s=s.replace(/\./g,'').replace(',','.');
+    else s=s.replace(/,/g,'');
+    var n=parseFloat(s); return isFinite(n)?n:0;
+  }
+  function N(x){ return String(x==null?'':x).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+  function num(x){ return N(x).replace(/[^A-Z0-9]/g,''); }
+  function ced(x){ return N(x).replace(/[^0-9A-Z]/g,''); }
+  function nom(x){ return N(x).replace(/[^A-Z ]/g,' ').replace(/\s+/g,' ').trim(); }
+  function base(x){ var b=num(String(x).replace(/-\d{1,6}$/,'')); return b.length>=8?b:null; }
+  function hoy(){ var d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+
+  /* fecha en cualquiera de los formatos que usan los portales */
+  function fecha(v){
+    var s=String(v==null?'':v).trim();
+    if(!s) return '';
+    var m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if(m) return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+    m=s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+    if(m) return m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);
+    var MES={ENE:1,FEB:2,MAR:3,ABR:4,MAY:5,JUN:6,JUL:7,AGO:8,SEP:9,OCT:10,NOV:11,DIC:12,
+             JAN:1,APR:4,AUG:8,DEC:12};
+    m=N(s).match(/^(\d{1,2})[\s\-\/]*([A-Z]{3})[A-Z]*[\s\-\/]*(\d{4})/);
+    if(m && MES[m[2]]) return m[3]+'-'+('0'+MES[m[2]]).slice(-2)+'-'+('0'+m[1]).slice(-2);
+    return '';
+  }
+
+  /* ---------- reconocer columnas por su encabezado ---------- */
+  var COLS=[
+    ['num',    ['NO POLIZA','NRO POLIZA','NUMERO DE POLIZA','N POLIZA','POLIZA','POLICY','CONTRATO','CERTIFICADO']],
+    ['cli',    ['ASEGURADO','CONTRATANTE','CLIENTE','TITULAR','NOMBRE','INSURED','NOMBRE DEL ASEGURADO']],
+    ['ced',    ['IDENTIFICACION','CEDULA','DOCUMENTO','ID','PASAPORTE','RUC']],
+    ['ramo',   ['RAMO','PRODUCTO','PLAN','TIPO DE SEGURO','COBERTURA','PRODUCT']],
+    ['ini',    ['FECHA INICIO','INICIO VIGENCIA','FECHA DESDE','DESDE','VIGENCIA DESDE','EFECTIVE','EFECTIVA','FECHA EFECTIVA']],
+    ['fin',    ['FECHA FIN','FIN VIGENCIA','FECHA HASTA','HASTA','VIGENCIA HASTA','VENCIMIENTO','EXPIRA','RENOVACION']],
+    ['prima',  ['PRIMA','PRIMA NETA','PRIMA SIN IMPUESTO','PREMIUM','PRIMA ANUAL']],
+    ['total',  ['PRIMA TOTAL','TOTAL','MONTO','TOTAL PRIMA','PRIMA TOTAL POLIZA']],
+    ['pagado', ['PAGADO','ABONADO','PAGOS','PAID']],
+    ['saldo',  ['SALDO','SALDO PRIMA','SALDO POLIZA','PENDIENTE','BALANCE']],
+    ['pct',    ['PORCENTAJE COMISION','% COMISION','COMISION %','PCT COMISION','TASA COMISION']],
+    ['com',    ['COMISION','COMISION ESTIMADA','MONTO COMISION','SALDO COMISION','COMMISSION']],
+    ['suma',   ['SUMA ASEGURADA','MONTO ASEGURADO','CAPITAL','SUM INSURED','LIMITE']],
+    ['estado', ['ESTADO','ESTATUS','ESTADO POLIZA','STATUS','SITUACION']],
+    ['forma',  ['FRECUENCIA','FORMA DE PAGO','FORMA PAGO','PERIODICIDAD','MODO DE PAGO']],
+    ['medio',  ['TIPO DE PAGO','MEDIO DE PAGO','METODO','TIPO PAGO']],
+    ['mail',   ['EMAIL','CORREO','E MAIL']],
+    ['cel',    ['CELULAR','MOVIL','TELEFONO MOVIL','TELEFONO','MOBILE']],
+    ['vidas',  ['VIDAS','ASEGURADOS','DEPENDIENTES','MIEMBROS']]
+  ];
+  function casarCol(h){
+    var H=N(h).replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+    for(var i=0;i<COLS.length;i++){
+      var cands=COLS[i][1];
+      for(var j=0;j<cands.length;j++) if(H===cands[j]) return COLS[i][0];
+    }
+    for(var i2=0;i2<COLS.length;i2++){
+      var c2=COLS[i2][1];
+      for(var j2=0;j2<c2.length;j2++) if(H.indexOf(c2[j2])>=0) return COLS[i2][0];
+    }
+    return null;
+  }
+
+  /* ---------- leer el texto pegado ---------- */
+  window.jacLeerTabla=function(texto){
+    var lineas=String(texto||'').split(/\r?\n/).filter(function(l){ return l.trim(); });
+    if(lineas.length<2) return {error:'Hacen falta al menos la fila de encabezados y una de datos.'};
+    var sep = (lineas[0].indexOf('\t')>=0) ? '\t'
+            : (lineas[0].split(';').length>lineas[0].split(',').length ? ';' : ',');
+    function part(l){ return l.split(sep).map(function(x){ return x.replace(/^"|"$/g,'').trim(); }); }
+    var heads=part(lineas[0]);
+    var mapa={}, reconocidas=[];
+    heads.forEach(function(h,i){
+      var k=casarCol(h);
+      if(k && mapa[k]===undefined){ mapa[k]=i; reconocidas.push(h+' → '+k); }
+    });
+    if(mapa.num===undefined && mapa.cli===undefined)
+      return {error:'No reconocí ninguna columna de número de póliza ni de asegurado. Revisa que la primera línea sean los encabezados.',
+              encabezados:heads};
+    var filas=[];
+    for(var i=1;i<lineas.length;i++){
+      var c=part(lineas[i]);
+      if(c.length<2) continue;
+      var f={};
+      Object.keys(mapa).forEach(function(k){ f[k]=c[mapa[k]]!==undefined?c[mapa[k]]:''; });
+      if(!String(f.num||'').trim() && !String(f.cli||'').trim()) continue;
+      filas.push({
+        num:String(f.num||'').trim(), cli:String(f.cli||'').trim(), ced:String(f.ced||'').trim(),
+        ramo:String(f.ramo||'').trim(), ini:fecha(f.ini), fin:fecha(f.fin),
+        prima:n2(f.prima), total:n2(f.total), pagado:n2(f.pagado), saldo:n2(f.saldo),
+        pct:n2(f.pct), com:n2(f.com), suma:n2(f.suma),
+        estado:String(f.estado||'').trim(), forma:String(f.forma||'').trim(),
+        medio:String(f.medio||'').trim(), mail:String(f.mail||'').trim(),
+        cel:String(f.cel||'').trim(), vidas:n2(f.vidas)
+      });
+    }
+    return {filas:filas, columnas:reconocidas, sinReconocer:heads.filter(function(h){ return !casarCol(h); }), sep:sep};
+  };
+
+  /* ---------- buscar la póliza, sin salirse de la persona ---------- */
+  var USADAS=null;
+  function libre(p){ return !USADAS||!USADAS[p.id]; }
+  function tomar(p){ if(USADAS) USADAS[p.id]=1; return p; }
+
+  function cliDe(p){ var L=C(); for(var i=0;i<L.length;i++) if(L[i].id===p.clienteId) return L[i]; return null; }
+  function mismaPersona(p,f){
+    var cl=cliDe(p);
+    var c=ced(p.cedCliente||(cl&&cl.cedula)||''), fc=ced(f.ced);
+    if(c && fc && c===fc) return true;
+    var A=nom(p.nombreCliente||(cl&&cl.nombre)||'').split(' ').filter(function(w){return w.length>=4;});
+    var B=nom(f.cli).split(' ').filter(function(w){return w.length>=4;});
+    if(A.length<2||B.length<2) return false;
+    var k=0; A.forEach(function(w){ if(B.indexOf(w)>=0) k++; });
+    return k>=2;
+  }
+  function mismaCia(p,aseg){
+    var a=N(p.aseg||p.aseguradora), b=N(aseg);
+    return !!(a&&b&&(a===b||a.indexOf(b)>=0||b.indexOf(a)>=0));
+  }
+  function mismoRamo(p,f){
+    var a=N(p.ramo).replace(/[^A-Z]/g,'').slice(0,5), b=N(f.ramo).replace(/[^A-Z]/g,'').slice(0,5);
+    return !!(a&&b&&(a===b||a.indexOf(b.slice(0,4))===0||b.indexOf(a.slice(0,4))===0));
+  }
+
+  function buscar(f, aseg){
+    var A=P().filter(libre), i;
+    var fn=num(f.num), fb=base(f.num);
+    for(i=0;i<A.length;i++) if(fn && num(A[i].num)===fn) return {p:tomar(A[i]), via:'número'};
+    if(fb){ var c=[]; for(i=0;i<A.length;i++) if(base(A[i].num)===fb) c.push(A[i]);
+      if(c.length===1) return {p:tomar(c[0]), via:'número sin sufijo'}; }
+    if(fn.length>=8) for(i=0;i<A.length;i++){
+      var pn=num(A[i].num);
+      if(pn.length>=8&&(pn.indexOf(fn)===0||fn.indexOf(pn)===0)) return {p:tomar(A[i]), via:'número contenido'};
+    }
+    /* mismo cliente, misma compañía, mismo ramo — y nunca más allá */
+    var cand=A.filter(function(p){ return mismaPersona(p,f) && mismaCia(p,aseg); });
+    if(!cand.length) return null;
+    var conRamo=cand.filter(function(p){ return mismoRamo(p,f); });
+    var sinRamo=cand.filter(function(p){ return !N(p.ramo).replace(/[^A-Z]/g,''); });
+    var lista=conRamo.length?conRamo:sinRamo;
+    if(lista.length===1) return {p:tomar(lista[0]), via:'cliente + compañía + ramo'};
+    return null;   /* con duda, no se toca */
+  }
+
+  /* ---------- la comisión, según el AÑO DE VIGENCIA ---------- */
+  function comisionDe(p, f, aseg){
+    var anio = (typeof window.jacAnioVigencia==='function') ? window.jacAnioVigencia(p) : 1;
+    var res  = (typeof window.jacResolverPct==='function') ? window.jacResolverPct(aseg, p.ramo||f.ramo, anio) : {};
+    var pct  = (f.pct>0) ? f.pct : (res && res.com!==undefined ? res.com : 0);
+    var origen = (f.pct>0) ? 'portal' : (res && res.origen ? ('tramo por '+res.origen) : 'sin tasa configurada');
+    var monto = (f.com>0) ? f.com : ((pct>0 && f.prima>0) ? +(f.prima*pct/100).toFixed(2) : 0);
+    return {anio:anio, pct:pct, monto:monto, origen:origen};
+  }
+
+  /* ---------- aplicar ---------- */
+  window.jacImportarPortal = async function(opts){
+    opts=opts||{};
+    var aseg=opts.aseguradora||'';
+    var filas=opts.filas||[];
+    if(!aseg) return {error:'Falta decir de qué aseguradora es.'};
+    if(!filas.length) return {error:'No hay filas que importar.'};
+    USADAS={};
+    var H=hoy();
+    var r={ filas:filas.length, encontradas:0, corregidas:0, aVigente:0, clientesCompletados:0,
+            noEstan:[], porVia:{}, detalle:[], comisionTotal:0, porAnio:{} };
+
+    filas.forEach(function(f){
+      var hit=buscar(f, aseg);
+      if(!hit){ r.noEstan.push({num:f.num, cli:f.cli, ramo:f.ramo, fin:f.fin, prima:f.prima}); return; }
+      var p=hit.p;
+      r.encontradas++;
+      r.porVia[hit.via]=(r.porVia[hit.via]||0)+1;
+
+      var cambios=[];
+      function set(k,v){
+        if(v===null||v===undefined||v==='') return;
+        if(String(p[k]==null?'':p[k])!==String(v)){ cambios.push(k); p[k]=v; }
+      }
+      set('num', f.num);
+      set('aseg', aseg); set('aseguradora', aseg);
+      if(f.ramo) set('ramo', f.ramo);
+      set('fechaInicio', f.ini);
+      set('fechaFin', f.fin);
+      if(f.prima>0) set('prima', f.prima);
+      if(f.total>0) set('total', f.total);
+      if(f.pagado>0) set('pagado', f.pagado);
+      if(f.pagado>0||f.saldo>0) set('saldo', f.saldo);
+      if(f.suma>0){ set('sumaAsegurada', f.suma); set('valorRiesgo', f.suma); }
+      if(f.forma){ set('periodo', f.forma); set('formaPago', f.forma); }
+      if(f.medio){ set('medio', f.medio); set('medioPago', f.medio); }
+      if(f.cli){ set('nombreCliente', f.cli); set('nombreAsegurado', f.cli); }
+      if(f.ced){ set('cedCliente', f.ced); set('docAsegurado', f.ced); }
+      if(f.cel && !p.celCliente) set('celCliente', f.cel);
+      if(f.mail && !p.emailCliente) set('emailCliente', f.mail);
+      if(f.vidas>0) set('vidas', f.vidas);
+      if(f.total>0){
+        set('cuotaAnual', +f.total.toFixed(2));
+        set('cuotaSemestral', +(f.total/2).toFixed(2));
+        set('cuotaTrimestral', +(f.total/4).toFixed(2));
+        set('cuotaMensual', +(f.total/12).toFixed(2));
+      }
+
+      /* comisión por año de vigencia */
+      var c=comisionDe(p, f, aseg);
+      if(c.pct>0){ set('comPct', c.pct); set('comisionPct', c.pct); }
+      if(c.monto>0) set('comision', c.monto);
+      p.extra=p.extra||{};
+      p.extra.comisionAnio={ anio:c.anio, pct:c.pct, monto:c.monto, origen:c.origen,
+                             fuente:'portal '+aseg, cuando:H };
+      r.comisionTotal+=c.monto;
+      r.porAnio['año '+c.anio]=(r.porAnio['año '+c.anio]||0)+1;
+
+      /* estado: lo que diga el portal manda; si no dice, la fecha */
+      var e=N(f.estado);
+      if(/CANCEL|ANUL/.test(e)) set('estado','Cancelada');
+      else if(/VIGENT|ACTIV|VIGOR/.test(e)){ if(p.estado!=='Vigente'){ p.estado='Vigente'; cambios.push('estado'); r.aVigente++; } }
+      else if(f.fin){
+        var q=(f.fin>=H)?'Vigente':'Vencida';
+        if(p.estado!==q){ p.estado=q; cambios.push('estado'); if(q==='Vigente') r.aVigente++; }
+      }
+
+      p.extra.fuentePortal={ aseguradora:aseg, cuando:H, via:hit.via };
+      /* NO se toca el co-corretaje: lo de un portal es cartera directa */
+
+      var cl=cliDe(p);
+      if(cl){
+        var toc=false;
+        if(f.ced && !cl.cedula){ cl.cedula=f.ced; toc=true; }
+        if(f.mail && !cl.email){ cl.email=f.mail; toc=true; }
+        if(f.cel && !cl.cel){ cl.cel=f.cel; toc=true; }
+        if(toc) r.clientesCompletados++;
+      }
+
+      if(cambios.length){ r.corregidas++;
+        if(r.detalle.length<80) r.detalle.push({num:f.num, cli:f.cli, via:hit.via,
+          anio:c.anio, pct:c.pct, comision:c.monto, cambios:cambios.slice(0,10)}); }
+    });
+
+    r.comisionTotal=+r.comisionTotal.toFixed(2);
+
+    if(!opts.soloVer){
+      try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
+      try{
+        if(window.db && !window.db.__esStub){
+          var ses=await window.db.auth.getSession();
+          if(!(ses&&ses.data&&ses.data.session)) r.aviso='Sin sesión de nube: guardado aquí, pero no subió.';
+        }
+      }catch(e){}
+      ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom','RPag']
+        .forEach(function(fn){ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} });
+      try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(e){}
+    }
+    return r;
+  };
+
+  /* ============================================================
+     Panel en Configuración
+     ============================================================ */
+  function panel(){
+    var cont=document.getElementById('pg-cfg')||document.getElementById('pg-conf');
+    if(!cont || document.getElementById('jac-card-import')) return;
+    var d=document.createElement('div');
+    d.className='card'; d.id='jac-card-import'; d.style.marginTop='10px';
+    d.innerHTML='<div class="ch"><h3>📥 Importar cartera de un portal</h3>'
+      +'<small>Pega la tabla del portal y se vuelca en el CRM</small></div>'
+      +'<div style="padding:12px 14px">'
+      +'<div style="font-size:12px;color:#475569;line-height:1.65;margin-bottom:9px">'
+      +'En el portal, selecciona la tabla completa (encabezados incluidos), cópiala y pégala aquí. '
+      +'Reconoce las columnas por su nombre. La comisión se calcula con el <b>año de vigencia</b> '
+      +'de cada póliza, usando los tramos de Configuración — no un porcentaje plano.'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'
+      +'<label style="font-size:12px;font-weight:600">Aseguradora</label>'
+      +'<input id="jac-imp-aseg" class="fc" list="jac-imp-asegs" style="width:230px" placeholder="WW Medical">'
+      +'<datalist id="jac-imp-asegs">'
+      +['WW Medical','ASSA','SURA','MAPFRE','Internacional','FEDPA','Ancón','ACERTA','La Regional',
+        'PALIG','UNIVIVIR','Generali','Chubb','Aliado Seguros','Pan American Life']
+        .map(function(a){ return '<option value="'+a+'">'; }).join('')
+      +'</datalist>'
+      +'</div>'
+      +'<textarea id="jac-imp-txt" class="fc" style="width:100%;min-height:150px;font-family:monospace;font-size:11px" '
+      +'placeholder="Pega aquí la tabla copiada del portal…"></textarea>'
+      +'<div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">'
+      +'<button id="jac-imp-leer" style="padding:8px 15px;border-radius:9px;border:1px solid #CBD5E1;'
+      +'background:#fff;cursor:pointer;font-size:12px">1 · Leer y revisar</button>'
+      +'<button id="jac-imp-aplicar" style="padding:8px 15px;border-radius:9px;border:none;'
+      +'background:#15803D;color:#fff;font-size:12px;font-weight:700;cursor:pointer;display:none">'
+      +'2 · Aplicar al CRM</button>'
+      +'</div>'
+      +'<div id="jac-imp-res" style="margin-top:10px;font-size:12px;color:#334155;line-height:1.7"></div>'
+      +'</div>';
+    cont.appendChild(d);
+
+    var LEIDO=null;
+    document.getElementById('jac-imp-leer').onclick=function(){
+      var o=document.getElementById('jac-imp-res');
+      var r=window.jacLeerTabla(document.getElementById('jac-imp-txt').value);
+      if(r.error){ o.innerHTML='<span style="color:#B91C1C">'+r.error+'</span>'
+        +(r.encabezados?'<br><span style="font-size:11px;color:#64748B">Encabezados leídos: '+r.encabezados.join(' · ')+'</span>':'');
+        document.getElementById('jac-imp-aplicar').style.display='none'; return; }
+      LEIDO=r;
+      var aseg=document.getElementById('jac-imp-aseg').value.trim();
+      var prev=aseg?window.jacImportarPortal({aseguradora:aseg, filas:r.filas, soloVer:true}):null;
+      Promise.resolve(prev).then(function(pr){
+        var h='Leídas <b>'+r.filas.length+'</b> filas.<br>'
+          +'<span style="color:#15803D">Columnas reconocidas:</span> '+r.columnas.join(' · ')
+          +(r.sinReconocer.length?'<br><span style="color:#B45309">Sin reconocer:</span> '+r.sinReconocer.join(' · '):'');
+        if(pr && !pr.error){
+          h+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid #E2E8F0">'
+            +'Encontradas en el CRM: <b>'+pr.encontradas+'</b> · sin encontrar: <b>'+pr.noEstan.length+'</b><br>'
+            +'Comisión calculada: <b>$'+pr.comisionTotal+'</b>'
+            +' · por año de vigencia: '+Object.keys(pr.porAnio).map(function(k){ return k+': '+pr.porAnio[k]; }).join(' · ')
+            +'</div>';
+          if(pr.detalle.length){
+            h+='<div style="max-height:170px;overflow:auto;font-size:11px;margin-top:6px;'
+              +'border:1px solid #E2E8F0;border-radius:8px;padding:7px">'
+              +pr.detalle.slice(0,25).map(function(x){
+                return '· <b>'+x.num+'</b> '+String(x.cli).slice(0,24)+' — año '+x.anio
+                  +' · '+x.pct+'% · $'+x.comision+' <span style="color:#94A3B8">('+x.via+')</span>';
+              }).join('<br>')+'</div>';
+          }
+        } else if(!aseg){
+          h+='<br><span style="color:#B45309">Escribe la aseguradora para ver la vista previa.</span>';
+        }
+        o.innerHTML=h;
+        document.getElementById('jac-imp-aplicar').style.display = (aseg && r.filas.length) ? '' : 'none';
+      });
+    };
+
+    document.getElementById('jac-imp-aplicar').onclick=async function(){
+      var o=document.getElementById('jac-imp-res');
+      var aseg=document.getElementById('jac-imp-aseg').value.trim();
+      if(!LEIDO||!aseg){ o.innerHTML='<span style="color:#B91C1C">Primero lee la tabla y pon la aseguradora.</span>'; return; }
+      this.disabled=true; this.textContent='Aplicando…';
+      var r=await window.jacImportarPortal({aseguradora:aseg, filas:LEIDO.filas});
+      window.__jacImport=r;
+      this.disabled=false; this.textContent='2 · Aplicar al CRM';
+      o.innerHTML='<b>Importado.</b> Encontradas <b>'+r.encontradas+'</b> de '+r.filas
+        +' · corregidas <b>'+r.corregidas+'</b> · a Vigente <b>'+r.aVigente+'</b>'
+        +' · fichas de cliente completadas <b>'+r.clientesCompletados+'</b><br>'
+        +'Comisión total <b>$'+r.comisionTotal+'</b> — repartida por año de vigencia: '
+        +Object.keys(r.porAnio).map(function(k){ return k+': '+r.porAnio[k]; }).join(' · ')
+        +(r.noEstan.length?'<br><span style="color:#B45309">'+r.noEstan.length+' filas no encontraron su póliza. '
+          +'Están en <code>window.__jacImport.noEstan</code>.</span>':'')
+        +(r.aviso?'<br><span style="color:#B91C1C">'+r.aviso+'</span>':'');
+    };
+  }
+  setTimeout(function(){ try{ panel(); }catch(e){} }, 3500);
+  setInterval(function(){ try{ panel(); }catch(e){} }, 5000);
 })();
 </script>
 
