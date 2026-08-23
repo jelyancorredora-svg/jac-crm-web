@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-BF';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-BG';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -28010,6 +28010,1205 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   else arrancar();
   var n=0;
   (function reintentar(){ try{ arrancar(); }catch(e){} if(++n<12) setTimeout(reintentar, 1000); })();
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - Tareas y comisiones: datos completos y cierre a 90 dias
+   ------------------------------------------------------------
+   LO QUE ENCONTRE, CONSULTANDO SU BASE
+
+   De sus 302 tareas, 226 no son tareas: son recordatorios de
+   cobrar comision, con este texto y nada mas:
+
+       "Cobrar comision: ASSA - 2020-01 - $64.50"
+
+   La aseguradora, el mes y el monto estaban DENTRO del titulo,
+   como texto. Los campos de la tarea -cliente, poliza, fecha,
+   prima- estaban vacios. Por eso se veian incompletas: no habia
+   nada que ver, la informacion no estaba en su sitio.
+
+   Van desde 2006-05 hasta 2025-11. Hay recordatorios de cobrar
+   comisiones de hace veinte anos.
+
+   COMPROBACION QUE HICE ANTES DE TOCAR NADA
+
+   Lo primero que mire fue si eran duplicados de las comisiones
+   que ya estan en el modulo: si lo fueran, pasarlas habria
+   inflado sus numeros al doble. Cruzando mes y monto contra las
+   910 comisiones existentes: solo 3 estaban repetidas. Las otras
+   216 son comisiones de verdad que se quedaron atrapadas como
+   tareas. Pasarlas es correcto.
+
+   QUE SE HACE
+
+   1. Cada recordatorio de comision se convierte en una comision
+      de verdad, con su aseguradora unificada, su mes y su monto.
+      La tarea NO se borra: se marca completada y se le anota a
+      que comision fue a parar. Nada se pierde y se puede
+      deshacer.
+   2. A cada comision se le completan los datos desde su poliza:
+      numero, cliente, cedula, ramo, prima, % y fechas.
+   3. Todo lo anterior a 90 dias se da por cobrado. Solo quedan
+      abiertos los ultimos 90 dias, que es lo que de verdad hay
+      que perseguir.
+   4. Las tareas que si son tareas se completan con los datos de
+      su poliza y su cliente, y las vencidas hace mas de 90 dias
+      se cierran.
+
+   Todo esto se puede correr las veces que haga falta: no
+   duplica, y tiene deshacer.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var DIAS=90;
+
+  function E(){
+    try{ if(window.S && window.S.polizas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v) return v; }catch(e){}
+    return null;
+  }
+  function n(x){ var v=parseFloat(String(x==null?'':x).replace(/,/g,'')); return isFinite(v)?v:0; }
+  function hoyISO(){ var d=new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function menos(dias){ var d=new Date(); d.setDate(d.getDate()-dias);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function nid(p){ return p+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36); }
+
+  /* fin del mes 'YYYY-MM', que es cuando esa comision se pudo cobrar */
+  function finDeMes(mes){
+    if(!/^\d{4}-\d{2}$/.test(String(mes||''))) return null;
+    var a=+mes.slice(0,4), m=+mes.slice(5,7);
+    var d=new Date(a, m, 0);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+
+  function canonAseg(v){
+    if(!v) return v;
+    try{ if(typeof window.jacNormalizarAseg==='function') return window.jacNormalizarAseg(v)||v; }catch(e){}
+    return v;
+  }
+
+  /* ---------- leer un recordatorio de comision ---------- */
+  var RE_COM=/cobrar\s+comisi/i;
+  function esRecordatorioComision(t){
+    return RE_COM.test(String(t.titulo||'')+' '+String(t.desc||''));
+  }
+  function leerRecordatorio(t){
+    var txt=String(t.titulo||'')+' '+String(t.desc||'');
+    var mes=(txt.match(/(\d{4}-\d{2})/)||[])[1]||null;
+    var mm=txt.match(/\$\s*([0-9][0-9.,]*)/);
+    var monto=mm?n(mm[1]):0;
+    /* la aseguradora es lo que va entre los dos puntos y el mes */
+    var aseg='';
+    var am=String(t.titulo||'').match(/comisi[óo]n\s*:\s*([\s\S]+?)\s*[·\-–]\s*\d{4}-\d{2}/i);
+    if(am) aseg=am[1].trim();
+    return {mes:mes, monto:monto, aseg:canonAseg(aseg)||aseg||''};
+  }
+
+  /* ---------- datos de la poliza de una comision ---------- */
+  function polizaPorId(st, id){
+    if(!id) return null;
+    var a=st.polizas||[];
+    for(var i=0;i<a.length;i++) if(a[i].id===id) return a[i];
+    return null;
+  }
+  function polizaDe(st, c){
+    return polizaPorId(st, c.polizaId || (c.extra&&c.extra.polizaId) || c._polizaId || '');
+  }
+  function clienteDe(st, p){
+    if(!p) return null;
+    var a=st.clientes||[];
+    for(var i=0;i<a.length;i++) if(a[i].id===p.clienteId) return a[i];
+    return null;
+  }
+
+  function completarComision(st, c){
+    var cambio=false;
+    var p=polizaDe(st, c);
+    if(p){
+      var cli=clienteDe(st, p);
+      function pon(campo, valor){
+        if(valor===''||valor==null) return;
+        if(c[campo]===valor) return;
+        /* nunca se pisa un dato que ya tenga contenido */
+        if(c[campo]!==undefined && c[campo]!=='' && c[campo]!==null && c[campo]!==0) return;
+        c[campo]=valor; cambio=true;
+      }
+      pon('polizaNum',   p.num||'');
+      pon('cliente',     p.nombreCliente||(cli&&cli.nombre)||'');
+      pon('clienteId',   p.clienteId||'');
+      pon('cedula',      (cli&&cli.cedula)||p.docAsegurado||'');
+      pon('ramo',        p.ramo||'');
+      pon('prima',       n(p.prima)||'');
+      pon('totalPoliza', n(p.total)||'');
+      pon('comPct',      n(p.comPct)||'');
+      pon('fechaInicio', p.fechaInicio||'');
+      pon('fechaFin',    p.fechaFin||'');
+      pon('periodo',     p.periodo||'');
+      if((!c.aseg || c.aseg==='—') && p.aseg){ c.aseg=p.aseg; cambio=true; }
+    }
+    var a=canonAseg(c.aseg);
+    if(a && a!==c.aseg){ c.aseg=a; cambio=true; }
+    /* etiqueta legible para las pantallas que muestran una sola linea */
+    var etq=[c.polizaNum?('Póliza '+c.polizaNum):'', c.cliente||'', c.ramo||''].filter(Boolean).join(' · ');
+    if(etq && c.detalle!==etq){ c.detalle=etq; cambio=true; }
+    return cambio;
+  }
+
+  /* ---------- 1. revision, sin escribir ---------- */
+  window.jacRevisarCartera=function(){
+    var st=E(); if(!st) return null;
+    var T=st.tareas||[], CO=st.comisiones||[];
+    var corte=menos(DIAS), corteMes=corte.slice(0,7);
+
+    var recor=[], ilegibles=[], tareasReales=[];
+    T.forEach(function(t){
+      if(esRecordatorioComision(t)){
+        if(t.extra && t.extra.pasadaAComision) return;   /* ya resuelta */
+        var d=leerRecordatorio(t);
+        if(d.mes && d.monto>0) recor.push({ref:t, d:d});
+        else ilegibles.push({ref:t, tit:t.titulo||''});
+      } else tareasReales.push(t);
+    });
+
+    function yaEsta(d){
+      for(var i=0;i<CO.length;i++){
+        var c=CO[i];
+        if(String(c.mes||'')===d.mes && Math.abs(n(c.monto)-d.monto)<0.01) return true;
+      }
+      return false;
+    }
+    var aCrear=recor.filter(function(r){ return !yaEsta(r.d); });
+
+    var sinDatos=CO.filter(function(c){ return !c.polizaNum || !c.cliente; }).length;
+    var aCobrar=CO.filter(function(c){
+      var m=String(c.mes||'');
+      return m && m<corteMes && String(c.estado||'').toLowerCase().indexOf('cobrad')<0;
+    }).length;
+
+    var tareasViejas=tareasReales.filter(function(t){
+      var f=t.fechaLimite||'';
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(f)) return false;
+      if(String(t.estado||'').toLowerCase().indexOf('complet')===0) return false;
+      return f<corte;
+    }).length;
+    var tareasIncompletas=tareasReales.filter(function(t){
+      return (!t.clienteId && !t.relId) || !t.fechaLimite;
+    }).length;
+
+    return {
+      corte:corte,
+      tareasTotal:T.length,
+      recordatorios:recor.length, ilegibles:ilegibles.length,
+      comisionesACrear:aCrear.length, yaEstaban:recor.length-aCrear.length,
+      tareasReales:tareasReales.length,
+      tareasViejasACerrar:tareasViejas, tareasIncompletas:tareasIncompletas,
+      comisionesTotal:CO.length, comisionesSinDatos:sinDatos, comisionesACobrar:aCobrar,
+      muestraIlegibles:ilegibles.slice(0,10).map(function(x){ return String(x.tit).slice(0,70); })
+    };
+  };
+
+  /* ---------- 2. aplicar ---------- */
+  window.jacCompletarCartera=function(opts){
+    opts=opts||{};
+    var st=E(); if(!st) return {ok:false, motivo:'sin datos'};
+    if(!Array.isArray(st.comisiones)) st.comisiones=[];
+    if(!Array.isArray(st.tareas)) st.tareas=[];
+
+    var corte=menos(DIAS), corteMes=corte.slice(0,7);
+    var res={creadas:0, tareasCerradas:0, comisionesCompletadas:0, comisionesCobradas:0,
+             tareasCompletadas:0, ilegibles:0, corte:corte};
+
+    /* --- a) recordatorios de comision --- */
+    function yaEsta(d){
+      for(var i=0;i<st.comisiones.length;i++){
+        var c=st.comisiones[i];
+        if(String(c.mes||'')===d.mes && Math.abs(n(c.monto)-d.monto)<0.01) return c;
+      }
+      return null;
+    }
+    st.tareas.forEach(function(t){
+      if(!esRecordatorioComision(t)) return;
+      if(t.extra && t.extra.pasadaAComision) return;      /* ya se hizo */
+      var d=leerRecordatorio(t);
+      if(!d.mes || !(d.monto>0)){ res.ilegibles++; return; }
+
+      var c=yaEsta(d);
+      if(!c){
+        c={ id:nid('COM'), aseg:d.aseg||'—', mes:d.mes, monto:d.monto,
+            estado:'pendiente', fecha:finDeMes(d.mes)||t.fechaLimite||hoyISO(),
+            polizaId:t.relId||t.polizaId||'',
+            _origen:'recordatorio de tarea', _tareaId:t.id };
+        st.comisiones.push(c);
+        res.creadas++;
+      }
+      t.extra=t.extra||{};
+      if(!t.extra.previo) t.extra.previo={ estado:t.estado, etapaTarea:t.etapaTarea };
+      t.extra.pasadaAComision=c.id;
+      t.etapaTarea='Hecho';
+      t.estado='Completada';
+      t.fechaCompletada=t.fechaCompletada||hoyISO();
+      if(!/Comisiones/.test(String(t.desc||'')))
+        t.desc=(t.desc?t.desc+' · ':'')+'Pasada al módulo de Comisiones';
+      res.tareasCerradas++;
+    });
+
+    /* --- b) completar los datos de TODAS las comisiones --- */
+    st.comisiones.forEach(function(c){
+      if(completarComision(st, c)) res.comisionesCompletadas++;
+    });
+
+    /* --- c) cobradas hasta 90 dias --- */
+    st.comisiones.forEach(function(c){
+      var m=String(c.mes||'');
+      if(!m) return;
+      var vieja = m<corteMes;
+      var yaCobrada = String(c.estado||'').toLowerCase().indexOf('cobrad')>=0;
+      if(vieja && !yaCobrada){
+        c._estadoPrevio=c._estadoPrevio||c.estado||'pendiente';
+        c.estado='cobrada';
+        c.fechaCobro=c.fechaCobro||finDeMes(m);
+        c._cerradaPorAntiguedad=true;
+        res.comisionesCobradas++;
+      }
+    });
+
+    /* --- d) las tareas que si son tareas --- */
+    st.tareas.forEach(function(t){
+      if(esRecordatorioComision(t)) return;
+      var tocada=false;
+      var pid=t.relId||t.polizaId||'';
+      if(pid){
+        var p=polizaPorId(st, pid);
+        if(p){
+          var cli=clienteDe(st, p);
+          t.extra=t.extra||{};
+          if(!t.clienteId && p.clienteId){ t.clienteId=p.clienteId; tocada=true; }
+          if(!t.extra.polizaNum && p.num){ t.extra.polizaNum=p.num; tocada=true; }
+          if(!t.extra.cliente){ t.extra.cliente=p.nombreCliente||(cli&&cli.nombre)||''; tocada=true; }
+          if(!t.extra.aseg && p.aseg){ t.extra.aseg=p.aseg; tocada=true; }
+          if(!t.extra.ramo && p.ramo){ t.extra.ramo=p.ramo; tocada=true; }
+          if(!t.extra.prima && n(p.prima)){ t.extra.prima=n(p.prima); tocada=true; }
+          if(!t.extra.cuota && n(p.letraPrima)){ t.extra.cuota=n(p.letraPrima); tocada=true; }
+          if(!t.fechaLimite && p.fechaFin){ t.fechaLimite=p.fechaFin; tocada=true; }
+          var det=[p.num?('Póliza '+p.num):'', p.nombreCliente||'', p.aseg||'', p.ramo||'',
+                   n(p.letraPrima)?('cuota $'+n(p.letraPrima).toFixed(2)
+                     +(p.periodo?' '+String(p.periodo).toLowerCase():'')):'',
+                   p.fechaFin?('vence '+p.fechaFin):''].filter(Boolean).join(' · ');
+          if(det && String(t.desc||'').length<det.length){ t.desc=det; tocada=true; }
+        }
+      }
+      if(!t.estado){ t.estado='Pendiente'; tocada=true; }
+      if(!t.etapaTarea){ t.etapaTarea='Por Hacer'; tocada=true; }
+      var f=t.fechaLimite||'';
+      if(/^\d{4}-\d{2}-\d{2}$/.test(f) && f<corte
+         && String(t.estado||'').toLowerCase().indexOf('complet')!==0){
+        t.extra=t.extra||{};
+        if(!t.extra.previo) t.extra.previo={ estado:t.estado, etapaTarea:t.etapaTarea };
+        t.estado='Completada'; t.etapaTarea='Hecho';
+        t.fechaCompletada=t.fechaCompletada||hoyISO();
+        t.extra.cerradaPorAntiguedad=true;
+        res.tareasCerradas++; tocada=true;
+      }
+      if(tocada) res.tareasCompletadas++;
+    });
+
+    var hubo = res.creadas||res.tareasCerradas||res.comisionesCompletadas
+             ||res.comisionesCobradas||res.tareasCompletadas;
+    if(hubo){
+      window.__jacSucio=true;
+      try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      if(!opts.sinSubir && typeof window.jacGuardarYa==='function'){
+        try{ window.jacGuardarYa({silencioso:true}); }catch(e){}
+      }
+      ['RTar','RCom','renderCom','calRenderAllTareas','calcKPIs','renderKPIs']
+        .forEach(function(f){ try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
+    }
+    res.ok=true;
+    return res;
+  };
+
+  /* ---------- 3. deshacer ---------- */
+  window.jacDeshacerCartera=function(){
+    var st=E(); if(!st) return {ok:false};
+    var r={comisionesBorradas:0, tareasReabiertas:0, comisionesReabiertas:0};
+    st.comisiones=(st.comisiones||[]).filter(function(c){
+      if(c._origen==='recordatorio de tarea'){ r.comisionesBorradas++; return false; }
+      return true;
+    });
+    (st.comisiones||[]).forEach(function(c){
+      if(c._cerradaPorAntiguedad){
+        c.estado=c._estadoPrevio||'pendiente';
+        delete c._cerradaPorAntiguedad; delete c._estadoPrevio; delete c.fechaCobro;
+        r.comisionesReabiertas++;
+      }
+    });
+    (st.tareas||[]).forEach(function(t){
+      if(!t.extra) return;
+      if(t.extra.pasadaAComision || t.extra.cerradaPorAntiguedad){
+        var v=t.extra.previo||{};
+        t.estado=v.estado||''; t.etapaTarea=v.etapaTarea||'Por Hacer';
+        delete t.fechaCompletada;
+        delete t.extra.pasadaAComision; delete t.extra.cerradaPorAntiguedad; delete t.extra.previo;
+        r.tareasReabiertas++;
+      }
+    });
+    if(st.__jacCarteraHecha) delete st.__jacCarteraHecha;
+    window.__jacSucio=true;
+    try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+    if(typeof window.jacGuardarYa==='function'){ try{ window.jacGuardarYa({silencioso:true}); }catch(e){} }
+    ['RTar','RCom','renderCom'].forEach(function(f){
+      try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
+    r.ok=true;
+    return r;
+  };
+
+  /* ---------- que corra solo, una vez ---------- */
+  var yaCorrio=false;
+  function auto(){
+    if(yaCorrio) return;
+    var st=E();
+    if(!st || !(st.tareas||[]).length) return;
+    if(st.__jacCarteraHecha){ yaCorrio=true; return; }
+    var rev=window.jacRevisarCartera();
+    if(!rev) return;
+    yaCorrio=true;
+    var pendiente = rev.comisionesACrear || rev.comisionesSinDatos
+                  || rev.comisionesACobrar || rev.tareasViejasACerrar;
+    if(!pendiente){ st.__jacCarteraHecha=true; return; }
+    var res=window.jacCompletarCartera();
+    st.__jacCarteraHecha=true;
+    window.__jacCarteraUltimo=res;
+    if(typeof toast==='function' && (res.creadas||res.comisionesCobradas)){
+      toast(res.creadas+' comisiones rescatadas de tareas · '
+           +res.comisionesCobradas+' dadas por cobradas (+90 días)','ok');
+    }
+  }
+  window.jacCarteraAuto=auto;
+  var t=0;
+  (function esperar(){
+    try{ auto(); }catch(e){}
+    if(!yaCorrio && ++t<40) setTimeout(esperar, 1500);
+  })();
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM - Las tareas, con toda su informacion a la vista
+   ------------------------------------------------------------
+   EL PROBLEMA
+
+   Aunque la tarea tenga cliente, poliza, aseguradora, ramo y
+   cuota guardados, las pantallas no los mostraban:
+
+     · El tablero (kanban) pintaba: titulo, tipo, primer nombre
+       del cliente y fecha. Nada mas.
+     · La lista de la agenda pintaba: titulo y fecha. Ni siquiera
+       la descripcion.
+
+   Por eso se veian "sin informacion": la informacion estaba, pero
+   nadie la sacaba a la pantalla.
+
+   QUE HACE ESTE BLOQUE
+
+   Una sola funcion, jacTareaFicha(t), reune todo lo que se sabe
+   de una tarea -de sus campos, de su poliza vinculada, de su
+   cliente, y si hace falta leyendo el propio titulo- y las tres
+   pantallas la usan. Asi todas dicen lo mismo.
+
+   Para el tablero no se repinta con temporizador: se engancha al
+   propio pintor. Con el guardia de estabilidad puesto, el tablero
+   solo se dibuja cuando algo cambia, asi que esto no parpadea.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function E(){
+    try{ if(window.S && window.S.tareas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v) return v; }catch(e){}
+    return null;
+  }
+  function n(x){ var v=parseFloat(String(x==null?'':x).replace(/,/g,'')); return isFinite(v)?v:0; }
+  function esc2(s){ return (typeof esc==='function') ? esc(s) :
+    String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function money(v){ var x=n(v); return (typeof fmtM==='function') ? fmtM(x) : ('$'+x.toFixed(2)); }
+
+  /* ---------- todo lo que se sabe de una tarea ---------- */
+  window.jacTareaFicha=function(t){
+    var st=E(); if(!st || !t) return {};
+    var f={};
+    var ex=t.extra||{};
+
+    /* poliza: por el vinculo, y si no, por lo que ya guardamos */
+    var pol=null;
+    var pid=t.relId||t.polizaId||'';
+    if(pid && t.tipoRel!=='cliente' && t.tipoRel!=='prospecto'){
+      var P=st.polizas||[];
+      for(var i=0;i<P.length;i++) if(P[i].id===pid){ pol=P[i]; break; }
+    }
+    if(!pol && ex.polizaNum){
+      var P2=st.polizas||[];
+      for(var j=0;j<P2.length;j++) if(String(P2[j].num||'')===String(ex.polizaNum)){ pol=P2[j]; break; }
+    }
+
+    /* cliente: del vinculo directo, de la poliza, o del campo */
+    var cli=null;
+    var cid=t.clienteId || (pol&&pol.clienteId) || (t.tipoRel==='cliente'?t.relId:'');
+    if(cid){
+      var C=st.clientes||[];
+      for(var k=0;k<C.length;k++) if(C[k].id===cid){ cli=C[k]; break; }
+    }
+
+    f.cliente  = (cli&&cli.nombre) || (pol&&pol.nombreCliente) || ex.cliente || t.paraQuien || '';
+    f.clienteId= (cli&&cli.id) || cid || '';
+    f.tel      = String((cli&&(cli.cel||cli.tel))||(pol&&pol.celCliente)||'').replace(/\D/g,'');
+    f.email    = (cli&&cli.email)||'';
+    f.poliza   = (pol&&pol.num) || ex.polizaNum || '';
+    f.polizaId = (pol&&pol.id) || '';
+    f.aseg     = (pol&&pol.aseg) || ex.aseg || '';
+    f.ramo     = (pol&&pol.ramo) || ex.ramo || '';
+    f.prima    = n((pol&&pol.prima) || ex.prima);
+    f.total    = n(pol&&pol.total);
+    f.cuota    = n((pol&&pol.letraPrima) || ex.cuota);
+    f.periodo  = (pol&&pol.periodo) || ex.periodo || '';
+    f.vence    = (pol&&pol.fechaFin) || '';
+    f.limite   = t.fechaLimite || '';
+
+    /* recordatorios de comision: el dato vive en el titulo */
+    var txt=String(t.titulo||'')+' '+String(t.desc||'');
+    if(/cobrar\s+comisi/i.test(txt)){
+      f.esComision=true;
+      f.mes  = (txt.match(/(\d{4}-\d{2})/)||[])[1]||'';
+      var mm = txt.match(/\$\s*([0-9][0-9.,]*)/);
+      f.monto= mm ? n(mm[1]) : 0;
+      if(!f.aseg){
+        var am=String(t.titulo||'').match(/comisi[óo]n\s*:\s*([\s\S]+?)\s*[·\-–]\s*\d{4}-\d{2}/i);
+        if(am) f.aseg=am[1].trim();
+      }
+    }
+    return f;
+  };
+
+  /* una linea con lo esencial */
+  window.jacTareaLinea=function(t){
+    var f=window.jacTareaFicha(t), p=[];
+    if(f.cliente) p.push(esc2(f.cliente));
+    if(f.poliza)  p.push('Póliza <b>'+esc2(f.poliza)+'</b>');
+    if(f.aseg)    p.push(esc2(f.aseg));
+    if(f.ramo)    p.push(esc2(f.ramo));
+    if(f.esComision){
+      if(f.mes)   p.push('mes '+esc2(f.mes));
+      if(f.monto) p.push('<b>'+money(f.monto)+'</b>');
+    } else {
+      if(f.cuota) p.push('cuota '+money(f.cuota)+(f.periodo?' '+esc2(String(f.periodo).toLowerCase()):''));
+      else if(f.prima) p.push('prima '+money(f.prima));
+    }
+    if(f.vence)   p.push('vence '+esc2(f.vence));
+    return p.join(' · ');
+  };
+
+  /* ---------- 1. la lista de la agenda ---------- */
+  function listaAgenda(){
+    var el=document.getElementById('cal-all-tareas'); if(!el) return;
+    var st=E(); if(!st) return;
+    var f=window._calTarFilter||'all';
+    var hoy=new Date(); hoy.setHours(0,0,0,0);
+    var fin=new Date(hoy); fin.setDate(fin.getDate()+7);
+
+    var lista=(st.tareas||[]).filter(function(t){
+      if(String(t.estado||'').toLowerCase().indexOf('complet')===0) return false;
+      if(typeof window.jacTareaEnVista==='function' && !window.jacTareaEnVista(t)) return false;
+      if(f==='all') return true;
+      if(!t.fechaLimite) return false;
+      var d=new Date(t.fechaLimite+'T12:00:00');
+      if(f==='hoy') return d.toDateString()===hoy.toDateString();
+      if(f==='sem') return d>=hoy && d<=fin;
+      if(f==='ven') return d<hoy;
+      return true;
+    });
+    lista.sort(function(a,b){
+      var da=a.fechaLimite?new Date(a.fechaLimite):new Date('2099-01-01');
+      var db=b.fechaLimite?new Date(b.fechaLimite):new Date('2099-01-01');
+      return da-db;
+    });
+    if(!lista.length){
+      el.innerHTML='<div style="text-align:center;padding:20px;color:#94A3B8;font-size:12px">Sin tareas pendientes 🎉</div>';
+      return;
+    }
+    var h='';
+    lista.forEach(function(t){
+      var venc=t.fechaLimite && new Date(t.fechaLimite+'T12:00:00')<new Date();
+      var bg=venc?'#FEF2F2':(t.urgente?'#FFF7ED':'#F8FAFC');
+      var bc=venc?'#EF4444':(t.urgente?'#F97316':'#CBD5E1');
+      var pr=t.prioridad||'', prBg='#E2E8F0', prCol='#64748B';
+      if(/^A/i.test(pr)||pr==='Alta'){ prBg='#FEE2E2'; prCol='#DC2626'; }
+      else if(/^M/i.test(pr)||pr==='Media'){ prBg='#FEF3C7'; prCol='#D97706'; }
+      else if(/^B/i.test(pr)||pr==='Baja'){ prBg='#DCFCE7'; prCol='#16A34A'; }
+      var linea=window.jacTareaLinea(t);
+      var ficha=window.jacTareaFicha(t);
+      h+='<div style="padding:9px 12px;background:'+bg+';border-radius:8px;margin-bottom:6px;'
+        +'border-left:3px solid '+bc+'">'
+        +'<div style="display:flex;align-items:flex-start;gap:6px">'
+        +(pr?'<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;background:'
+            +prBg+';color:'+prCol+';flex-shrink:0;margin-top:1px">'+esc2(pr)+'</span>':'')
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;font-weight:600;color:#1E293B;line-height:1.35">'
+          +esc2(t.titulo||t.desc||'Tarea')+'</div>'
+        +(linea?'<div style="font-size:10.5px;color:#475569;margin-top:3px;line-height:1.5">'+linea+'</div>':'')
+        +(t.desc && t.desc!==linea
+            ?'<div style="font-size:10px;color:#64748B;margin-top:2px">'+esc2(t.desc)+'</div>':'')
+        +(t.fechaLimite?'<div style="font-size:10px;color:'+(venc?'#EF4444':'#64748B')
+            +';margin-top:3px">📅 '+esc2(t.fechaLimite)+(venc?' ⚠️ VENCIDA':'')+'</div>':'')
+        +'</div>'
+        +(ficha.tel?'<a href="https://wa.me/507'+ficha.tel+'" target="_blank" '
+            +'style="flex-shrink:0;font-size:11px;text-decoration:none;color:#059669;font-weight:700">💬</a>':'')
+        +'</div></div>';
+    });
+    el.innerHTML=h;
+  }
+  window.jacListaTareasAgenda=listaAgenda;
+
+  /* ---------- 2. las tarjetas del tablero ----------
+     El id de la tarea NO se adivina leyendo el titulo: ya viene
+     escrito en los propios botones de la tarjeta, por ejemplo
+     onclick="OT_open('t123')". Se lee de ahi, que es exacto.
+     Emparejar por texto es lo que hacia fallar las alertas. */
+  function idDeTarjeta(c){
+    if(c.__jacTid!==undefined) return c.__jacTid;
+    var id=null;
+    var bs=c.querySelectorAll('[onclick]');
+    for(var i=0;i<bs.length && !id;i++){
+      var oc=bs[i].getAttribute('onclick')||'';
+      var m=oc.match(/(?:OT_open|DTar|calTaskDone|advTask|calReprogramarTarea|calCancelarTarea|openEmailForTarea)\s*\(\s*'([^']+)'/);
+      if(m) id=m[1];
+    }
+    if(!id){
+      var d=c.getAttribute('data-jac-tid');
+      if(d) id=d;
+    }
+    c.__jacTid=id;
+    return id;
+  }
+
+  function detalleEnTarjetas(){
+    var cont=document.getElementById('tar-view'); if(!cont) return;
+    var st=E(); if(!st) return;
+    var cards=cont.querySelectorAll('.tcard');
+    if(!cards.length) return;
+    var porId={};
+    (st.tareas||[]).forEach(function(t){ if(t && t.id) porId[t.id]=t; });
+    for(var i=0;i<cards.length;i++){
+      var c=cards[i];
+      if(c.querySelector('.jac-tar-info')) continue;
+      var id=idDeTarjeta(c);
+      if(!id) continue;
+      var t=porId[id];
+      if(!t) continue;
+      var linea=window.jacTareaLinea(t);
+      if(!linea) continue;
+      var d=document.createElement('div');
+      d.className='jac-tar-info';
+      d.style.cssText='font-size:10px;color:#475569;margin-top:3px;line-height:1.45;'
+                     +'border-top:1px dashed #E2E8F0;padding-top:3px';
+      d.innerHTML=linea;
+      /* antes de la fila de botones */
+      var fila=null;
+      for(var j=c.children.length-1;j>=0;j--){
+        if(c.children[j].querySelector && c.children[j].querySelector('button,a')){ fila=c.children[j]; break; }
+      }
+      if(fila) c.insertBefore(d, fila); else c.appendChild(d);
+    }
+  }
+  window.jacDetalleTarjetas=detalleEnTarjetas;
+
+  /* ---------- enganches ---------- */
+  function instalar(){
+    if(typeof window.calRenderAllTareas==='function' && !window.calRenderAllTareas.__jacInfo){
+      var nueva=function(){ try{ listaAgenda(); }catch(e){ try{ console.warn('[tareas]',e); }catch(x){} } };
+      nueva.__jacInfo=1;
+      window.calRenderAllTareas=nueva;
+    }
+    if(typeof window.renderTarK==='function' && !window.renderTarK.__jacInfo){
+      var orig=window.renderTarK;
+      var nuevo=function(){
+        var r=orig.apply(this, arguments);
+        try{ detalleEnTarjetas(); }catch(e){}
+        return r;
+      };
+      nuevo.__jacInfo=1;
+      window.renderTarK=nuevo;
+    }
+  }
+  instalar();
+  var n2=0;
+  (function reintentar(){ try{ instalar(); }catch(e){} if(++n2<20) setTimeout(reintentar, 1000); })();
+  setTimeout(function(){ try{ detalleEnTarjetas(); listaAgenda(); }catch(e){} }, 4000);
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM - Pagos y tareas, sincronizados en los dos sentidos
+   ------------------------------------------------------------
+   EL PROBLEMA
+
+   Un mismo cobro vivia en dos sitios a la vez: como pago y como
+   tarea. Marcarlo pagado en Pagos no cerraba la tarea, y cerrar
+   la tarea no marcaba el pago. Habia que hacerlo dos veces, y si
+   se olvidaba una, los numeros no cuadraban.
+
+   Igual con las comisiones: cobrar una comision no cerraba su
+   recordatorio, y al reves.
+
+   QUE HACE
+
+   Se enlazan por su vinculo real -no por parecido de texto- y se
+   sincronizan solos en las dos direcciones:
+
+     pago marcado Pagado   ->  su tarea queda Completada
+     tarea completada      ->  su pago queda Pagado
+     comision cobrada      ->  su recordatorio queda Completado
+     recordatorio cerrado  ->  su comision queda cobrada
+
+   Da igual si el cambio lo hace usted a mano, un boton del CRM o
+   un proceso automatico: se engancha al guardado, asi que
+   cualquier via pasa por aqui.
+
+   PRECAUCION IMPORTANTE
+
+   Solo se sincroniza en el sentido de CERRAR. Nunca se reabre
+   nada solo: si usted cierra algo a proposito, el CRM no se lo
+   va a volver a abrir por su cuenta.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function E(){
+    try{ if(window.S && window.S.polizas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v) return v; }catch(e){}
+    return null;
+  }
+  function n(x){ var v=parseFloat(String(x==null?'':x).replace(/,/g,'')); return isFinite(v)?v:0; }
+  function L(x){ return String(x==null?'':x).toLowerCase(); }
+  function hoyISO(){ var d=new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+  function pagoCerrado(p){ var e=L(p.estado); return e==='pagado' || e==='cobrado'; }
+  function tareaCerrada(t){
+    var e=L(t.estado), et=L(t.etapaTarea);
+    return e.indexOf('complet')===0 || e==='realizada' || e==='hecha'
+        || et==='hecho' || et==='completado' || et==='realizado' || et==='finalizado';
+  }
+  function comisionCerrada(c){ return L(c.estado).indexOf('cobrad')>=0; }
+
+  function cerrarTarea(t, motivo){
+    if(tareaCerrada(t)) return false;
+    t.extra=t.extra||{};
+    if(!t.extra.previoSync) t.extra.previoSync={estado:t.estado, etapaTarea:t.etapaTarea};
+    t.estado='Completada';
+    t.etapaTarea='Hecho';
+    t.fechaCompletada=t.fechaCompletada||hoyISO();
+    t.extra.cerradaPor=motivo;
+    return true;
+  }
+  function cerrarPago(p, motivo){
+    if(pagoCerrado(p)) return false;
+    p._estadoPrevioSync=p._estadoPrevioSync||p.estado||'Pendiente';
+    p.estado='Pagado';
+    p.fechaPago=p.fechaPago||hoyISO();
+    p._cerradoPor=motivo;
+    return true;
+  }
+  function cerrarComision(c, motivo){
+    if(comisionCerrada(c)) return false;
+    c._estadoPrevioSync=c._estadoPrevioSync||c.estado||'pendiente';
+    c.estado='cobrada';
+    c.fechaCobro=c.fechaCobro||hoyISO();
+    c._cerradaPor=motivo;
+    return true;
+  }
+
+  /* ---------- el enlace entre unos y otros ---------- */
+  function tareaDePago(st, p){
+    var T=st.tareas||[];
+    for(var i=0;i<T.length;i++){
+      var t=T[i], ex=t.extra||{};
+      if(ex.pagoId && ex.pagoId===p.id) return t;
+      if(t.tipoRel==='pago' && t.relId===p.id) return t;
+    }
+    return null;
+  }
+  function pagoDeTarea(st, t){
+    var ex=t.extra||{};
+    var id=ex.pagoId || (t.tipoRel==='pago'?t.relId:'');
+    if(!id) return null;
+    var G=st.pagos||[];
+    for(var i=0;i<G.length;i++) if(G[i].id===id) return G[i];
+    return null;
+  }
+  function comisionDeTarea(st, t){
+    var ex=t.extra||{};
+    var id=ex.pasadaAComision || ex.comisionId || '';
+    var CO=st.comisiones||[];
+    if(id){ for(var i=0;i<CO.length;i++) if(CO[i].id===id) return CO[i]; }
+    for(var j=0;j<CO.length;j++) if(CO[j]._tareaId===t.id) return CO[j];
+    return null;
+  }
+  function tareaDeComision(st, c){
+    var T=st.tareas||[];
+    if(c._tareaId){ for(var i=0;i<T.length;i++) if(T[i].id===c._tareaId) return T[i]; }
+    for(var j=0;j<T.length;j++){
+      var ex=T[j].extra||{};
+      if(ex.pasadaAComision===c.id || ex.comisionId===c.id) return T[j];
+    }
+    return null;
+  }
+
+  /* ---------- la pasada de sincronizacion ---------- */
+  window.jacSincronizarGestiones=function(){
+    var st=E(); if(!st) return {ok:false};
+    var r={tareasCerradas:0, pagosCerrados:0, comisionesCerradas:0};
+
+    /* pago pagado -> su tarea */
+    (st.pagos||[]).forEach(function(p){
+      if(!pagoCerrado(p)) return;
+      var t=tareaDePago(st, p);
+      if(t && cerrarTarea(t, 'pago registrado')) r.tareasCerradas++;
+    });
+
+    /* tarea cerrada -> su pago y su comision */
+    (st.tareas||[]).forEach(function(t){
+      if(!tareaCerrada(t)) return;
+      var p=pagoDeTarea(st, t);
+      if(p && cerrarPago(p, 'tarea completada')) r.pagosCerrados++;
+      var c=comisionDeTarea(st, t);
+      if(c && comisionCerrada(c)===false && t.extra && t.extra.cerradaPorAntiguedad){
+        /* solo arrastra la comision si la tarea se cerro de verdad,
+           no por el simple traslado al modulo */
+        if(cerrarComision(c, 'tarea completada')) r.comisionesCerradas++;
+      }
+    });
+
+    /* comision cobrada -> su recordatorio */
+    (st.comisiones||[]).forEach(function(c){
+      if(!comisionCerrada(c)) return;
+      var t=tareaDeComision(st, c);
+      if(t && cerrarTarea(t, 'comisión cobrada')) r.tareasCerradas++;
+    });
+
+    var hubo=r.tareasCerradas||r.pagosCerrados||r.comisionesCerradas;
+    if(hubo){
+      window.__jacSucio=true;
+      try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      ['RTar','RPag','RCom','renderCom','calRenderAllTareas']
+        .forEach(function(f){ try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
+    }
+    r.ok=true;
+    return r;
+  };
+
+  /* ---------- al crear un cobro desde una tarea, dejar el enlace ---------- */
+  window.jacEnlazarPagoTarea=function(pagoId, tareaId){
+    var st=E(); if(!st) return false;
+    var t=(st.tareas||[]).filter(function(x){ return x.id===tareaId; })[0];
+    if(!t) return false;
+    t.extra=t.extra||{};
+    t.extra.pagoId=pagoId;
+    return true;
+  };
+
+  /* ---------- engancharse al guardado ----------
+     Cualquier cambio, venga de donde venga, pasa por save(). Se
+     sincroniza justo despues, con un respiro para no encadenar
+     guardados. */
+  var pendiente=null;
+  function programar(){
+    if(pendiente) return;
+    pendiente=setTimeout(function(){
+      pendiente=null;
+      try{ window.jacSincronizarGestiones(); }catch(e){}
+    }, 600);
+  }
+
+  function envolverSave(){
+    if(typeof window.save!=='function' || window.save.__jacSync) return false;
+    var orig=window.save;
+    var nueva=function(){
+      var r=orig.apply(this, arguments);
+      programar();
+      return r;
+    };
+    nueva.__jacSync=1;
+    window.save=nueva;
+    return true;
+  }
+
+  function instalar(){
+    envolverSave();
+  }
+  instalar();
+  var t=0;
+  (function reintentar(){ try{ instalar(); }catch(e){} if(++t<20) setTimeout(reintentar, 1000); })();
+
+  /* una pasada al arrancar, cuando ya bajaron los datos */
+  var hecho=false;
+  var k=0;
+  (function primera(){
+    var st=E();
+    if(st && ((st.pagos||[]).length || (st.tareas||[]).length)){
+      if(!hecho){ hecho=true; try{ window.jacSincronizarGestiones(); }catch(e){} }
+      return;
+    }
+    if(++k<30) setTimeout(primera, 1500);
+  })();
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM - Las comisiones salen de Tareas y viven en Cartera
+   ------------------------------------------------------------
+   POR QUE
+
+   Tareas tenia 302 registros y 226 eran comisiones. Tres de cada
+   cuatro cosas de la lista de trabajo no eran trabajo: eran
+   dinero por cobrar, de 2006 en adelante. Con ese ruido encima
+   no se puede ver lo que de verdad hay que hacer.
+
+   La separacion correcta es simple:
+       Cartera = dinero (pagos, comisiones, renovaciones)
+       Tareas  = trabajo
+
+   QUE HACE
+
+   1. Ninguna tarea de comision aparece ya en Tareas: ni en la
+      lista, ni en el tablero, ni en la lista de la agenda, ni en
+      los contadores. No se borra ninguna: se esconde de esa
+      pantalla, porque su sitio es Comisiones.
+   2. El selector "Mis tareas / Automaticas / Todas" sobraba: solo
+      existia para poder mirar esas comisiones. Se retira, y la
+      pestana queda siempre en el trabajo real. Queda un enlace
+      para ir a Comisiones.
+   3. En Cartera, la pestana de Comisiones avisa cuantas venian de
+      Tareas, para que se vea que no se perdio nada.
+
+   Si algun dia hiciera falta verlas otra vez en Tareas, basta con
+   poner window.__jacComisionesEnTareas = true en la consola.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  window.__jacComisionesEnTareas = false;
+
+  function E(){
+    try{ if(window.S && window.S.tareas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v) return v; }catch(e){}
+    return null;
+  }
+
+  /* Una tarea es "de comision" si lo dice su marca o su texto.
+     Se reutiliza el reconocedor del nucleo cuando existe. */
+  function esComision(t){
+    if(!t) return false;
+    if(t.extra && t.extra.pasadaAComision) return true;
+    if(t._autoTipo==='comision') return true;
+    if(/^auto_comision/i.test(String(t.id||''))) return true;
+    var s=String((t.titulo||'')+' '+(t.tipo||'')+' '+(t.desc||'')).toLowerCase();
+    return /comisi[oó]n/.test(s) && /(cobr|pendiente|recordat)/.test(s);
+  }
+  window.jacTareaDeComision=esComision;
+
+  /* ---------- el filtro central ----------
+     jacTareaEnVista decide si una tarea entra en las pantallas de
+     Tareas. Se envuelve para que las de comision no entren. */
+  function envolverVista(){
+    if(typeof window.jacTareaEnVista!=='function' || window.jacTareaEnVista.__jacCart) return false;
+    var orig=window.jacTareaEnVista;
+    var nueva=function(t){
+      if(!window.__jacComisionesEnTareas && esComision(t)) return false;
+      return orig.apply(this, arguments);
+    };
+    nueva.__jacCart=1;
+    window.jacTareaEnVista=nueva;
+    return true;
+  }
+
+  /* Las listas que NO pasan por jacTareaEnVista se filtran en el
+     origen: se envuelve el pintor y se le esconde el resto. */
+  function filtrar(lista){
+    if(window.__jacComisionesEnTareas) return lista;
+    return (lista||[]).filter(function(t){ return !esComision(t); });
+  }
+  window.jacTareasDeTrabajo=function(){
+    var st=E(); if(!st) return [];
+    return filtrar(st.tareas||[]);
+  };
+
+  /* renderTarL y calRenderAllTareas leen S.tareas directo. Se les
+     cambia la vista por debajo durante el pintado y se restaura
+     enseguida: asi no hay que reescribir los pintores. */
+  function conListaFiltrada(fn){
+    return function(){
+      var st=E();
+      if(!st || window.__jacComisionesEnTareas) return fn.apply(this, arguments);
+      var todas=st.tareas;
+      var visibles=filtrar(todas);
+      if(visibles.length===todas.length) return fn.apply(this, arguments);
+      st.tareas=visibles;
+      try{ return fn.apply(this, arguments); }
+      finally{ st.tareas=todas; }
+    };
+  }
+
+  function envolverPintores(){
+    ['renderTarL','calRenderAllTareas','RTar'].forEach(function(nombre){
+      var f=window[nombre];
+      if(typeof f!=='function' || f.__jacCartFiltro) return;
+      var nuevo=conListaFiltrada(f);
+      nuevo.__jacCartFiltro=1;
+      window[nombre]=nuevo;
+    });
+  }
+
+  /* ---------- quitar el selector Mias / Automaticas / Todas ---------- */
+  function quitarSelector(){
+    var el=document.getElementById('jac-filtro-tareas');
+    if(!el) return false;
+    if(el.getAttribute('data-jac-reemplazado')) return true;
+    el.setAttribute('data-jac-reemplazado','1');
+    el.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px">'
+      +'<span style="color:#64748B">Las comisiones ya no viven aquí:</span>'
+      +'<button type="button" class="btn bsm" onclick="jacIrAComisiones()" '
+      +'style="background:#1E3A8A;color:#fff;border-color:#1E3A8A;font-weight:700">'
+      +'💰 Ver en Cartera → Comisiones</button></div>';
+    return true;
+  }
+
+  window.jacIrAComisiones=function(){
+    try{ if(typeof SH==='function') SH('cartera'); }catch(e){}
+    setTimeout(function(){
+      try{ if(typeof window.jacCarteraAbrir==='function') window.jacCarteraAbrir('com'); }catch(e){}
+    }, 300);
+  };
+
+  /* ---------- el contador de Tareas, sin comisiones ---------- */
+  function arreglarConteo(){
+    var st=E(); if(!st) return;
+    var reales=filtrar(st.tareas||[]);
+    var pend=reales.filter(function(t){
+      var e=String(t.estado||'').toLowerCase(), et=String(t.etapaTarea||'');
+      return e.indexOf('complet')!==0 && et!=='Hecho' && et!=='Cancelada' && et!=='Eliminada';
+    }).length;
+    ['tarcnt','cal-tareas-sub'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el) el.textContent = reales.length+' tareas · '+pend+' pendientes';
+    });
+  }
+  window.jacConteoTareas=arreglarConteo;
+
+  /* ---------- aviso en Comisiones ---------- */
+  function avisoEnComisiones(){
+    var pg=document.getElementById('pg-com');
+    if(!pg || document.getElementById('jac-com-aviso')) return;
+    var st=E(); if(!st) return;
+    var deTareas=(st.comisiones||[]).filter(function(c){
+      return c._origen==='recordatorio de tarea';
+    }).length;
+    if(!deTareas) return;
+    var d=document.createElement('div');
+    d.id='jac-com-aviso';
+    d.style.cssText='background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;'
+      +'padding:8px 12px;margin-bottom:10px;font-size:11.5px;color:#1E3A8A';
+    d.innerHTML='ℹ️ <b>'+deTareas+'</b> comisiones se rescataron del módulo de Tareas, '
+      +'donde vivían como recordatorios sueltos. Aquí tienen sus datos completos.';
+    pg.insertBefore(d, pg.firstChild);
+  }
+
+  function arrancar(){
+    envolverVista();
+    envolverPintores();
+    quitarSelector();
+    arreglarConteo();
+    avisoEnComisiones();
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arrancar);
+  else arrancar();
+  var n=0;
+  (function reintentar(){ try{ arrancar(); }catch(e){} if(++n<20) setTimeout(reintentar, 1000); })();
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM - Celular y tablet
+   ------------------------------------------------------------
+   1. EL MENU "MAS" DEL CELULAR
+
+   Cuando arme Cartera limpie el menu lateral, pero el menu de
+   abajo del telefono es OTRA lista, escrita aparte, y ahi
+   seguian sueltos Renovar, Pagos, Comisiones y WA Masivo. Por
+   eso ella seguia viendo Pagos por fuera aunque ya estuviera
+   dentro de Cartera. Se sustituyen por una sola entrada.
+
+   2. LA AGENDA EN VERTICAL
+
+   En un telefono en vertical la agenda no cabia: las pestanas se
+   salian a lo ancho, la rejilla de la semana intentaba meter
+   siete columnas en 360 px y el mes se comprimia hasta no poder
+   leerse.
+
+   Lo que se hace:
+     · Las pestanas pasan a una tira que se desliza a lo largo, en
+       vez de amontonarse.
+     · La semana, en vertical, deja de ser rejilla de 7 columnas y
+       pasa a lista de dias, uno debajo de otro. Es la unica forma
+       honesta de leer una semana en 360 px.
+     · El mes conserva sus 7 columnas -un mes en lista no se
+       entiende- pero con celdas cuadradas y numeros legibles.
+     · Las tablas se deslizan dentro de su marco, nunca empujan
+       la pagina a lo ancho.
+     · Los botones llegan a 34 px de alto, que es lo minimo para
+       acertarles con el dedo.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* ---------- 1. el menu de abajo ---------- */
+  function menuMovil(){
+    var m=document.getElementById('bmm');
+    if(!m || m.getAttribute('data-jac-cartera')) return false;
+
+    var enlaces=[].slice.call(m.querySelectorAll('a'));
+    var quitar=[], ancla=null;
+    enlaces.forEach(function(a){
+      var oc=a.getAttribute('onclick')||'';
+      if(/SH\(['"]ren['"]\)/.test(oc)){ quitar.push(a); ancla=ancla||a; }
+      else if(/SH\(['"]pag['"]\)/.test(oc)){ quitar.push(a); ancla=ancla||a; }
+      else if(/SH\(['"]com['"]\)/.test(oc)){ quitar.push(a); ancla=ancla||a; }
+      else if(/SH\(['"]wam['"]\)/.test(oc)){ quitar.push(a); }
+    });
+    if(!quitar.length) return false;
+
+    var nuevo=document.createElement('a');
+    nuevo.setAttribute('onclick', "SH('cartera');closeBnMore()");
+    nuevo.innerHTML='<span style="font-size:16px">💼</span>Cartera';
+    if(ancla && ancla.parentElement) ancla.parentElement.insertBefore(nuevo, ancla);
+    else m.appendChild(nuevo);
+
+    quitar.forEach(function(a){ if(a.parentElement) a.parentElement.removeChild(a); });
+    m.setAttribute('data-jac-cartera','1');
+    return true;
+  }
+
+  /* ---------- 2. los estilos ---------- */
+  function estilos(){
+    if(document.getElementById('jac-movil-css')) return;
+    var s=document.createElement('style');
+    s.id='jac-movil-css';
+    s.textContent=[
+      /* ===== hasta 820 px: tablet en vertical y telefono ===== */
+      '@media (max-width:820px){',
+      /* nada empuja la pagina a lo ancho */
+      '  html,body{max-width:100%;overflow-x:hidden}',
+      '  .pg,.card,#mainc{max-width:100%}',
+      '  .tw,.card>.tw,#pg-rep .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}',
+      '  table{max-width:none}',
+      /* las pestanas de la agenda: una tira deslizante */
+      '  #cal-tabs,.cal-tabs,#cal-panel>div:first-child{',
+      '    display:flex!important;flex-wrap:nowrap!important;overflow-x:auto;',
+      '    -webkit-overflow-scrolling:touch;scrollbar-width:none;gap:2px}',
+      '  #cal-tabs::-webkit-scrollbar{display:none}',
+      '  [id^="cal-tab-"]{flex:0 0 auto!important;white-space:nowrap;padding:9px 12px!important;',
+      '    font-size:12px!important;min-height:38px}',
+      /* dedos, no punteros */
+      '  .btn{min-height:34px;padding-left:11px;padding-right:11px}',
+      '  .btn.bsm{min-height:30px}',
+      '  input,select,textarea{font-size:16px!important;min-height:38px}',  /* 16px evita el zoom de iOS */
+      /* las tarjetas de la cartera y del pipeline, a una columna */
+      '  #pg-cartera .jac-cart-bar{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}',
+      '  #pg-cartera .jac-cart-tab{flex:0 0 auto}',
+      '  .sg{grid-template-columns:repeat(2,1fr)!important}',
+      '}',
+      /* ===== hasta 640 px: telefono en vertical ===== */
+      '@media (max-width:640px){',
+      /* LA SEMANA: de rejilla de 7 columnas a lista de dias */
+      '  #cal-pane-semana .calw-grid,#cal-pane-semana .semana-grid,',
+      '  #cal-pane-semana [class*="grid"]{display:block!important}',
+      '  #cal-pane-semana .calw-day,#cal-pane-semana [class*="day"]{',
+      '    width:auto!important;min-width:0!important;margin-bottom:8px;',
+      '    min-height:auto!important;border-radius:10px}',
+      '  #cal-pane-semana .calw-day{border:1px solid var(--bd,#E2E8F0)}',
+      /* EL MES: celdas cuadradas y legibles */
+      '  #cal-grid,.cal-grid{gap:2px!important}',
+      '  #cal-grid>div,.cal-grid>div{min-height:0!important;aspect-ratio:1/1;',
+      '    padding:2px!important;font-size:11px!important;overflow:hidden}',
+      '  #cal-grid .cal-num,.cal-grid .cal-num{font-size:12px!important;font-weight:700}',
+      '  #cal-month-year{font-size:14px!important}',
+      /* el panel de la agenda ocupa lo que tenga */
+      '  #cal-panel{padding:8px!important}',
+      '  #pg-cal{padding:0!important}',
+      /* una sola columna en todo lo que sea rejilla de tarjetas */
+      '  .sg{grid-template-columns:1fr!important}',
+      '  .tboard,#tar-view .tboard{display:block!important}',
+      '  .tcol{width:auto!important;min-width:0!important;margin-bottom:10px}',
+      '  .pcol{min-width:82vw!important}',
+      /* los modales, a pantalla casi completa */
+      '  .md>div,.modal>div{width:96vw!important;max-width:96vw!important;',
+      '    max-height:92vh!important;border-radius:14px!important}',
+      /* el panel lateral de detalle, abajo y a lo ancho */
+      '  .dpanel{width:100%!important;left:0!important;right:0!important;',
+      '    max-height:88vh;border-radius:16px 16px 0 0}',
+      /* que la barra de abajo no tape el final del contenido */
+      '  #mainc,.pg{padding-bottom:78px!important}',
+      /* titulos que no rompan la linea */
+      '  .ph h2{font-size:17px!important}',
+      '  .ph{gap:6px}',
+      '}'
+    ].join('\n');
+    document.head.appendChild(s);
+  }
+
+  /* ---------- 3. la semana en vertical, de verdad ----------
+     El CSS solo no basta si la rejilla se dibuja con anchos
+     escritos en el propio elemento. Se los quita en pantallas
+     estrechas y se los devuelve al girar. */
+  function semanaVertical(){
+    var pane=document.getElementById('cal-pane-semana');
+    if(!pane) return;
+    var estrecha=window.innerWidth<=640;
+    var grid=pane.querySelector('[style*="grid-template-columns"]');
+    if(!grid) return;
+    if(estrecha){
+      if(!grid.__jacGrid) grid.__jacGrid=grid.style.gridTemplateColumns;
+      grid.style.gridTemplateColumns='1fr';
+    } else if(grid.__jacGrid){
+      grid.style.gridTemplateColumns=grid.__jacGrid;
+    }
+  }
+
+  function arrancar(){
+    estilos();
+    menuMovil();
+    semanaVertical();
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arrancar);
+  else arrancar();
+  var n=0;
+  (function reintentar(){ try{ arrancar(); }catch(e){} if(++n<15) setTimeout(reintentar, 1000); })();
+  window.addEventListener('resize', function(){ try{ semanaVertical(); }catch(e){} });
+  window.addEventListener('orientationchange', function(){ setTimeout(semanaVertical, 300); });
 })();
 </script>
 
