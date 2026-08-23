@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AV';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AX';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -17899,6 +17899,12 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   }
 
   function pintar(forzar){
+    /* DESACTIVADO. Este chip metía siete botones encima de la tabla de
+       Pólizas. Los quité con un limpiador que corría cada 1,5 s, pero
+       esta función los volvía a poner cada 2,5 s: aparecían y
+       desaparecían, y eso es el "salto" que se veía en el módulo.
+       Se corta aquí, en el origen, y ya no hay pelea. */
+    if(!window.__jacChipPolizas) return;
     var pg=document.getElementById('pg-pol');
     if(!pg) return;
     var el=document.getElementById('jac-cc-chip');
@@ -24863,7 +24869,8 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     if(!d){
       d=document.createElement('div');
       d.className='card'; d.id='jac-card-avisos'; d.style.marginTop='10px';
-      cont.appendChild(d);
+      /* Arriba del todo: es lo que más va a mirar */
+      if(cont.firstChild) cont.insertBefore(d, cont.firstChild); else cont.appendChild(d);
     }
     var st=window.jacAvisosEstado ? window.jacAvisosEstado() : {permiso:'?'};
     var on = st.permiso==='granted' && st.temporizadorMontado;
@@ -24912,12 +24919,16 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
         +(cuenta.cumpleManana?('<b>'+cuenta.cumpleManana+'</b> mañana'):'')+'</div>';
     }
 
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
-    if(!on && !bloqueado)
-      h+='<button onclick="jacAvisosActivar()" style="padding:9px 16px;border-radius:9px;border:none;'
-        +'background:#15803D;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Dar permiso y activar</button>';
-    h+='<button onclick="jacAvisosProbar()" style="padding:9px 16px;border-radius:9px;'
+    /* El botón se ve SIEMPRE, activas o no. Antes, cuando ya estaban
+       activas, desaparecía — y desde fuera eso parece que lo borré. */
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      +'<button onclick="jacAvisosActivar()" style="padding:9px 16px;border-radius:9px;border:none;'
+      +'background:'+(on?'#15803D':'#B45309')+';color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+      +(on?'🔔 Notificaciones activas ✓':'🔔 Activar notificaciones')+'</button>'
+      +'<button onclick="jacAvisosProbar()" style="padding:9px 16px;border-radius:9px;'
       +'border:1px solid #CBD5E1;background:#fff;font-size:12px;cursor:pointer">Probar ahora</button>'
+      +'<button onclick="jacAvisosRevisarYa()" style="padding:9px 16px;border-radius:9px;'
+      +'border:1px solid #CBD5E1;background:#fff;font-size:12px;cursor:pointer">Revisar pendientes</button>'
       +'</div><div id="jac-avisos-res" style="font-size:12px;color:#475569;margin-top:9px"></div>';
 
     if(st.avisadosHoy&&st.avisadosHoy.length){
@@ -24935,6 +24946,14 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       ? '<span style="color:#15803D">Activadas ✓ — ya no hay que volver a pulsarlo.</span>'
       : '<span style="color:#B91C1C">'+e(r)+'</span>';
     setTimeout(tarjeta, 500);
+  };
+  window.jacAvisosRevisarYa=function(){
+    var o=document.getElementById('jac-avisos-res');
+    var r=window.jacRevisarAvisos();
+    if(!r.activo){ if(o) o.innerHTML='<span style="color:#B91C1C">Falta el permiso del navegador.</span>'; return; }
+    if(o) o.innerHTML='Revisado. 🎂 '+r.cumplesHoy+' hoy / '+r.cumplesManana+' mañana · '
+      +'⚠️ '+r.vencen7+' por vencer · 💰 '+r.cobrosVencidos+' cobros · 📋 '+r.tareasVencidas+' tareas.'
+      +(r.enviados.length?(' Avisos enviados: '+r.enviados.join(', ')+'.'):' Nada nuevo que avisar hoy.');
   };
   window.jacAvisosProbar=function(){
     var o=document.getElementById('jac-avisos-res');
@@ -25000,8 +25019,13 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       if(el && el.parentNode) el.parentNode.removeChild(el);
     });
   }
+  /* Una pasada al cargar y alguna suelta. Ya no hace falta insistir cada
+     1,5 s: el chip está cortado en su origen, así que no vuelve a nacer.
+     Aquel bucle era el que hacía parpadear la página de Pólizas. */
   limpiar();
-  setInterval(limpiar, 1500);
+  setTimeout(limpiar, 2500);
+  setTimeout(limpiar, 8000);
+  setTimeout(limpiar, 20000);
 
   /* ---------- Las acciones, con su comprobación ---------- */
   /* pendiente() devuelve null si no hay nada que hacer, o un texto
@@ -25384,6 +25408,229 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       +'@media(max-width:820px){#pg-rep table{font-size:10px}}';
     document.head.appendChild(st);
   }catch(x){}
+})();
+</script>
+
+
+<!-- bloque-aseguradoras.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Una sola lista de aseguradoras, en todo el CRM
+   ------------------------------------------------------------
+   LO QUE HAY AHORA, MEDIDO EN SU CRM
+
+   Cuatro desplegables, cuatro listas distintas:
+
+     · Filtro de Pólizas (fpa) ...... 15 nombres, sacados de las
+       pólizas — por eso salen «Cía Internacional De Seguros,
+       S.A.» y «Internacional» como si fueran dos compañías.
+     · Crear póliza (crt-as) ........ 30 nombres, y otros: «IS»,
+       «PALIG», «WW Medical», «VUMI-LA REGIONAL DE SEGUROS».
+     · Cotizador (cotz-aseg) ........ 15 nombres, y otros más:
+       «Internacional de Seguros», «Aliados», «VUMI-La Regional».
+     · Catálogo guardado ............ 20 nombres, otra vez
+       distintos: «ACERTA COMPAÑIA DE SEGUROS,S.A.», «LA REGIONAL
+       DE SEGUROS | VUMI», «VIVIR COMPAÑIA DE SEGUROS, S.A».
+
+   Así, al crear una póliza elige «IS» o «WW Medical», y eso no
+   casa con nada de lo que ya tiene guardado. De ahí que los
+   totales por compañía no cuadren.
+
+   ------------------------------------------------------------
+   LO QUE HACE ESTO
+
+   Una lista canónica, la misma en los cuatro sitios y en el
+   catálogo. Un diccionario de equivalencias que reconoce todas
+   las grafías que aparecen hoy en su CRM y las lleva al nombre
+   bueno. Y se repasa cada poco, porque una bajada de la nube
+   puede volver a meter los nombres viejos.
+
+   La Regional de Seguros y La Regional de Seguros Vumi siguen
+   SEPARADAS, y nada que lleve VUMI se toca. Ese cerrojo se queda.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* La lista buena. Las que tienen pólizas primero; el resto queda
+     disponible por si emite con ellas. */
+  var LISTA=[
+    'ASSA',
+    'Acerta',
+    'Aliado Seguros, S.A.',
+    'Ancón',
+    'BANESCO SEGUROS, S.A.',
+    'BUPA PANAMÁ, S.A.',
+    'Chubb',
+    'COMPAÑÍA DE ASISTENCIA AL VIAJERO DE PANAMÁ S.A.',
+    'Cía Internacional De Seguros, S.A.',
+    'FEDPA',
+    'GENERALI',
+    'La Regional de Seguros',
+    'La Regional de Seguros Vumi',
+    'MAPFRE',
+    'OPTIMA COMPAÑÍA DE SEGUROS, S.A.',
+    'PAN AMERICAN LIFE INSURANCE DE PANAMÁ',
+    'SAGICOR PANAMÁ, S.A.',
+    'SURA',
+    'UNIVIVIR',
+    'WorldWide Medical Assurance'
+  ];
+
+  function llave(x){
+    return String(x==null?'':x).toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/[^A-Z0-9]/g,'');
+  }
+
+  /* Todas las grafías que aparecen hoy en su CRM, cada una a su sitio */
+  var ALIAS={};
+  function reg(bueno, variantes){
+    ALIAS[llave(bueno)]=bueno;
+    variantes.forEach(function(v){ ALIAS[llave(v)]=bueno; });
+  }
+  reg('ASSA',['ASSA','ASSA COMPANIA DE SEGUROS','ASSA COMPAÑIA DE SEGUROS, S.A.','ASSA COMPAÑÍA DE SEGUROS, S.A.']);
+  reg('Acerta',['ACERTA','ACERTA SEGUROS','ACERTA SEGUROS, S.A.','ACERTA COMPAÑIA DE SEGUROS','ACERTA COMPAÑIA DE SEGUROS,S.A.']);
+  reg('Aliado Seguros, S.A.',['ALIADO','ALIADOS','ALIADO SEGUROS','ALIADO SEGUROS, S.A.']);
+  reg('Ancón',['ANCON','ASEGURADORA ANCON','ASEGURADORA ANCON, S.A.']);
+  reg('BANESCO SEGUROS, S.A.',['BANESCO','BANESCO SEGUROS','BANESCO SEGUROS, S.A','BG SEGUROS']);
+  reg('BUPA PANAMÁ, S.A.',['BUPA','BUPA PANAMA','BUPA PANAMÁ, S.A.']);
+  reg('Chubb',['CHUBB']);
+  reg('COMPAÑÍA DE ASISTENCIA AL VIAJERO DE PANAMÁ S.A.',['ASISTENCIA AL VIAJERO','COMPANIA DE ASISTENCIA AL VIAJERO DE PANAMA S.A.']);
+  reg('Cía Internacional De Seguros, S.A.',['IS','INTERNACIONAL','INTERNACIONAL DE SEGUROS','CIA INTERNACIONAL DE SEGUROS','CIA INTERNACIONAL DE SEGUROS, S.A.','CIA. INTERNACIONAL DE SEGUROS, S.A.','COMPANIA INTERNACIONAL DE SEGUROS']);
+  reg('FEDPA',['FEDPA','SEGUROS FEDPA','SEGUROS FEDPA, S.A.','SEGUROS FEDPA, S.A']);
+  reg('GENERALI',['GENERALI']);
+  reg('La Regional de Seguros',['LA REGIONAL','LA REGIONAL DE SEGUROS','LA REGIONAL DE SEGUROS, S.A.']);
+  reg('La Regional de Seguros Vumi',['VUMI','VUMI-LA REGIONAL','VUMI-LA REGIONAL DE SEGUROS','LA REGIONAL DE SEGUROS | VUMI','LA REGIONAL DE SEGUROS VUMI','LA REGIONAL VUMI']);
+  reg('MAPFRE',['MAPFRE','MAPFRE PANAMA','MAPFRE PANAMA, S.A.']);
+  reg('OPTIMA COMPAÑÍA DE SEGUROS, S.A.',['OPTIMA','OPTIMA COMPAÑÍA DE SEGUROS, S.A']);
+  reg('PAN AMERICAN LIFE INSURANCE DE PANAMÁ',['PALIG','PAN AMERICAN','PAN AMERICAN LIFE','PAN AMERICAN LIFE INSURANCE DE PANAMÁ, S. A']);
+  reg('SAGICOR PANAMÁ, S.A.',['SAGICOR','SAGICOR PANAMA S.A']);
+  reg('SURA',['SURA','SEGUROS SURAMERICANA','SEGUROS SURAMERICANA, S.A.','SURAMERICANA']);
+  reg('UNIVIVIR',['UNIVIVIR','UNI VIVIR','VIVIR','VIVIR COMPAÑIA DE SEGUROS, S.A','VIVIR COMPAÑÍA DE SEGUROS, S.A.']);
+  reg('WorldWide Medical Assurance',['WW MEDICAL','WW','WORLDWIDE','WORLWIDE','WORLDWIDE MEDICAL','WORLDWIDE MEDICAL ASSURAN','WORLWIDE MEDICAL ASSURANCE','WORLDWIDE MEDICAL ASSURANCE']);
+
+  /* Cerrojo: nada con VUMI se convierte en «La Regional de Seguros».
+     Son dos compañías distintas — una de autos y otra de salud. */
+  function esVumi(x){ return llave(x).indexOf('VUMI')>=0; }
+
+  window.jacNormalizarAseg=function(x){
+    var s=String(x==null?'':x).trim();
+    if(!s) return '';
+    var k=llave(s);
+    var c=ALIAS[k];
+    if(!c) return s;                                   /* desconocida: se respeta */
+    if(esVumi(s) && !esVumi(c)) return s;               /* jamás mezclar Vumi */
+    return c;
+  };
+  window.jacListaAseguradoras=function(){ return LISTA.slice(); };
+
+  /* ---------- 1. Las pólizas y demás registros ---------- */
+  window.jacUnificarAseguradoras=function(){
+    var n=0, det={};
+    function arreglar(o, campos){
+      campos.forEach(function(c){
+        if(!o[c]) return;
+        var b=window.jacNormalizarAseg(o[c]);
+        if(b && b!==o[c]){ det[o[c]+' → '+b]=(det[o[c]+' → '+b]||0)+1; o[c]=b; n++; }
+      });
+    }
+    ((typeof S!=='undefined'&&S.polizas)||[]).forEach(function(p){ arreglar(p,['aseg','aseguradora']); });
+    ['comisiones','pagos','siniestros','prospectos','vehiculos'].forEach(function(t){
+      ((typeof S!=='undefined'&&S[t])||[]).forEach(function(x){ arreglar(x,['aseg','aseguradora','asegPreferida']); });
+    });
+    /* El catálogo guardado: la lista buena, sin duplicados */
+    if(typeof S!=='undefined'){
+      var obj = Array.isArray(S.aseguradoras) && S.aseguradoras.length
+        && typeof S.aseguradoras[0]==='object';
+      var extra={};
+      (S.aseguradoras||[]).forEach(function(a){
+        var nom=(a&&a.nombre!==undefined)?a.nombre:a;
+        var b=window.jacNormalizarAseg(nom);
+        if(b && LISTA.indexOf(b)<0) extra[b]=1;         /* alguna suya que no esté en la lista */
+      });
+      var full=LISTA.concat(Object.keys(extra)).sort(function(a,b){
+        return a.localeCompare(b,'es'); });
+      S.aseguradoras=full.map(function(x){ return obj?{nombre:x}:x; });
+    }
+    return {cambios:n, detalle:det};
+  };
+
+  /* ---------- 2. Todos los desplegables, la misma lista ---------- */
+  function esDeAseguradoras(sel){
+    if(!sel || !sel.options) return false;
+    if(/aseg|aseguradora|-as$|cia|compania/i.test(sel.id||'')) return true;
+    var txt=[].map.call(sel.options,function(o){ return o.textContent; }).join('|').toUpperCase();
+    var golpes=0;
+    ['ASSA','MAPFRE','SURA','FEDPA','UNIVIVIR','ANCON','ACERTA'].forEach(function(m){
+      if(txt.indexOf(m)>=0) golpes++; });
+    return golpes>=3;
+  }
+
+  window.jacPoblarDesplegables=function(){
+    var tocados=0;
+    [].forEach.call(document.querySelectorAll('select'), function(sel){
+      if(!esDeAseguradoras(sel)) return;
+      if(sel.__jacFirma===LISTA.length && !sel.__jacSucio) {
+        /* ya poblado y sin cambios: no se toca, para no parpadear */
+      }
+      var actual=window.jacNormalizarAseg(sel.value);
+      /* La primera opción suele ser «Todas» o «— Seleccionar —»: se conserva */
+      var cabecera=null;
+      if(sel.options.length && (!sel.options[0].value ||
+          /todas|seleccionar|—|todos/i.test(sel.options[0].textContent))){
+        cabecera={v:sel.options[0].value, t:sel.options[0].textContent};
+      }
+      var yaIgual = (sel.options.length === LISTA.length + (cabecera?1:0))
+        && [].every.call(sel.options, function(o,i){
+             if(cabecera && i===0) return o.textContent===cabecera.t;
+             return o.value===LISTA[i-(cabecera?1:0)]; });
+      if(yaIgual) return;
+      var h='';
+      if(cabecera) h+='<option value="'+cabecera.v.replace(/"/g,'&quot;')+'">'+cabecera.t+'</option>';
+      LISTA.forEach(function(x){
+        h+='<option value="'+x.replace(/"/g,'&quot;')+'">'+x+'</option>'; });
+      sel.innerHTML=h;
+      if(actual && LISTA.indexOf(actual)>=0) sel.value=actual;
+      else if(cabecera) sel.value=cabecera.v;
+      sel.__jacFirma=LISTA.length;
+      tocados++;
+    });
+    return tocados;
+  };
+
+  /* ---------- 3. Que no se deshaga ----------
+     Una bajada de la nube puede volver a traer los nombres viejos, así
+     que se repasa cada poco. Si no hay nada que cambiar, no escribe ni
+     guarda: no da guerra. */
+  var _ultimo=0;
+  async function repasar(){
+    try{
+      var r=window.jacUnificarAseguradoras();
+      window.jacPoblarDesplegables();
+      if(r.cambios>0 && Date.now()-_ultimo>15000){
+        _ultimo=Date.now();
+        try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+        if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+        ['calcKPIs','renderKPIs','RD','RP'].forEach(function(fn){
+          try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+        window.__jacAsegUltimo=r;
+      }
+    }catch(x){}
+  }
+  setTimeout(repasar, 6000);
+  setTimeout(repasar, 15000);
+  setInterval(repasar, 20000);
+
+  window.jacEstadoAseguradoras=function(){
+    var P=(typeof S!=='undefined'&&S.polizas)||[];
+    var c={}; P.forEach(function(p){ var k=p.aseg||'(vacío)'; c[k]=(c[k]||0)+1; });
+    var fuera=Object.keys(c).filter(function(k){ return LISTA.indexOf(k)<0; });
+    return { enPolizas:c, fueraDeLista:fuera, lista:LISTA.length,
+      catalogo:((typeof S!=='undefined'&&S.aseguradoras)||[]).length,
+      desplegables:[].filter.call(document.querySelectorAll('select'), esDeAseguradoras)
+        .map(function(s){ return (s.id||'(sin id)')+': '+s.options.length; }) };
+  };
 })();
 </script>
 
