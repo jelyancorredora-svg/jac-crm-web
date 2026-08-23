@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AU';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AV';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -25087,6 +25087,303 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   setTimeout(tarjeta, 3000);
   setInterval(tarjeta, 6000);
   window.jacHerramientas=tarjeta;
+})();
+</script>
+
+
+<!-- bloque-reportes.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — El módulo de Reportes, rehecho
+   ------------------------------------------------------------
+   LO QUE ESTABA MAL, MEDIDO
+
+   1. La pestaña de Comisiones sumaba el campo `comisionEsp`, que
+      NO EXISTE en ninguna de tus 337 pólizas. Por eso salía
+      $0.00 en todas las compañías. La comisión de verdad está en
+      `comision` y suma $19,638.65. Ese era el «falta
+      información».
+
+   2. La columna Póliza hacía `p.num || p.id`. Las 99 pólizas sin
+      número mostraban el identificador interno, esos
+      «RESTORE2178607029462074313» que se ven en pantalla.
+
+   3. La columna Prima cogía `primaMensual` antes que `prima`.
+      Solo 19 pólizas tienen primaMensual, así que esas 19
+      mostraban la cuota del mes y las otras 302 la prima del
+      año. Una columna donde no se puede comparar ni sumar.
+
+   4. La tabla medía 1129 px dentro de un hueco de 1068. Se salía
+      61 px y cortaba la última columna — de ahí que la Letra
+      apareciera partida.
+
+   5. La Letra salía en crudo: 18.244285714285713.
+
+   6. No había totales, ni filtros, ni forma de buscar.
+
+   ------------------------------------------------------------
+   CÓMO QUEDA
+
+   Cinco vistas: Pólizas, Cobros, Clientes, Comisiones y Resumen
+   por compañía. Filtros de compañía, ramo y estado, más un
+   buscador. Fila de totales en todas. La tabla va dentro de un
+   marco que se desplaza a lo ancho, así que nunca rompe la
+   página ni corta columnas. Y el CSV se lleva todo lo que se ve.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var _tipo='pol', _f={q:'',aseg:'',ramo:'',estado:''};
+
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function C(){ return (typeof S!=='undefined'&&S.clientes)||[]; }
+  function G(){ return (typeof S!=='undefined'&&S.pagos)||[]; }
+  function n(v){ return parseFloat(v)||0; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x)
+    .replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function money(v){ var q=Number(v)||0;
+    return (q<0?'-':'')+'$'+Math.abs(q).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+  function fecha(f){
+    if(!f) return '—';
+    if(typeof fmt==='function'){ try{ return fmt(f); }catch(x){} }
+    return String(f);
+  }
+  /* Un número de póliza de verdad, nunca el identificador interno */
+  function numero(p){
+    var s=String(p.num||'').trim();
+    if(!s) return '(sin número)';
+    if(/^RESTORE\d{10,}$/i.test(s)) return '(sin número)';
+    if(/^[a-f0-9]{16,}$/i.test(s))  return '(sin número)';
+    return s;
+  }
+  function cliente(p){
+    if(p.nombreCliente) return p.nombreCliente;
+    var c=C().filter(function(x){ return x.id===p.clienteId; })[0];
+    return (c&&c.nombre) || '—';
+  }
+  /* La prima del año, siempre la misma medida */
+  function primaAnual(p){
+    var a=n(p.prima);
+    if(a>0) return a;
+    var m=n(p.primaMensual);
+    return m>0 ? +(m*12).toFixed(2) : 0;
+  }
+  function cuota(p){
+    var l=n(p.letraPrima)||n(p.cuotaMensual);
+    return l>0 ? l : 0;
+  }
+
+  function cumple(p){
+    if(_f.aseg && String(p.aseg||'')!==_f.aseg) return false;
+    if(_f.ramo && String(p.ramo||'')!==_f.ramo) return false;
+    if(_f.estado && String(p.estado||'')!==_f.estado) return false;
+    if(_f.q){
+      var t=(numero(p)+' '+cliente(p)+' '+(p.aseg||'')+' '+(p.ramo||'')+' '+(p.cedCliente||'')).toLowerCase();
+      if(t.indexOf(_f.q.toLowerCase())<0) return false;
+    }
+    return true;
+  }
+
+  function opciones(campo, sel){
+    var v={}; P().forEach(function(p){ var x=String(p[campo]||''); if(x) v[x]=1; });
+    return '<option value="">Todas</option>'+Object.keys(v).sort().map(function(x){
+      return '<option value="'+e(x)+'"'+(x===sel?' selected':'')+'>'+e(x)+'</option>'; }).join('');
+  }
+
+  var COLS={
+    pol:[['Póliza','num'],['Compañía','aseg'],['Ramo','ramo'],['Cliente','cli'],['Cédula','ced'],
+         ['Estado','est'],['Inicio','ini'],['Vence','fin'],['Prima año','prima','n'],
+         ['Cuota','cuota','n'],['% com','pct','n'],['Comisión','com','n'],
+         ['Co-corretaje','cc'],['Pagado','pagado','n'],['Saldo','saldo','n'],['Forma','forma']],
+    pag:[['Vence','fecha'],['Cliente','cli'],['Póliza','pol'],['Compañía','aseg'],
+         ['Concepto','cuota'],['Monto','monto','n'],['Estado','est'],['Días','dias','n']],
+    cli:[['Cliente','nombre'],['Cédula','ced'],['Teléfono','tel'],['Correo','email'],
+         ['Pólizas','nPols','n'],['Vigentes','act','n'],['Prima año','prima','n'],['Comisión','com','n']],
+    com:[['Compañía','aseg'],['Pólizas','pols','n'],['Prima año','prima','n'],
+         ['Comisión tuya','com','n'],['Cedida','cedida','n'],['% medio','pct','n']],
+    res:[['Ramo','ramo'],['Pólizas','pols','n'],['Vigentes','vig','n'],
+         ['Prima año','prima','n'],['Comisión','com','n']]
+  };
+
+  function datos(){
+    var L=P().filter(cumple);
+    if(_tipo==='pol'){
+      return L.map(function(p){
+        return {num:numero(p), aseg:p.aseg||'—', ramo:p.ramo||'—', cli:cliente(p),
+          ced:p.cedCliente||'—', est:p.estado||'—',
+          ini:fecha(p.fechaInicio), fin:fecha(p.fechaFin),
+          prima:primaAnual(p), cuota:cuota(p), pct:n(p.comPct),
+          com:n(p.comision), cc:p.coCor||'—',
+          pagado:n(p.pagado), saldo:n(p.saldo),
+          forma:p.formaPago||p.periodo||'—'};
+      }).sort(function(a,b){ return b.prima-a.prima; });
+    }
+    if(_tipo==='pag'){
+      var hoy=new Date();
+      return G().map(function(g){
+        var p=P().filter(function(x){ return x.id===g.polizaId; })[0]||{};
+        var d=g.fecha?Math.round((hoy-new Date(String(g.fecha)+'T00:00:00'))/86400000):null;
+        return {fecha:fecha(g.fecha), cli:g.cliente||cliente(p), pol:p.num?numero(p):'—',
+          aseg:g.aseg||p.aseg||'—', cuota:g.cuota||g.referencia||'—',
+          monto:n(g.monto), est:g.estado||'Pendiente', dias:(d===null?0:d)};
+      }).sort(function(a,b){ return b.dias-a.dias; });
+    }
+    if(_tipo==='cli'){
+      return C().map(function(c){
+        var pl=P().filter(function(p){ return p.clienteId===c.id && cumple(p); });
+        return {nombre:c.nombre||'—', ced:c.cedula||'—', tel:c.cel||c.tel||'—', email:c.email||'—',
+          nPols:pl.length,
+          act:pl.filter(function(p){ return String(p.estado||'')==='Vigente'; }).length,
+          prima:+pl.reduce(function(s,p){ return s+primaAnual(p); },0).toFixed(2),
+          com:+pl.reduce(function(s,p){ return s+n(p.comision); },0).toFixed(2)};
+      }).filter(function(r){ return r.nPols>0; }).sort(function(a,b){ return b.com-a.com; });
+    }
+    if(_tipo==='com'){
+      var m={};
+      L.filter(function(p){ return String(p.estado||'')!=='Cancelada'; }).forEach(function(p){
+        var k=p.aseg||'Sin compañía';
+        m[k]=m[k]||{aseg:k,pols:0,prima:0,com:0,cedida:0};
+        m[k].pols++; m[k].prima+=primaAnual(p);
+        m[k].com+=n(p.comision);            /* el campo REAL, no comisionEsp */
+        m[k].cedida+=n(p.coCorCom);
+      });
+      return Object.keys(m).map(function(k){ var x=m[k];
+        x.prima=+x.prima.toFixed(2); x.com=+x.com.toFixed(2); x.cedida=+x.cedida.toFixed(2);
+        x.pct = x.prima>0 ? +((x.com/x.prima)*100).toFixed(2) : 0;
+        return x; }).sort(function(a,b){ return b.com-a.com; });
+    }
+    /* resumen por ramo */
+    var r={};
+    L.forEach(function(p){
+      var k=p.ramo||'Sin ramo';
+      r[k]=r[k]||{ramo:k,pols:0,vig:0,prima:0,com:0};
+      r[k].pols++; if(String(p.estado||'')==='Vigente') r[k].vig++;
+      r[k].prima+=primaAnual(p); r[k].com+=n(p.comision);
+    });
+    return Object.keys(r).map(function(k){ var x=r[k];
+      x.prima=+x.prima.toFixed(2); x.com=+x.com.toFixed(2); return x; })
+      .sort(function(a,b){ return b.prima-a.prima; });
+  }
+
+  window.jacRepFiltro=function(campo,valor){ _f[campo]=valor; window.repShow(_tipo); };
+  window.jacRepLimpiar=function(){ _f={q:'',aseg:'',ramo:'',estado:''}; window.repShow(_tipo); };
+
+  window.repShow=function(tipo){
+    _tipo=tipo||_tipo;
+    ['pol','pag','cli','com','res'].forEach(function(t){
+      var b=document.getElementById('rep-btn-'+t);
+      if(b){ b.style.background=(t===_tipo)?'#1D4ED8':'#fff';
+             b.style.color=(t===_tipo)?'#fff':'#334155';
+             b.style.borderColor=(t===_tipo)?'#1D4ED8':'#CBD5E1'; }
+    });
+    var body=document.getElementById('rep-body');
+    if(!body) return;
+
+    var cols=COLS[_tipo]||COLS.pol, filas=datos();
+
+    /* ---- filtros ---- */
+    var fh='<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:11px">'
+      +'<input id="jac-rep-q" placeholder="Buscar póliza, cliente, cédula…" value="'+e(_f.q)+'" '
+      +'style="flex:1;min-width:190px;padding:7px 11px;border:1px solid #CBD5E1;border-radius:8px;font-size:12px" '
+      +'oninput="clearTimeout(window.__rq);window.__rq=setTimeout(function(){jacRepFiltro(\'q\',document.getElementById(\'jac-rep-q\').value)},350)">'
+      +'<select onchange="jacRepFiltro(\'aseg\',this.value)" style="padding:7px 9px;border:1px solid #CBD5E1;border-radius:8px;font-size:12px">'
+      +opciones('aseg',_f.aseg)+'</select>'
+      +'<select onchange="jacRepFiltro(\'ramo\',this.value)" style="padding:7px 9px;border:1px solid #CBD5E1;border-radius:8px;font-size:12px">'
+      +opciones('ramo',_f.ramo)+'</select>'
+      +'<select onchange="jacRepFiltro(\'estado\',this.value)" style="padding:7px 9px;border:1px solid #CBD5E1;border-radius:8px;font-size:12px">'
+      +opciones('estado',_f.estado)+'</select>';
+    if(_f.q||_f.aseg||_f.ramo||_f.estado)
+      fh+='<button onclick="jacRepLimpiar()" style="padding:7px 12px;border:1px solid #CBD5E1;'
+        +'border-radius:8px;background:#fff;font-size:12px;cursor:pointer">Quitar filtros</button>';
+    fh+='</div>';
+
+    /* ---- totales ---- */
+    var tot={}; cols.forEach(function(c){ if(c[2]==='n') tot[c[1]]=0; });
+    filas.forEach(function(r){ Object.keys(tot).forEach(function(k){ tot[k]+=n(r[k]); }); });
+
+    /* ---- tabla, dentro de un marco que se desplaza ---- */
+    var h=fh
+      +'<div style="font-size:12px;color:#475569;margin-bottom:8px"><b>'+filas.length+'</b> '
+      +(_tipo==='pol'?'pólizas':_tipo==='pag'?'cobros':_tipo==='cli'?'clientes':'líneas')
+      +(_f.q||_f.aseg||_f.ramo||_f.estado?' (filtrado)':'')
+      +(tot.prima!==undefined?(' · prima '+money(tot.prima)):'')
+      +(tot.com!==undefined?(' · comisión <b style="color:#15803D">'+money(tot.com)+'</b>'):'')
+      +(tot.monto!==undefined?(' · '+money(tot.monto)):'')
+      +'</div>'
+      /* Este marco es lo que impide que la tabla rompa la página */
+      +'<div style="width:100%;overflow-x:auto;border:1px solid #E2E8F0;border-radius:10px">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">'
+      +'<thead><tr style="background:#F8FAFC">'
+      +cols.map(function(c){ return '<th style="padding:7px 9px;text-align:'+(c[2]==='n'?'right':'left')
+        +';border-bottom:1px solid #E2E8F0;font-weight:700;position:sticky;top:0;background:#F8FAFC">'
+        +e(c[0])+'</th>'; }).join('')
+      +'</tr></thead><tbody>';
+
+    filas.slice(0,600).forEach(function(r){
+      h+='<tr style="border-bottom:1px solid #F1F5F9">'
+        +cols.map(function(c){
+          var v=r[c[1]];
+          var txt = (c[2]==='n')
+            ? (c[1]==='pct' ? (n(v)?n(v)+'%':'—')
+              : c[1]==='dias' ? (v>0?(v+'d'):(v<0?('en '+(-v)+'d'):'hoy'))
+              : (['nPols','act','pols','vig'].indexOf(c[1])>=0 ? String(v||0) : money(v)))
+            : e(v==null?'—':v);
+          var col='';
+          if(c[1]==='saldo'&&n(v)>0) col=';color:#B45309;font-weight:700';
+          if(c[1]==='com'&&n(v)>0) col=';color:#15803D;font-weight:700';
+          if(c[1]==='cc'&&v&&v!=='—') col=';color:#1D4ED8';
+          if(c[1]==='est') col=';color:'+(String(v)==='Vigente'?'#15803D':String(v)==='Vencida'?'#B91C1C':'#64748B');
+          if(c[1]==='dias'&&n(v)>90) col=';color:#B91C1C;font-weight:700';
+          return '<td style="padding:6px 9px;text-align:'+(c[2]==='n'?'right':'left')+col+'">'+txt+'</td>';
+        }).join('')+'</tr>';
+    });
+
+    h+='</tbody><tfoot><tr style="background:#F8FAFC;font-weight:800;border-top:2px solid #E2E8F0">'
+      +cols.map(function(c,i){
+        if(i===0) return '<td style="padding:8px 9px">TOTAL ('+filas.length+')</td>';
+        if(c[2]!=='n') return '<td></td>';
+        var v=tot[c[1]];
+        var txt=(c[1]==='pct') ? (tot.prima>0?(+(tot.com/tot.prima*100).toFixed(2)+'%'):'—')
+          : (['nPols','act','pols','vig','dias'].indexOf(c[1])>=0 ? String(Math.round(v)) : money(v));
+        return '<td style="padding:8px 9px;text-align:right">'+txt+'</td>';
+      }).join('')
+      +'</tr></tfoot></table></div>';
+
+    if(filas.length>600)
+      h+='<div style="font-size:11px;color:#94A3B8;padding:6px 2px">Se muestran 600 de '
+        +filas.length+' para que la página no se atasque. El Excel se los lleva todos.</div>';
+
+    body.innerHTML=h;
+
+    /* Lo que se exporta es exactamente lo que se ve */
+    window._repData=[cols.map(function(c){ return c[0]; })].concat(
+      filas.map(function(r){ return cols.map(function(c){
+        var v=r[c[1]]; return (v==null?'':v); }); }));
+    window._repTipo=_tipo;
+  };
+
+  /* La pestaña nueva de Resumen por ramo */
+  function ponerPestana(){
+    var b=document.getElementById('rep-btn-com');
+    if(!b || document.getElementById('rep-btn-res')) return;
+    var n2=b.cloneNode(true);
+    n2.id='rep-btn-res'; n2.textContent='📁 Por ramo';
+    n2.setAttribute('onclick',"repShow('res')");
+    n2.onclick=function(){ window.repShow('res'); };
+    b.parentNode.insertBefore(n2, b.nextSibling);
+  }
+  setInterval(function(){ try{ ponerPestana(); }catch(x){} }, 2500);
+
+  /* El hueco de 147 px que quedaba encima del título */
+  try{
+    var st=document.createElement('style');
+    st.textContent='#pg-rep{padding-top:6px!important}'
+      +'#pg-rep .ph{margin-top:0!important}'
+      +'#pg-rep table td,#pg-rep table th{vertical-align:middle}'
+      +'@media(max-width:820px){#pg-rep table{font-size:10px}}';
+    document.head.appendChild(st);
+  }catch(x){}
 })();
 </script>
 
