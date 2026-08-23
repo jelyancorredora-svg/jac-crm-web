@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AX';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AY';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -25630,6 +25630,108 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       catalogo:((typeof S!=='undefined'&&S.aseguradoras)||[]).length,
       desplegables:[].filter.call(document.querySelectorAll('select'), esDeAseguradoras)
         .map(function(s){ return (s.id||'(sin id)')+': '+s.options.length; }) };
+  };
+})();
+</script>
+
+
+<!-- bloque-reportes-layout.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Reportes: el hueco y las columnas estiradas
+   ------------------------------------------------------------
+   EL HUECO DE ARRIBA — la causa, medida
+
+   Todas las páginas del CRM viven dentro de <main id="mainc">.
+   La de Reportes no: está colgada directamente del <body>, DESPUÉS
+   de todo el bloque de la aplicación. Así que arranca donde
+   termina ese bloque:
+
+       cabecera #hdr ......  53 px
+       #mainc vacío .......  94 px
+       ------------------------------
+       Reportes empieza en  147 px
+
+   No era un margen ni un padding: era estar en el sitio
+   equivocado del documento. Se mueve dentro de #mainc, como sus
+   hermanas, y el hueco desaparece solo.
+
+   ------------------------------------------------------------
+   LAS COLUMNAS ESTIRADAS
+
+   La tabla llevaba width:100%. Dentro de un marco que se
+   desplaza, el navegador reparte el sobrante entre las primeras
+   columnas, y salían así:
+
+       Póliza 215 px · Compañía 383 px · Ramo 219 px · Cliente 337
+
+   Cuatro columnas ocupando 1.154 px, con huecos enormes entre
+   ellas, mientras las otras doce quedaban fuera de la vista.
+
+   Ahora cada columna mide lo que mide su contenido, los nombres
+   largos se recortan con puntos suspensivos, y la columna de
+   Póliza queda fija a la izquierda: al desplazarse a la derecha
+   siempre se sabe de qué póliza es cada fila.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* ---------- 1. Ponerla donde van todas ---------- */
+  function reubicar(){
+    var pg=document.getElementById('pg-rep');
+    var main=document.getElementById('mainc');
+    if(!pg || !main) return false;
+    if(pg.parentElement===main) return true;
+    main.appendChild(pg);
+    return true;
+  }
+  reubicar();
+  setTimeout(reubicar, 1200);
+  setTimeout(reubicar, 4000);
+  setInterval(function(){ try{ reubicar(); }catch(e){} }, 10000);
+
+  /* ---------- 2. Que las columnas midan lo suyo ---------- */
+  var css=''
+    /* La tabla se ajusta a su contenido, no al ancho del marco */
+    +'#pg-rep table{width:max-content!important;min-width:100%;table-layout:auto}'
+    +'#pg-rep th,#pg-rep td{padding:6px 10px!important}'
+    /* Los textos largos se recortan en vez de estirar la columna */
+    +'#pg-rep td:nth-child(2),#pg-rep td:nth-child(4){max-width:185px;overflow:hidden;text-overflow:ellipsis}'
+    +'#pg-rep th:nth-child(2),#pg-rep th:nth-child(4){max-width:185px}'
+    /* Póliza y Ramo también: sin tope se estiraban a 219 y 221 px */
+    +'#pg-rep td:nth-child(1),#pg-rep th:nth-child(1){max-width:170px;overflow:hidden;text-overflow:ellipsis}'
+    +'#pg-rep td:nth-child(3),#pg-rep th:nth-child(3){max-width:175px;overflow:hidden;text-overflow:ellipsis}'
+    /* La póliza, fija a la izquierda al desplazarse */
+    +'#pg-rep tbody td:first-child,#pg-rep tfoot td:first-child{position:sticky;left:0;background:#fff;'
+    +'box-shadow:1px 0 0 #E2E8F0;font-weight:600}'
+    +'#pg-rep thead th:first-child{position:sticky;left:0;z-index:3;background:#F8FAFC;'
+    +'box-shadow:1px 0 0 #E2E8F0}'
+    +'#pg-rep tfoot td:first-child{background:#F8FAFC}'
+    +'#pg-rep tbody tr:hover td{background:#F8FAFC}'
+    +'#pg-rep tbody tr:hover td:first-child{background:#F1F5F9}'
+    /* Nada de hueco muerto arriba */
+    +'#pg-rep{padding-top:0!important;margin-top:0!important}'
+    +'#pg-rep>div:first-child{padding-top:10px!important}'
+    /* En pantalla pequeña, más apretado */
+    +'@media(max-width:820px){#pg-rep th,#pg-rep td{padding:5px 7px!important;font-size:10px}'
+    +'#pg-rep td:nth-child(2),#pg-rep td:nth-child(4){max-width:130px}}';
+  try{
+    var st=document.getElementById('jac-css-rep');
+    if(!st){ st=document.createElement('style'); st.id='jac-css-rep'; document.head.appendChild(st); }
+    st.textContent=css;
+  }catch(e){}
+
+  window.jacRepMedida=function(){
+    var pg=document.getElementById('pg-rep');
+    var t=document.querySelector('#pg-rep table');
+    var m=t?t.parentElement:null;
+    return { dentroDeMainc: !!(pg&&pg.parentElement&&pg.parentElement.id==='mainc'),
+      arrancaEn: pg?Math.round(pg.getBoundingClientRect().top):null,
+      tabla: t?Math.round(t.getBoundingClientRect().width):0,
+      marco: m?m.clientWidth:0,
+      columnas: [].map.call(document.querySelectorAll('#pg-rep thead th'), function(th){
+        return th.textContent.trim()+':'+Math.round(th.getBoundingClientRect().width); }) };
   };
 })();
 </script>
