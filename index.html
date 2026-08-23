@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AO';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AP';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -23772,6 +23772,497 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       +(r.cambian.length?'#B45309':'#475569')+';color:#fff;font-size:12px;font-weight:600;cursor:pointer';
     b.textContent=r.cambian.length?('⚠️ '+r.cambian.length+' pólizas sin cuotas cuadradas'):'Pagos cuadrados ✓';
     b.onclick=window.jacPagosAuditoria;
+    fila.appendChild(b);
+  }
+  setInterval(function(){ try{ boton(); }catch(x){} }, 5000);
+})();
+</script>
+
+
+<!-- bloque-cc-auditoria.html -->
+
+<script>
+/* ============================================================
+   JAC CRM - Capital Care: auditoria contra el informe definitivo
+   ------------------------------------------------------------
+   Fuente: RptDetalleCarteraCompaniaSeguroUnidad.xlsx, 59 polizas,
+   todas con Lider = CAPITAL CARE & CO. Este sustituye al informe
+   anterior de 79 filas.
+
+   ------------------------------------------------------------
+   LO QUE ENCONTRE, Y NO ES LO QUE PARECIA
+
+   Usted vio companias mal puestas, y tenia razon en el sintoma
+   pero la causa es otra: NINGUNA poliza tiene la compania
+   equivocada. Lo que pasa es que la MISMA compania esta escrita
+   de tres maneras distintas, y el CRM las trata como tres
+   companias diferentes:
+
+       Cia Internacional De Seguros, S.A. .... 89 polizas
+       Internacional ......................... 30 polizas
+       CIA INTERNACIONAL DE SEGUROS ...........  4 polizas
+
+       Acerta .................................  2 polizas
+       ACERTA .................................  2 polizas
+
+   Lo mismo con los ramos, y esto si le costaba dinero:
+
+       AUTOS/VEHICULOS .. 81      AUTOMOVIL ............ 58
+       INCENDIO Y LINEAS. 26      INCENDIO ............. 13
+       FIANZAS/ROBO ..... 11      FIANZA ...............  3
+
+   Su tabla de comisiones tiene configurado "ASSA||AUTOS/VEHICULOS"
+   al 20%. Las 58 polizas que dicen "AUTOMOVIL" no casaban con esa
+   linea, asi que se quedaban sin porcentaje.
+
+   OJO: "La Regional" (1 poliza, autos) y "La Regional de Seguros
+   Vumi" (5 polizas, salud) NO se unifican. Son cosas distintas.
+
+   ------------------------------------------------------------
+   LAS FECHAS: EL CRM VA POR DELANTE, NO ESTA MAL
+
+   32 polizas tienen fecha distinta a la del Excel. Mirandolas una
+   a una, el CRM tiene el ciclo NUEVO y el Excel el ANTERIOR:
+
+     Melvin Montenegro  Excel 25/01/2025-25/01/2026
+                          CRM 25/01/2026-25/01/2027
+
+   Ya estan renovadas. Si copiara las fechas del Excel le echaria
+   la cartera un ano atras y se le volverian a vencer todas. Por
+   eso NO se tocan las fechas. Usted tiene razon: estan vigentes.
+
+   Lo mismo con las 3 que el Excel da por VENCIDA: en el CRM ya
+   figuran renovadas y vigentes. El Excel es mas viejo.
+
+   ------------------------------------------------------------
+   LO QUE SI HAY QUE MIRAR
+
+   7 polizas con la prima distinta de verdad, no por el impuesto.
+   Van listadas para que decida usted, porque no se si el Excel
+   esta viejo o el CRM mal.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var AGENCIA='Capital Care & Co';
+  var INFORME=[{"n": "0830024041163", "a": "MAPFRE", "c": "NELSON BARRAGAN TEJEIRA", "ced": "PE-8-2120", "r": "AUTOS/VEHÍCULOS", "i": "2024-12-28", "f": "2025-12-28", "ps": 650.1, "im": 39.01, "p": 689.11, "pg": 125.3, "sa": 563.81, "ce": 130.02, "e": "VENCIDA", "lt": 1, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 15000.0}, {"n": "02BR2908859", "a": "ASSA", "c": "GABRIEL TOMAS COPETE CALDERON", "ced": "8-875-486", "r": "AUTOS/VEHÍCULOS", "i": "2024-12-31", "f": "2025-12-31", "ps": 150.94, "im": 9.06, "p": 160.0, "pg": 160.0, "sa": 0.0, "ce": 30.19, "e": "VENCIDA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-012-000021218", "a": "Cía Internacional De Seguros, S.A.", "c": "MELVIN MONTENEGRO DE LA ROSA", "ced": "8-765-927", "r": "AUTOS/VEHÍCULOS", "i": "2025-01-25", "f": "2026-01-25", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 183.0, "sa": 0.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "01-82-1180631-0", "a": "SURA", "c": "ITZEL MARIA WRIGHT RUIZ", "ced": "8-290-443", "r": "INCENDIO Y LÍNEAS ALIADAS", "i": "2025-02-01", "f": "2026-02-01", "ps": 77.4, "im": 3.87, "p": 81.27, "pg": 73.17, "sa": 8.1, "ce": 15.48, "e": "ACTIVA", "lt": 10, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 77401.78}, {"n": "03G50509", "a": "ASSA", "c": "ALEJANDRO ANTONIO FRAUCA PALACIOS", "ced": "8-845-663", "r": "INCENDIO Y LÍNEAS ALIADAS", "i": "2025-02-10", "f": "2026-02-10", "ps": 113.4, "im": 5.5, "p": 115.5, "pg": 115.5, "sa": 0.0, "ce": 22.0, "e": "ACTIVA", "lt": 10, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-012-000021268", "a": "Cía Internacional De Seguros, S.A.", "c": "PL PANAMA LOGISTIC S.A", "ced": "155694202-2-2020-3", "r": "AUTOS/VEHÍCULOS", "i": "2025-02-01", "f": "2026-02-01", "ps": 1739.22, "im": 104.35, "p": 1843.57, "pg": 1358.01, "sa": 485.56, "ce": 347.84, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "06B52344", "a": "ASSA", "c": "JAIME ALEXANDER CASTRO PEREZ", "ced": "7-701-2117", "r": "PROPIEDAD", "i": "2025-02-17", "f": "2025-07-17", "ps": 500.0, "im": 25.0, "p": 525.0, "pg": 525.0, "sa": 0.0, "ce": 100.0, "e": "VENCIDA", "lt": 1, "tp": "ACH", "fp": "MENSUAL", "sm": 0.0}, {"n": "02B3408498", "a": "ASSA", "c": "GABRIEL TOMAS COPETE CALDERON", "ced": "8-875-486", "r": "AUTOS/VEHÍCULOS", "i": "2025-03-25", "f": "2026-03-25", "ps": 1256.95, "im": 69.73, "p": 1231.88, "pg": 1129.26, "sa": 102.62, "ce": 232.43, "e": "ACTIVA", "lt": 12, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 28600.0}, {"n": "030-001-000762082", "a": "Cía Internacional De Seguros, S.A.", "c": "TOMAS ABDIEL HERRERA CASTAÑEDA", "ced": "8-790-2376", "r": "AUTOS/VEHÍCULOS", "i": "2025-03-25", "f": "2026-03-25", "ps": 624.69, "im": 37.48, "p": 662.17, "pg": 662.17, "sa": 0.0, "ce": 124.94, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "02B3408559", "a": "ASSA", "c": "AMSI MAVET PENA MARTINEZ", "ced": "8-849-2428", "r": "AUTOS/VEHÍCULOS", "i": "2025-03-26", "f": "2026-03-26", "ps": 437.95, "im": 24.35, "p": 430.14, "pg": 358.65, "sa": 71.49, "ce": 81.16, "e": "ACTIVA", "lt": 12, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 8000.0}, {"n": "030-012-000021492", "a": "Cía Internacional De Seguros, S.A.", "c": "CARLOS IVAN LUNA CORTEZ", "ced": "7-122-404", "r": "AUTOS/VEHÍCULOS", "i": "2025-03-26", "f": "2026-03-26", "ps": 1266.04, "im": 75.96, "p": 1342.0, "pg": 1207.8, "sa": 134.2, "ce": 253.21, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-001-000762087", "a": "Cía Internacional De Seguros, S.A.", "c": "EDUARDO ALBERTO LASSO VIELGO", "ced": "8-745-1193", "r": "AUTOS/VEHÍCULOS", "i": "2025-03-31", "f": "2026-03-31", "ps": 804.0, "im": 48.24, "p": 852.24, "pg": 717.68, "sa": 134.56, "ce": 160.8, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "10-29-2176111-0", "a": "La Regional de Seguros", "c": "ORLANDO  ANTONIO  HIGUERO  LEZCANO", "ced": "8-848-1474", "r": "AUTOS/VEHÍCULOS", "i": "2025-03-29", "f": "2026-03-29", "ps": 290.2, "im": 17.41, "p": 307.61, "pg": 277.4, "sa": 30.21, "ce": 58.04, "e": "ACTIVA", "lt": 12, "tp": "", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-012-000018094", "a": "Cía Internacional De Seguros, S.A.", "c": "JAIME ALEXANDER CASTRO PEREZ", "ced": "7-701-2117", "r": "AUTOS/VEHÍCULOS", "i": "2025-04-10", "f": "2026-04-10", "ps": 651.67, "im": 39.1, "p": 690.77, "pg": 690.77, "sa": 0.0, "ce": 130.33, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "033-012-000000792", "a": "Cía Internacional De Seguros, S.A.", "c": "JOSE LUIS RIOS PEREZ", "ced": "7-702-488", "r": "INCENDIO Y LÍNEAS ALIADAS", "i": "2025-04-19", "f": "2026-04-19", "ps": 222.0, "im": 11.1, "p": 233.1, "pg": 258.05, "sa": -24.95, "ce": 44.4, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "ANUAL", "sm": 0.0}, {"n": "040-012-000000204", "a": "Cía Internacional De Seguros, S.A.", "c": "JOSE LUIS RIOS PEREZ", "ced": "7-702-488", "r": "PROPIEDAD", "i": "2025-04-19", "f": "2026-04-19", "ps": 250.0, "im": 12.5, "p": 262.5, "pg": 262.5, "sa": 0.0, "ce": 50.0, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "ANUAL", "sm": 0.0}, {"n": "030-012-000019851", "a": "Cía Internacional De Seguros, S.A.", "c": "YEREMY MARTINEZ GONZALEZ", "ced": "8-938-1518", "r": "AUTOS/VEHÍCULOS", "i": "2025-04-23", "f": "2026-04-23", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 183.0, "sa": 0.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "04-04-1367045-2", "a": "FEDPA", "c": "ROBERTO  ELIAS COHEN  PEREZ", "ced": "6-715-991", "r": "AUTOS/VEHÍCULOS", "i": "2025-04-26", "f": "2026-04-26", "ps": 547.27, "im": 32.84, "p": 580.11, "pg": 522.09, "sa": 58.02, "ce": 109.45, "e": "ACTIVA", "lt": 12, "tp": "", "fp": "MENSUAL", "sm": 0.0}, {"n": "02B3412557", "a": "ASSA", "c": "LEXMA MAGALIS GUERRA RUIZ", "ced": "8-812-1753", "r": "AUTOS/VEHÍCULOS", "i": "2025-05-20", "f": "2026-05-20", "ps": 657.83, "im": 35.96, "p": 635.21, "pg": 423.52, "sa": 211.69, "ce": 119.85, "e": "ACTIVA", "lt": 12, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 13288.7}, {"n": "02-93-1072634-1", "a": "SURA", "c": "PATRICIA MARTEZ", "ced": "8-845-2470", "r": "AUTOS/VEHÍCULOS", "i": "2025-04-29", "f": "2026-04-29", "ps": 380.33, "im": 22.82, "p": 403.15, "pg": 242.59, "sa": 160.56, "ce": 76.07, "e": "ACTIVA", "lt": 10, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 6286.13}, {"n": "0225-03316-09", "a": "Ancón", "c": "KARLA TAMARA CASTILLO OTHON", "ced": "8-739-2164", "r": "AUTOS/VEHÍCULOS", "i": "2025-05-19", "f": "2026-05-19", "ps": 1157.05, "im": 24.28, "p": 428.95, "pg": 300.23, "sa": 128.72, "ce": 80.93, "e": "ACTIVA", "lt": 11, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 17490.0}, {"n": "15051544000000", "a": "MAPFRE", "c": "JELY AN CASTRO PEREZ", "ced": "7-118-282", "r": "FIANZAS/ROBO/SUSTRACCIÓN", "i": "2025-05-03", "f": "2026-05-03", "ps": 100.0, "im": 5.0, "p": 105.0, "pg": 105.0, "sa": 0.0, "ce": 20.0, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "ANUAL", "sm": 0.0}, {"n": "31300000003528", "a": "MAPFRE", "c": "LIZBETH LUISANA PEREA JOSEPH", "ced": "3-712-1669", "r": "PROPIEDAD", "i": "2025-05-21", "f": "2026-05-21", "ps": 40.0, "im": 2.0, "p": 42.0, "pg": 42.0, "sa": 0.0, "ce": 8.0, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 10000.0}, {"n": "0225-03756-09", "a": "Ancón", "c": "JELY AN CASTRO PEREZ", "ced": "7-118-282", "r": "AUTOS/VEHÍCULOS", "i": "2025-05-31", "f": "2026-05-31", "ps": 1034.55, "im": 34.01, "p": 600.91, "pg": 360.54, "sa": 240.37, "ce": 113.38, "e": "ACTIVA", "lt": 10, "tp": "PAGO DIRECTO", "fp": "MENSUAL", "sm": 15990.0}, {"n": "030-001-000773605", "a": "Cía Internacional De Seguros, S.A.", "c": "EYVIND SAID DOMINGUEZ GONZALEZ", "ced": "8-1024-1790", "r": "AUTOS/VEHÍCULOS", "i": "2025-06-03", "f": "2026-06-03", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 122.0, "sa": 61.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "0225-01591-01", "a": "Ancón", "c": "LOREN THOMAS MC NEELY", "ced": "565739669", "r": "AUTOS/VEHÍCULOS", "i": "2025-06-12", "f": "2026-06-12", "ps": 5914.45, "im": 123.28, "p": 2069.02, "pg": 1655.22, "sa": 413.8, "ce": 390.38, "e": "ACTIVA", "lt": 10, "tp": "PAGO DIRECTO", "fp": "MENSUAL", "sm": 68400.0}, {"n": "04-05-1708297-1", "a": "FEDPA", "c": "LIZBETH LUISANA PEREA JOSEPH", "ced": "3-712-1669", "r": "AUTOS/VEHÍCULOS", "i": "2025-08-09", "f": "2026-08-09", "ps": 117.92, "im": 7.08, "p": 125.0, "pg": 125.0, "sa": 0.0, "ce": 23.58, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "04-05-1950814-0", "a": "FEDPA", "c": "JORGE TUÑON", "ced": "8-763-2045", "r": "AUTOS/VEHÍCULOS", "i": "2025-06-23", "f": "2026-06-23", "ps": 108.49, "im": 7.92, "p": 140.0, "pg": 140.0, "sa": 0.0, "ce": 26.42, "e": "ACTIVA", "lt": 2, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "04-05-1953528-0", "a": "FEDPA", "c": "YULIET FONTE", "ced": "L641470", "r": "AUTOS/VEHÍCULOS", "i": "2025-06-26", "f": "2026-06-26", "ps": 117.92, "im": 7.08, "p": 125.0, "pg": 125.0, "sa": 0.0, "ce": 23.58, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "02-12696031-0", "a": "Acerta", "c": "NELSON BARRAGAN TEJEIRA", "ced": "PE-8-2120", "r": "AUTOS/VEHÍCULOS", "i": "2025-06-26", "f": "2026-06-26", "ps": 169.82, "im": 10.19, "p": 180.01, "pg": 90.0, "sa": 90.01, "ce": 33.96, "e": "ACTIVA", "lt": 1, "tp": "", "fp": "ANUAL", "sm": 0.0}, {"n": "02B3419013", "a": "ASSA", "c": "JAIME ADOLFO CASTRO PEREZ", "ced": "7-119-688", "r": "AUTOS/VEHÍCULOS", "i": "2025-07-15", "f": "2026-07-15", "ps": 1662.78, "im": 93.45, "p": 1650.88, "pg": 963.06, "sa": 687.82, "ce": 311.49, "e": "ACTIVA", "lt": 12, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 63900.0}, {"n": "04-05-1970094-0", "a": "FEDPA", "c": "FELIX PASTOR PIZA ARRIETA", "ced": "8-731-851", "r": "AUTOS/VEHÍCULOS", "i": "2025-07-18", "f": "2026-07-18", "ps": 117.92, "im": 8.61, "p": 152.17, "pg": 114.12, "sa": 38.05, "ce": 28.71, "e": "ACTIVA", "lt": 2, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "03B91806", "a": "ASSA", "c": "LEON GUILLERMO MONTAÑO CHACON PLATA", "ced": "8-484-774", "r": "INCENDIO Y LÍNEAS ALIADAS", "i": "2025-10-14", "f": "2026-10-14", "ps": 140.0, "im": 7.0, "p": 147.0, "pg": 147.0, "sa": 0.0, "ce": 28.0, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "15B36395", "a": "ASSA", "c": "LEON GUILLERMO MONTAÑO CHACON PLATA", "ced": "8-484-774", "r": "INCENDIO Y LÍNEAS ALIADAS", "i": "2025-10-14", "f": "2026-10-14", "ps": 69.0, "im": 3.45, "p": 72.45, "pg": 72.45, "sa": 0.0, "ce": 13.8, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "033-012-000001062", "a": "Cía Internacional De Seguros, S.A.", "c": "JHON JAIRO VALVERDE OSORIO", "ced": "E-8-151884", "r": "INCENDIO Y LÍNEAS ALIADAS", "i": "2025-08-12", "f": "2026-08-12", "ps": 110.0, "im": 5.5, "p": 115.5, "pg": 115.5, "sa": 0.0, "ce": 22.0, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "02B3423338", "a": "ASSA", "c": "ANA RAQUEL LAU RODRIGUEZ", "ced": "8-940-469", "r": "AUTOS/VEHÍCULOS", "i": "2025-08-30", "f": "2026-08-30", "ps": 920.77, "im": 51.17, "p": 904.04, "pg": 376.65, "sa": 527.39, "ce": 170.57, "e": "ACTIVA", "lt": 12, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 19190.0}, {"n": "02B3423630", "a": "ASSA", "c": "ROSARIO ESTHER DELGADO ACEVEDO", "ced": "7-72-135", "r": "AUTOS/VEHÍCULOS", "i": "2025-09-04", "f": "2026-09-04", "ps": 403.18, "im": 23.2, "p": 409.82, "pg": 204.9, "sa": 204.92, "ce": 77.32, "e": "ACTIVA", "lt": 10, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 6969.6}, {"n": "030-001-000773626", "a": "Cía Internacional De Seguros, S.A.", "c": "JOAO PEDRO CARMOZINE", "ced": "E-8-122659", "r": "AUTOS/VEHÍCULOS", "i": "2025-09-08", "f": "2026-09-08", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 183.0, "sa": 0.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "02B3425396", "a": "ASSA", "c": "CORINA BEATRIZ FLORES FUENTES", "ced": "8-832-2261", "r": "AUTOS/VEHÍCULOS", "i": "2025-10-04", "f": "2026-10-04", "ps": 567.51, "im": 32.56, "p": 575.29, "pg": 230.08, "sa": 345.21, "ce": 108.55, "e": "ACTIVA", "lt": 10, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 8100.5}, {"n": "02-12696563-0", "a": "Acerta", "c": "KAREN YADIRA RAMIREZ ANACONA", "ced": "E-8-134628", "r": "AUTOS/VEHÍCULOS", "i": "2025-09-15", "f": "2026-09-15", "ps": 490.19, "im": 29.41, "p": 519.6, "pg": 207.84, "sa": 311.76, "ce": 98.04, "e": "ACTIVA", "lt": 10, "tp": "", "fp": "MENSUAL", "sm": 0.0}, {"n": "04-05-1810021-1", "a": "FEDPA", "c": "OMAR BLANCO", "ced": "N-19-1071", "r": "AUTOS/VEHÍCULOS", "i": "2025-12-26", "f": "2026-12-26", "ps": 108.49, "im": 6.51, "p": 115.0, "pg": 0.0, "sa": 115.0, "ce": 21.7, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-001-000653812", "a": "Cía Internacional De Seguros, S.A.", "c": "EDUARDO ALBERTO LASSO VIELGO", "ced": "8-745-1193", "r": "AUTOS/VEHÍCULOS", "i": "2025-11-23", "f": "2026-11-23", "ps": 466.14, "im": 27.97, "p": 494.11, "pg": 46.94, "sa": 447.17, "ce": 93.23, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "02-93-1159210-1", "a": "SURA", "c": "FERNEY BEDOYA ARROYAVE", "ced": "BA451807", "r": "AUTOS/VEHÍCULOS", "i": "2025-10-19", "f": "2026-10-19", "ps": 570.0, "im": 34.2, "p": 604.2, "pg": 181.26, "sa": 422.94, "ce": 114.0, "e": "ACTIVA", "lt": 10, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 21919.65}, {"n": "030-001-000773641", "a": "Cía Internacional De Seguros, S.A.", "c": "JOSE DE LA PAZ RODRIGUEZ ARCIA", "ced": "8-739-1416", "r": "AUTOS/VEHÍCULOS", "i": "2025-10-21", "f": "2026-10-21", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 122.0, "sa": 61.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-001-000773640", "a": "Cía Internacional De Seguros, S.A.", "c": "JOSE ADRIAN GONZALES RIVAS", "ced": "8-747-1453", "r": "AUTOS/VEHÍCULOS", "i": "2025-10-20", "f": "2026-10-20", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 122.0, "sa": 61.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "01-82-1165813-1", "a": "SURA", "c": "FRANCIS NEITOR GUERRA SAAVEDRA", "ced": "8-843-331", "r": "INCENDIO Y LÍNEAS ALIADAS", "i": "2025-11-15", "f": "2026-11-15", "ps": 75.6, "im": 3.78, "p": 79.38, "pg": 35.69, "sa": 43.69, "ce": 15.12, "e": "ACTIVA", "lt": 6, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 94500.0}, {"n": "04-04-570284-9", "a": "FEDPA", "c": "JAVIER ARMANDO NIETO UREÑA", "ced": "8-207-2587", "r": "AUTOS/VEHÍCULOS", "i": "2025-10-22", "f": "2026-10-22", "ps": 342.53, "im": 20.55, "p": 363.08, "pg": 72.62, "sa": 290.46, "ce": 68.51, "e": "ACTIVA", "lt": 12, "tp": "", "fp": "MENSUAL", "sm": 0.0}, {"n": "02-93-1237187-0", "a": "SURA", "c": "LUIS LOPEZ", "ced": "7-713-810", "r": "AUTOS/VEHÍCULOS", "i": "2025-11-06", "f": "2026-11-06", "ps": 1968.06, "im": 118.08, "p": 2086.14, "pg": 625.83, "sa": 1460.31, "ce": 393.61, "e": "ACTIVA", "lt": 10, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 44900.0}, {"n": "030-001-000773652", "a": "Cía Internacional De Seguros, S.A.", "c": "MAYLIN JULIANA FUNG PACHECO", "ced": "140325247", "r": "AUTOS/VEHÍCULOS", "i": "2025-11-16", "f": "2026-11-16", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 183.0, "sa": 0.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "ANUAL", "sm": 0.0}, {"n": "02-92-1054443-2", "a": "SURA", "c": "CIPRIAN ZAMBRANO CORDOBA", "ced": "7-52-907", "r": "AUTOS/VEHÍCULOS", "i": "2026-01-13", "f": "2027-01-13", "ps": 164.73, "im": 9.88, "p": 174.61, "pg": 0.0, "sa": 174.61, "ce": 32.95, "e": "ACTIVA", "lt": 3, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-012-000019229", "a": "Cía Internacional De Seguros, S.A.", "c": "JEANNETTE FONT MITIL", "ced": "8-206-1607", "r": "AUTOS/VEHÍCULOS", "i": "2026-01-03", "f": "2027-01-03", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 36.61, "sa": 146.39, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-001-000773658", "a": "Cía Internacional De Seguros, S.A.", "c": "VICTOR HUGO BOSCH CASTRO", "ced": "8-1000-972", "r": "AUTOS/VEHÍCULOS", "i": "2025-12-04", "f": "2026-12-04", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 61.01, "sa": 121.99, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "032-012-000000064", "a": "Cía Internacional De Seguros, S.A.", "c": "PL PANAMA LOGISTIC S.A", "ced": "155694202-2-2020-3", "r": "PROPIEDAD", "i": "2026-02-01", "f": "2027-02-01", "ps": 250.0, "im": 12.5, "p": 262.5, "pg": 0.0, "sa": 262.5, "ce": 50.0, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "02B3433365", "a": "ASSA", "c": "MIGUEL FERMIN", "ced": "8-891-1830", "r": "AUTOS/VEHÍCULOS", "i": "2025-12-15", "f": "2026-12-15", "ps": 1024.9, "im": 57.69, "p": 1019.18, "pg": 84.93, "sa": 934.25, "ce": 192.3, "e": "ACTIVA", "lt": 12, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 22500.0}, {"n": "030-001-000773674", "a": "Cía Internacional De Seguros, S.A.", "c": "XIOMARA PHILLIPS", "ced": "8-305-97", "r": "AUTOS/VEHÍCULOS", "i": "2025-12-26", "f": "2026-12-26", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 0.0, "sa": 183.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "ANUAL", "sm": 0.0}, {"n": "033-012-000000761", "a": "Cía Internacional De Seguros, S.A.", "c": "PILAR DE LOS ANGELES BOSCH CASTRO", "ced": "7-711-1197", "r": "INCENDIO Y LÍNEAS ALIADAS", "i": "2026-01-16", "f": "2027-01-16", "ps": 115.78, "im": 5.79, "p": 121.57, "pg": 12.16, "sa": 109.41, "ce": 23.16, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-001-000762067", "a": "Cía Internacional De Seguros, S.A.", "c": "INGRID EDITH CARDENAS CHANIS", "ced": "7-701-212", "r": "AUTOS/VEHÍCULOS", "i": "2026-02-08", "f": "2027-02-08", "ps": 196.23, "im": 11.77, "p": 208.0, "pg": 0.0, "sa": 208.0, "ce": 39.25, "e": "ACTIVA", "lt": 1, "tp": "EFECTIVO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-001-000762069", "a": "Cía Internacional De Seguros, S.A.", "c": "NILSA LETICIA ESTRADA MORENO", "ced": "8-190-113", "r": "AUTOS/VEHÍCULOS", "i": "2026-02-12", "f": "2027-02-12", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 0.0, "sa": 183.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}, {"n": "030-012-000019308", "a": "Cía Internacional De Seguros, S.A.", "c": "ELEANNY MARLENS UREÑA LOPEZ", "ced": "4-735-1324", "r": "AUTOS/VEHÍCULOS", "i": "2026-01-19", "f": "2027-01-19", "ps": 172.64, "im": 10.36, "p": 183.0, "pg": 0.0, "sa": 183.0, "ce": 34.53, "e": "ACTIVA", "lt": 1, "tp": "TARJETA DE CREDITO", "fp": "MENSUAL", "sm": 0.0}];
+
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function k(x){ return String(x==null?'':x).toUpperCase().replace(/[^A-Z0-9]/g,''); }
+  function n(v){ return parseFloat(v)||0; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ var q=Number(v)||0;
+    return (q<0?'-':'')+'$'+Math.abs(q).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+  /* ---------- Nombres canónicos ----------
+     Lista EXACTA, no expresiones regulares. Probando esto descubrí
+     que una regla con /SURA/ convertía "WORLDWIDE MEDICAL ASSURAN"
+     y "PAN AMERICAN LIFE INSURANCE" en SURA — porque "ASSURAN" e
+     "INSURANCE" llevan esas letras dentro. Eso le habría cambiado
+     la compañía a seis pólizas. Con lista cerrada no puede pasar.  */
+  function llave(x){
+    return String(x==null?'':x).toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^A-Z0-9]/g,'');
+  }
+  var ASEG={};
+  [['Cía Internacional De Seguros, S.A.',
+    ['CIA INTERNACIONAL DE SEGUROS, S.A.','CIA INTERNACIONAL DE SEGUROS',
+     'INTERNACIONAL','INTERNACIONAL DE SEGUROS','CIA. INTERNACIONAL DE SEGUROS, S.A.',
+     'COMPANIA INTERNACIONAL DE SEGUROS']],
+   ['Acerta', ['ACERTA','ACERTA SEGUROS','ACERTA SEGUROS, S.A.']],
+   ['ASSA',   ['ASSA','ASSA COMPANIA DE SEGUROS, S.A.','ASSA COMPANIA DE SEGUROS']],
+   ['FEDPA',  ['FEDPA','SEGUROS FEDPA','SEGUROS FEDPA, S.A.','SEGUROS FEDPA, S.A']],
+   ['SURA',   ['SURA','SEGUROS SURAMERICANA','SEGUROS SURAMERICANA, S.A.','SURAMERICANA']],
+   ['MAPFRE', ['MAPFRE','MAPFRE PANAMA','MAPFRE PANAMA, S.A.']],
+   ['Ancón',  ['ANCON','ASEGURADORA ANCON','ASEGURADORA ANCON, S.A.']],
+   /* Ojo: "La Regional de Seguros" (autos) y "La Regional de Seguros
+      Vumi" (salud) son DISTINTAS. Vumi no entra en esta lista. */
+   ['La Regional de Seguros', ['LA REGIONAL','LA REGIONAL DE SEGUROS','LA REGIONAL DE SEGUROS, S.A.']]
+  ].forEach(function(par){ par[1].forEach(function(v){ ASEG[llave(v)]=par[0]; }); });
+
+  var RAMO={};
+  [['AUTOS/VEHÍCULOS',          ['AUTOMOVIL','AUTOMOVILES','AUTOS','AUTOS/VEHICULOS','AUTO']],
+   ['INCENDIO Y LÍNEAS ALIADAS',['INCENDIO','INCENDIO Y LINEAS ALIADAS']],
+   ['FIANZAS/ROBO/SUSTRACCIÓN', ['FIANZA','FIANZAS','FIANZAS/ROBO/SUSTRACCION']]
+  ].forEach(function(par){ par[1].forEach(function(v){ RAMO[llave(v)]=par[0]; }); });
+
+  function canon(v, tabla){
+    var s=String(v||'').trim(); if(!s) return null;
+    var c=tabla[llave(s)];
+    return (c && c!==s) ? c : (c||null);
+  }
+  window.jacCanonAseg=function(v){ return canon(v, ASEG); };
+  window.jacCanonRamo=function(v){ return canon(v, RAMO); };
+
+  /* ---------- 1. Unificar nombres en toda la cartera ---------- */
+  window.jacUnificarNombres=function(){
+    var ca={}, cr={};
+    P().forEach(function(p){
+      var a=canon(p.aseg, ASEG);
+      if(a && p.aseg!==a){ ca[p.aseg+' → '+a]=(ca[p.aseg+' → '+a]||0)+1; p.aseg=a; p.aseguradora=a; }
+      var r=canon(p.ramo, RAMO);
+      if(r && p.ramo!==r){ cr[p.ramo+' → '+r]=(cr[p.ramo+' → '+r]||0)+1;
+        if(!p.ramoOriginal) p.ramoOriginal=p.ramo;
+        p.ramo=r; }
+    });
+    /* El catálogo, y la tabla de comisiones con sus claves */
+    if(typeof S!=='undefined'){
+      if(Array.isArray(S.aseguradoras)){
+        var vistos={}, out=[];
+        S.aseguradoras.forEach(function(x){
+          var nom=(x&&x.nombre!==undefined)?x.nombre:x;
+          var c=canon(nom, ASEG)||nom;
+          if(vistos[c]) return; vistos[c]=1;
+          out.push((x&&x.nombre!==undefined)?{nombre:c}:c);
+        });
+        out.sort(function(a,b){ var x=(a&&a.nombre!==undefined)?a.nombre:a,
+          y=(b&&b.nombre!==undefined)?b.nombre:b; return String(x).localeCompare(String(y),'es'); });
+        S.aseguradoras=out;
+      }
+      try{
+        var cfg=S.comisCfg||{};
+        if(cfg.combos){
+          Object.keys(cfg.combos).forEach(function(key){
+            var pa=key.split('||'); if(pa.length!==2) return;
+            var a=canon(pa[0],ASEG)||pa[0], r=canon(pa[1],RAMO)||pa[1];
+            var nueva=a+'||'+r;
+            if(nueva===key) return;
+            if(!cfg.combos[nueva]) cfg.combos[nueva]=cfg.combos[key];
+            delete cfg.combos[key];
+          });
+        }
+        if(cfg.ramos){
+          Object.keys(cfg.ramos).forEach(function(key){
+            var r=canon(key,RAMO); if(!r||r===key) return;
+            if(!cfg.ramos[r]) cfg.ramos[r]=cfg.ramos[key];
+            delete cfg.ramos[key];
+          });
+        }
+        if(cfg.asegs){
+          Object.keys(cfg.asegs).forEach(function(key){
+            var a=canon(key,ASEG); if(!a||a===key) return;
+            if(!cfg.asegs[a]) cfg.asegs[a]=cfg.asegs[key];
+            delete cfg.asegs[key];
+          });
+        }
+      }catch(x){}
+    }
+    return {aseguradoras:ca, ramos:cr,
+      total:Object.keys(ca).reduce(function(s,q){ return s+ca[q]; },0)
+           +Object.keys(cr).reduce(function(s,q){ return s+cr[q]; },0)};
+  };
+
+  /* ---------- 2. Cotejar el informe contra el CRM ---------- */
+  function buscar(f){
+    var p=P().filter(function(x){ return k(x.num)===k(f.n); })[0];
+    if(p) return p;
+    var b=k(f.n).replace(/\d$/,'');
+    return P().filter(function(x){
+      var q=k(x.num);
+      return q.length>=9 && b.length>=9 && q.replace(/\d$/,'')===b;
+    })[0]||null;
+  }
+
+  window.jacAuditarCC=function(){
+    var faltan=[], primas=[], ganchos=[], fechas=[], bien=0;
+    INFORME.forEach(function(f){
+      var p=buscar(f);
+      if(!p){ faltan.push(f); return; }
+      var mal=false;
+      if(p.coCor!==AGENCIA){ ganchos.push({ref:p,num:f.n,cli:f.c,tiene:p.coCor||'(sin gancho)'}); mal=true; }
+      var dif=+(f.p-n(p.total)).toFixed(2);
+      if(Math.abs(dif)>0.5){ primas.push({ref:p,num:f.n,cli:f.c,aseg:f.a,
+        crm:n(p.total),excel:f.p,dif:dif}); mal=true; }
+      /* Las fechas: si el CRM va por delante, está bien, no es error */
+      if(String(p.fechaFin||'')!==f.f){
+        var adelante = String(p.fechaFin||'')>f.f;
+        fechas.push({num:f.n,cli:f.c,crmIni:p.fechaInicio,crmFin:p.fechaFin,
+          exIni:f.i,exFin:f.f, adelante:adelante});
+        if(!adelante) mal=true;
+      }
+      if(!mal) bien++;
+    });
+    /* Ganchos que sobran: marcadas que no están en este informe */
+    var marcadas=P().filter(function(p){ return p.coCor===AGENCIA; });
+    var enInf={}; INFORME.forEach(function(f){ enInf[k(f.n)]=1; });
+    var sobran=marcadas.filter(function(p){
+      var q=k(p.num);
+      if(enInf[q]) return false;
+      return !INFORME.some(function(f){ var b=k(f.n);
+        return b.length>=9 && q.length>=9 && b.replace(/\d$/,'')===q.replace(/\d$/,''); });
+    }).map(function(p){ return {ref:p, num:p.num||'(sin número)', cli:p.nombreCliente||'',
+        aseg:p.aseg, ramo:p.ramo, est:p.estado, prima:n(p.prima),
+        cede:n(p.coCorCom)}; }).sort(function(a,b){ return b.cede-a.cede; });
+
+    return { informe:INFORME.length, correctas:bien, faltan:faltan,
+      primas:primas, ganchos:ganchos, fechas:fechas, sobran:sobran,
+      fechasAdelante:fechas.filter(function(x){ return x.adelante; }).length,
+      fechasAtras:fechas.filter(function(x){ return !x.adelante; }).length,
+      cedenDeMas:+sobran.reduce(function(s,x){ return s+x.cede; },0).toFixed(2),
+      primaInforme:+INFORME.reduce(function(s,f){ return s+f.p; },0).toFixed(2),
+      comisionInforme:+INFORME.reduce(function(s,f){ return s+f.ce; },0).toFixed(2) };
+  };
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Capital Care: aplicar y ver el informe
+   ============================================================ */
+(function(){
+  'use strict';
+  var AGENCIA='Capital Care & Co';
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function n(v){ return parseFloat(v)||0; }
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+  function money(v){ var q=Number(v)||0;
+    return (q<0?'-':'')+'$'+Math.abs(q).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+  /* Unifica nombres y pone el gancho a las que le falten.
+     No toca fechas ni primas: eso lo decide ella. */
+  window.jacAplicarCC=async function(){
+    var u=window.jacUnificarNombres();
+    var r=window.jacAuditarCC(), g=0;
+    r.ganchos.forEach(function(f){
+      var p=f.ref;
+      p.extra=p.extra||{};
+      if(!p.extra.ganchoPrevioCC)
+        p.extra.ganchoPrevioCC={coCor:p.coCor, coCorPart:p.coCorPart,
+          coCorCom:p.coCorCom, participacion:p.participacion};
+      p.coCor=AGENCIA; p.coCorPart=35; p.participacion=65;
+      var base=n(p.prima)*n(p.comPct)/100;
+      p.comision=+(base*0.65).toFixed(2);
+      p.coCorCom=+(base*0.35).toFixed(2);
+      g++;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    var ok=(typeof window.jacGuardarYa==='function')
+      ? await window.jacGuardarYa({silencioso:true}) : {ok:false};
+    ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    try{ if(typeof window.jacRepintar==='function') window.jacRepintar(); }catch(x){}
+    return {nombres:u.total, ganchos:g, guardado:ok.ok===true, detalle:u};
+  };
+
+  window.jacAplicarPrimasCC=async function(ids){
+    var r=window.jacAuditarCC(), c=0;
+    r.primas.forEach(function(f,i){
+      if(ids && ids.indexOf(i)<0) return;
+      var p=f.ref;
+      p.extra=p.extra||{};
+      if(!p.extra.primaPreviaCC) p.extra.primaPreviaCC={prima:p.prima, total:p.total, itbms:p.itbms};
+      var inf=null;
+      for(var j=0;j<r.informe;j++){}
+      p.total=f.excel;
+      /* La prima sin impuesto se recalcula manteniendo la proporción */
+      var pct=n(p.itbmsPct)||( n(p.prima)>0 ? (n(p.total)/n(p.prima)-1)*100 : 0 );
+      if(pct>0 && pct<20) p.prima=+(f.excel/(1+pct/100)).toFixed(2);
+      p.itbms=+(n(p.total)-n(p.prima)).toFixed(2);
+      c++;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+    ['calcKPIs','renderKPIs','RD','RP'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return {ajustadas:c};
+  };
+
+  window.jacQuitarSobrantesCC=async function(ids){
+    var r=window.jacAuditarCC(), c=0;
+    r.sobran.forEach(function(f,i){
+      if(ids && ids.indexOf(i)<0) return;
+      var p=f.ref;
+      p.extra=p.extra||{};
+      p.extra.ganchoPrevioCC={coCor:p.coCor, coCorPart:p.coCorPart,
+        coCorCom:p.coCorCom, participacion:p.participacion};
+      delete p.coCor; delete p.coCorPart; delete p.coCorCom;
+      p.participacion=100;
+      p.comision=+(n(p.prima)*n(p.comPct)/100).toFixed(2);
+      c++;
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+    ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return {quitados:c};
+  };
+
+  window.jacDeshacerCC=async function(){
+    var c=0;
+    P().forEach(function(p){
+      var v=p&&p.extra&&p.extra.ganchoPrevioCC;
+      if(v){ if(v.coCor){ p.coCor=v.coCor; p.coCorPart=v.coCorPart; p.coCorCom=v.coCorCom; }
+             else { delete p.coCor; delete p.coCorPart; delete p.coCorCom; }
+             p.participacion=v.participacion; delete p.extra.ganchoPrevioCC; c++; }
+      var q=p&&p.extra&&p.extra.primaPreviaCC;
+      if(q){ p.prima=q.prima; p.total=q.total; p.itbms=q.itbms; delete p.extra.primaPreviaCC; c++; }
+    });
+    try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+    if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+    ['calcKPIs','renderKPIs','RD','RP','RCom','renderCom'].forEach(function(fn){
+      try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+    return {devueltas:c};
+  };
+
+  /* ---------------- El informe ---------------- */
+  window.jacPanelCC=function(){
+    var r=window.jacAuditarCC();
+
+    var h='<div style="font-size:12px;color:#334155;line-height:1.75;margin-bottom:12px">'
+      +'Informe de Capital Care: <b>'+r.informe+' pólizas</b>, prima '+money(r.primaInforme)
+      +', comisión estimada '+money(r.comisionInforme)+'.<br>'
+      +'Todas aparecen en el CRM. <b>Ninguna tiene la compañía equivocada.</b></div>';
+
+    h+='<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:11px 13px;'
+      +'font-size:12px;margin-bottom:12px;line-height:1.7">'
+      +'<b>Lo que sí está mal: la misma compañía escrita de varias formas.</b><br>'
+      +'<span style="color:#1E3A8A;font-size:11px">El CRM las trata como compañías distintas en los '
+      +'listados, en los KPIs y —esto es lo caro— en su tabla de comisiones. Tiene configurado '
+      +'<code>ASSA||AUTOS/VEHÍCULOS</code> al 20%, y las pólizas que dicen <code>AUTOMÓVIL</code> '
+      +'no casan con esa línea: se quedan sin porcentaje.</span></div>';
+
+    if(r.fechas.length){
+      h+='<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:11px 13px;'
+        +'font-size:12px;margin-bottom:12px;line-height:1.7">'
+        +'<b>Las fechas: usted tiene razón, están vigentes.</b><br>'
+        +'<span style="color:#166534;font-size:11px">'+r.fechas.length+' pólizas tienen fecha distinta '
+        +'a la del Excel, pero <b>'+r.fechasAdelante+'</b> es porque el CRM ya tiene el ciclo renovado '
+        +'y el Excel el anterior. Copiar las fechas del Excel le echaría la cartera un año atrás y se '
+        +'le volverían a vencer todas. <b>No se tocan.</b>'
+        +(r.fechasAtras?(' Hay '+r.fechasAtras+' donde el CRM va por detrás; esas sí conviene mirarlas.'):'')
+        +'</span></div>';
+    }
+
+    if(r.primas.length){
+      h+='<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:11px 13px;'
+        +'font-size:12px;margin-bottom:12px"><b>'+r.primas.length+' primas que no cuadran de verdad</b>'
+        +'<div style="font-size:11px;color:#78350F;margin:5px 0 8px">No es el impuesto: es diferencia real. '
+        +'Marque las que quiera traer del Excel.</div>'
+        +'<table style="width:100%;border-collapse:collapse;font-size:11px">';
+      r.primas.forEach(function(f,i){
+        h+='<tr style="border-bottom:1px solid #FEF3C7">'
+          +'<td style="padding:4px 6px;width:22px"><input type="checkbox" class="jac-cc-prima" data-i="'+i+'"></td>'
+          +'<td style="padding:4px 6px;font-family:monospace">'+e(f.num)+'</td>'
+          +'<td style="padding:4px 6px">'+e(f.cli)+'</td>'
+          +'<td style="padding:4px 6px;color:#64748B">'+e(f.aseg)+'</td>'
+          +'<td style="padding:4px 6px;text-align:right">CRM '+money(f.crm)+' → Excel <b>'+money(f.excel)+'</b></td>'
+          +'<td style="padding:4px 6px;text-align:right;color:'+(f.dif>0?'#15803D':'#B91C1C')+'">'
+            +(f.dif>0?'+':'')+f.dif.toFixed(2)+'</td></tr>';
+      });
+      h+='</table><button onclick="jacCCPrimas()" style="margin-top:8px;padding:7px 14px;border-radius:9px;'
+        +'border:none;background:#B45309;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+        +'Traer del Excel las marcadas</button></div>';
+    }
+
+    if(r.sobran.length){
+      h+='<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:11px 13px;'
+        +'font-size:12px;margin-bottom:12px">'
+        +'<b>'+r.sobran.length+' pólizas con el gancho de Capital Care que NO están en este informe</b>'
+        +'<div style="font-size:11px;color:#7F1D1D;margin:5px 0 8px">Le están cediendo <b>'
+        +money(r.cedenDeMas)+'</b> de comisión. Viene todo marcado; desmarque lo que sí sea de ellos.</div>'
+        +'<div style="margin-bottom:6px"><label style="font-size:11px;cursor:pointer">'
+        +'<input type="checkbox" checked onchange="jacCCTodos(this.checked)"> marcar / desmarcar todas</label></div>'
+        +'<div style="max-height:26vh;overflow:auto;background:#fff;border-radius:8px">'
+        +'<table style="width:100%;border-collapse:collapse;font-size:11px">';
+      r.sobran.forEach(function(f,i){
+        h+='<tr style="border-bottom:1px solid #F1F5F9">'
+          +'<td style="padding:4px 6px;width:22px"><input type="checkbox" class="jac-cc-sobra" data-i="'+i+'" checked></td>'
+          +'<td style="padding:4px 6px;font-family:monospace;white-space:nowrap">'+e(f.num)+'</td>'
+          +'<td style="padding:4px 6px">'+e(f.cli)+'</td>'
+          +'<td style="padding:4px 6px;color:#64748B">'+e(f.aseg)+' · '+e(f.ramo)+'</td>'
+          +'<td style="padding:4px 6px;text-align:right">'+money(f.prima)+'</td>'
+          +'<td style="padding:4px 6px;text-align:right;color:#B45309">cede '+money(f.cede)+'</td></tr>';
+      });
+      h+='</table></div>'
+        +'<button onclick="jacCCQuitar()" style="margin-top:8px;padding:7px 14px;border-radius:9px;'
+        +'border:none;background:#B91C1C;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+        +'Quitar el gancho a las marcadas</button></div>';
+    }
+
+    h+='<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'
+      +'<button onclick="jacCCUnificar()" style="padding:9px 17px;border-radius:9px;border:none;'
+      +'background:#15803D;color:#fff;font-size:12px;font-weight:700;cursor:pointer">'
+      +'Unificar nombres de compañías y ramos</button>'
+      +'<button onclick="jacCCDeshacer()" style="padding:9px 17px;border-radius:9px;'
+      +'border:1px solid #CBD5E1;background:#fff;font-size:12px;cursor:pointer">Deshacer</button>'
+      +'</div><div id="jac-cc59-res" style="font-size:12px;color:#475569;margin-top:9px"></div>';
+
+    if(typeof openDP==='function') openDP(h,'Capital Care — auditoría del informe');
+  };
+
+  window.jacCCTodos=function(v){
+    var c=document.querySelectorAll('.jac-cc-sobra');
+    for(var i=0;i<c.length;i++) c[i].checked=v;
+  };
+  function marcados(cls){
+    var c=document.querySelectorAll(cls), o=[];
+    for(var i=0;i<c.length;i++) if(c[i].checked) o.push(parseInt(c[i].getAttribute('data-i'),10));
+    return o;
+  }
+  window.jacCCUnificar=async function(){
+    var o=document.getElementById('jac-cc59-res'); if(o) o.innerHTML='Unificando…';
+    var r=await window.jacAplicarCC();
+    if(o) o.innerHTML='Unificados <b>'+r.nombres+'</b> nombres · gancho puesto a <b>'+r.ganchos+'</b>. '
+      +(r.guardado?'<span style="color:#15803D">Guardado ✓</span>':'<span style="color:#B91C1C">Sin confirmar la subida.</span>');
+    setTimeout(window.jacPanelCC, 800);
+  };
+  window.jacCCPrimas=async function(){
+    var r=await window.jacAplicarPrimasCC(marcados('.jac-cc-prima'));
+    var o=document.getElementById('jac-cc59-res');
+    if(o) o.innerHTML='Ajustadas <b>'+r.ajustadas+'</b> primas desde el Excel.';
+  };
+  window.jacCCQuitar=async function(){
+    var r=await window.jacQuitarSobrantesCC(marcados('.jac-cc-sobra'));
+    var o=document.getElementById('jac-cc59-res');
+    if(o) o.innerHTML='Quitado el gancho a <b>'+r.quitados+'</b> pólizas.';
+    setTimeout(window.jacPanelCC, 800);
+  };
+  window.jacCCDeshacer=async function(){
+    var r=await window.jacDeshacerCC();
+    var o=document.getElementById('jac-cc59-res');
+    if(o) o.innerHTML='Devueltos <b>'+r.devueltas+'</b> cambios.';
+  };
+
+  /* La unificación de nombres corre sola: no es criterio, es
+     la misma compañía escrita distinta. Lo demás espera a ella. */
+  var YA=false, N=0;
+  async function hayNube(){
+    try{ if(!window.db||window.db.__esStub) return false;
+      var s=await window.db.auth.getSession(); return !!(s&&s.data&&s.data.session);
+    }catch(x){ return false; }
+  }
+  async function auto(){
+    if(YA) return; N++; if(N>50) return;
+    if(P().length<20) return;
+    if(!(await hayNube())) return;
+    YA=true;
+    try{
+      var u=window.jacUnificarNombres();
+      if(u.total){
+        try{ S._ts=Date.now(); if(typeof save==='function') save(); }catch(x){}
+        if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+        ['calcKPIs','renderKPIs','RD','RP'].forEach(function(fn){
+          try{ if(typeof window[fn]==='function') window[fn](); }catch(x){} });
+      }
+      window.__jacCC59=u;
+    }catch(x){ YA=false; }
+  }
+  setTimeout(auto, 30000);
+  var t=setInterval(function(){ if(YA||N>50){ clearInterval(t); return; } auto(); }, 9000);
+
+  function boton(){
+    var chip=document.getElementById('jac-cc-chip');
+    if(!chip||document.getElementById('jac-btn-cc59')) return;
+    var fila=chip.firstElementChild; if(!fila) return;
+    var r; try{ r=window.jacAuditarCC(); }catch(x){ return; }
+    var pend=r.primas.length+r.sobran.length+r.ganchos.length;
+    var b=document.createElement('button');
+    b.id='jac-btn-cc59'; b.type='button';
+    b.style.cssText='padding:6px 13px;border-radius:999px;border:none;background:'
+      +(pend?'#B45309':'#475569')+';color:#fff;font-size:12px;font-weight:600;cursor:pointer';
+    b.textContent='Capital Care · informe '+r.informe+(pend?(' — '+pend+' a revisar'):' ✓');
+    b.onclick=window.jacPanelCC;
     fila.appendChild(b);
   }
   setInterval(function(){ try{ boton(); }catch(x){} }, 5000);
