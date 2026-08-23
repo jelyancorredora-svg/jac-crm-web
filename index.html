@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-AT';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-AU';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -24653,6 +24653,440 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     fila.appendChild(b);
   }
   setInterval(function(){ try{ boton(); }catch(x){} }, 5000);
+})();
+</script>
+
+
+<!-- bloque-notificaciones.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Notificaciones que no se apagan
+   ------------------------------------------------------------
+   POR QUÉ SE LE APAGABAN
+
+   El botón «Activar Notificaciones» llamaba a una función que
+   hacía dos cosas: pedir permiso al navegador y montar un
+   temporizador que revisa cada hora. El temporizador vive en la
+   pestaña: **al recargar la página desaparece**. Y al arrancar,
+   el CRM solo hacía UNA comprobación suelta, sin volver a montar
+   el temporizador.
+
+   Resultado: notificaba una vez al abrir y se callaba hasta que
+   ella volvía a pulsar el botón. Exactamente lo que describe.
+
+   Y peor: cada vez que lo pulsaba se montaba OTRO temporizador
+   encima, así que acababa recibiendo la misma notificación
+   repetida.
+
+   Además el botón nunca cambiaba de aspecto, así que no había
+   forma de saber si estaba activo. Por eso «se desmarca»: es que
+   nunca llegó a marcarse.
+
+   ------------------------------------------------------------
+   CÓMO QUEDA
+
+   · El aviso arranca SOLO en cada carga, sin pulsar nada, si el
+     permiso ya está dado. No hay que activarlo cada vez.
+   · Un único temporizador. Si ya hay uno, no monta otro.
+   · El botón enseña su estado: verde y «activas» cuando lo están.
+   · No repite: cada aviso se manda una vez al día como mucho, y
+     eso se guarda en el navegador, así que sobrevive a recargas.
+   · Cumpleaños: avisa el mismo día y también la víspera, para
+     que dé tiempo a felicitar.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var CLAVE='jacAvisos';       /* qué se ha avisado ya, por día */
+  var _t=null;                 /* el único temporizador */
+
+  function hoy(){ var d=new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function P(){ return (typeof S!=='undefined'&&S.polizas)||[]; }
+  function C(){ return (typeof S!=='undefined'&&S.clientes)||[]; }
+
+  function leido(){
+    try{ var v=JSON.parse(localStorage.getItem(CLAVE)||'{}');
+         if(v.dia!==hoy()) return {dia:hoy(), hechos:{}};
+         return v; }catch(e){ return {dia:hoy(), hechos:{}}; }
+  }
+  function marcar(k){
+    try{ var v=leido(); v.hechos[k]=1; localStorage.setItem(CLAVE, JSON.stringify(v)); }catch(e){}
+  }
+  function yaAvisado(k){ try{ return !!leido().hechos[k]; }catch(e){ return false; } }
+
+  function avisar(clave, titulo, cuerpo){
+    if(!('Notification' in window) || Notification.permission!=='granted') return false;
+    if(yaAvisado(clave)) return false;
+    try{
+      var n=new Notification(titulo, {body:cuerpo, tag:clave,
+        icon:'https://crm.jacsegurospa.com/favicon.ico'});
+      n.onclick=function(){ try{ window.focus(); n.close(); }catch(e){} };
+      marcar(clave);
+      /* Queda registrado dentro del CRM para poder mirarlo después */
+      try{ S.notifLog=(S.notifLog||[]).slice(-80);
+           S.notifLog.push({cuando:new Date().toISOString(), titulo:titulo, cuerpo:cuerpo}); }catch(e){}
+      return true;
+    }catch(e){ return false; }
+  }
+
+  /* ---------- Cumpleaños: hoy y mañana ---------- */
+  function cumples(dias){
+    var d=new Date(); d.setDate(d.getDate()+(dias||0));
+    var m=d.getMonth()+1, q=d.getDate();
+    return C().filter(function(c){
+      if(!c.fNac) return false;
+      var s=String(c.fNac);
+      var mm=parseInt(s.slice(5,7),10), dd=parseInt(s.slice(8,10),10);
+      return mm===m && dd===q;
+    });
+  }
+
+  function dias(f){
+    if(!f) return null;
+    var a=new Date(String(f)+'T00:00:00'), b=new Date(hoy()+'T00:00:00');
+    if(isNaN(a)) return null;
+    return Math.round((a-b)/86400000);
+  }
+
+  window.jacRevisarAvisos=function(forzar){
+    if(!('Notification' in window) || Notification.permission!=='granted') return {activo:false};
+    if(forzar){ try{ localStorage.removeItem(CLAVE); }catch(e){} }
+    var enviados=[];
+
+    /* Cumpleaños de hoy */
+    var hoyC=cumples(0);
+    if(hoyC.length && avisar('cumple-hoy','🎂 Cumpleaños hoy',
+        hoyC.map(function(c){ return String(c.nombre||'').split(' ').slice(0,2).join(' '); }).join(', ')
+        +(hoyC.length>3?' y más':''))) enviados.push('cumpleaños hoy');
+
+    /* Cumpleaños de mañana, para que dé tiempo a preparar el mensaje */
+    var manC=cumples(1);
+    if(manC.length && avisar('cumple-manana','🎂 Mañana cumple',
+        manC.map(function(c){ return String(c.nombre||'').split(' ').slice(0,2).join(' '); }).join(', ')))
+      enviados.push('cumpleaños mañana');
+
+    /* Pólizas por vencer */
+    var v7=P().filter(function(p){ var d=dias(p.fechaFin);
+      return d!==null && d>=0 && d<=7 && p.estado!=='Cancelada'; });
+    if(v7.length && avisar('vencen-7','⚠️ Pólizas por vencer',
+        v7.length+(v7.length>1?' pólizas vencen':' póliza vence')+' en los próximos 7 días'))
+      enviados.push('vencimientos');
+
+    /* Cobros vencidos */
+    var pg=(typeof S!=='undefined'&&S.pagos)||[];
+    var deuda=pg.filter(function(x){
+      if(String(x.estado||'Pendiente')==='Pagado') return false;
+      var d=dias(x.fecha); return d!==null && d<0; });
+    if(deuda.length){
+      var tot=deuda.reduce(function(s,x){ return s+(parseFloat(x.monto)||0); },0);
+      if(avisar('cobros','💰 Cobros vencidos',
+        deuda.length+' cobros pendientes · $'+tot.toFixed(2))) enviados.push('cobros');
+    }
+
+    /* Tareas con fecha pasada */
+    var tar=((typeof S!=='undefined'&&S.tareas)||[]).filter(function(t){
+      if(String(t.estado||'')==='completado') return false;
+      var d=dias(t.fechaLimite); return d!==null && d<=0; });
+    if(tar.length && avisar('tareas','📋 Tareas pendientes',
+        tar.length+(tar.length>1?' tareas vencidas':' tarea vencida')+': '+(tar[0].titulo||'')))
+      enviados.push('tareas');
+
+    return {activo:true, enviados:enviados,
+      cumplesHoy:hoyC.length, cumplesManana:manC.length,
+      vencen7:v7.length, cobrosVencidos:deuda.length, tareasVencidas:tar.length};
+  };
+
+  /* ---------- Un solo temporizador, y arranca solo ---------- */
+  window.jacAvisosEncender=function(){
+    if(_t) return true;                       /* ya hay uno: no se monta otro */
+    if(!('Notification' in window) || Notification.permission!=='granted') return false;
+    window.jacRevisarAvisos();
+    _t=setInterval(function(){ try{ window.jacRevisarAvisos(); }catch(e){} }, 1800000); /* cada 30 min */
+    /* Al volver a la pestaña también, por si estuvo dormida */
+    document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState==='visible'){ try{ window.jacRevisarAvisos(); }catch(e){} }
+    });
+    return true;
+  };
+
+  window.jacAvisosPedirPermiso=async function(){
+    if(!('Notification' in window)) return 'este navegador no las soporta';
+    if(Notification.permission==='denied')
+      return 'las bloqueaste en el navegador — hay que darles permiso desde el candado de la barra de direcciones';
+    if(Notification.permission!=='granted'){
+      try{ await Notification.requestPermission(); }catch(e){}
+    }
+    if(Notification.permission==='granted'){ window.jacAvisosEncender(); return 'ok'; }
+    return 'no se dio permiso';
+  };
+
+  window.jacAvisosEstado=function(){
+    return { permiso:('Notification' in window)?Notification.permission:'no soportado',
+      temporizadorMontado:!!_t,
+      avisadosHoy:Object.keys((leido().hechos)||{}),
+      ultimos:((typeof S!=='undefined'&&S.notifLog)||[]).slice(-5) };
+  };
+
+  /* Arranca solo en cada carga. No hay que pulsar nada. */
+  setTimeout(function(){ try{ window.jacAvisosEncender(); }catch(e){} }, 5000);
+  setTimeout(function(){ try{ window.jacAvisosEncender(); }catch(e){} }, 20000);
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — Notificaciones: la tarjeta de Configuración
+   ------------------------------------------------------------
+   El botón viejo decía siempre lo mismo, activas o no. Este
+   enseña el estado de verdad, y trae un botón de probar para
+   que se vea con los ojos que funciona.
+   ============================================================ */
+(function(){
+  'use strict';
+  function e(x){ return (typeof esc==='function')?esc(x):String(x==null?'':x); }
+
+  function quitarViejo(){
+    /* El botón antiguo montaba un temporizador cada vez que se pulsaba,
+       así que acababa repitiendo los avisos. Fuera. */
+    document.querySelectorAll('.push-btn').forEach(function(b){
+      if(b.parentNode) b.parentNode.removeChild(b);
+    });
+  }
+
+  function tarjeta(){
+    var cont=document.getElementById('pg-cfg')||document.getElementById('pg-conf');
+    if(!cont) return;
+    quitarViejo();
+    var d=document.getElementById('jac-card-avisos');
+    if(!d){
+      d=document.createElement('div');
+      d.className='card'; d.id='jac-card-avisos'; d.style.marginTop='10px';
+      cont.appendChild(d);
+    }
+    var st=window.jacAvisosEstado ? window.jacAvisosEstado() : {permiso:'?'};
+    var on = st.permiso==='granted' && st.temporizadorMontado;
+    var bloqueado = st.permiso==='denied';
+
+    var r=null;
+    try{ r=window.jacRevisarAvisos ? null : null; }catch(x){}
+    /* Solo contar, sin mandar nada */
+    var cuenta={};
+    try{
+      var hoy=new Date();
+      var C=(typeof S!=='undefined'&&S.clientes)||[];
+      function cump(k){ var q=new Date(); q.setDate(q.getDate()+k);
+        var m=q.getMonth()+1, dd=q.getDate();
+        return C.filter(function(c){ if(!c.fNac) return false;
+          var s=String(c.fNac);
+          return parseInt(s.slice(5,7),10)===m && parseInt(s.slice(8,10),10)===dd; }).length; }
+      cuenta.cumpleHoy=cump(0); cuenta.cumpleManana=cump(1);
+    }catch(x){}
+
+    var h='<div class="ch"><h3>🔔 Avisos y recordatorios</h3></div>'
+      +'<div style="padding:12px 15px">'
+      +'<div style="display:flex;align-items:center;gap:9px;padding:10px 13px;border-radius:10px;'
+      +'background:'+(on?'#F0FDF4':(bloqueado?'#FEF2F2':'#FFFBEB'))+';border:1px solid '
+      +(on?'#BBF7D0':(bloqueado?'#FECACA':'#FDE68A'))+';margin-bottom:11px">'
+      +'<span style="font-size:20px">'+(on?'✅':(bloqueado?'🚫':'⚠️'))+'</span>'
+      +'<div style="font-size:12px;line-height:1.55;color:'+(on?'#166534':(bloqueado?'#991B1B':'#78350F'))+'">'
+      +(on ? '<b>Notificaciones activas.</b><br>Se encienden solas cada vez que abres el CRM. '
+             +'No hay que pulsar nada.'
+           : bloqueado ? '<b>El navegador las tiene bloqueadas.</b><br>Pulsa el candado que hay a la '
+             +'izquierda de la dirección, busca Notificaciones y ponlo en Permitir.'
+           : '<b>Falta dar permiso al navegador.</b><br>Pulsa el botón de abajo y acepta cuando pregunte.')
+      +'</div></div>';
+
+    h+='<div style="font-size:12px;color:#475569;line-height:1.8;margin-bottom:11px">'
+      +'Te avisa de: <b>cumpleaños</b> (el día y la víspera) · <b>pólizas por vencer</b> a 7 días · '
+      +'<b>cobros vencidos</b> · <b>tareas pasadas de fecha</b>.<br>'
+      +'<span style="color:#64748B;font-size:11px">Cada aviso se manda una vez al día como mucho, '
+      +'aunque recargues la página.</span></div>';
+
+    if(cuenta.cumpleHoy||cuenta.cumpleManana){
+      h+='<div style="background:#FDF2F8;border:1px solid #FBCFE8;border-radius:9px;padding:8px 12px;'
+        +'font-size:12px;color:#9D174D;margin-bottom:11px">🎂 '
+        +(cuenta.cumpleHoy?('<b>'+cuenta.cumpleHoy+'</b> cumple'+(cuenta.cumpleHoy>1?'n':'')+' hoy'):'')
+        +(cuenta.cumpleHoy&&cuenta.cumpleManana?' · ':'')
+        +(cuenta.cumpleManana?('<b>'+cuenta.cumpleManana+'</b> mañana'):'')+'</div>';
+    }
+
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    if(!on && !bloqueado)
+      h+='<button onclick="jacAvisosActivar()" style="padding:9px 16px;border-radius:9px;border:none;'
+        +'background:#15803D;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Dar permiso y activar</button>';
+    h+='<button onclick="jacAvisosProbar()" style="padding:9px 16px;border-radius:9px;'
+      +'border:1px solid #CBD5E1;background:#fff;font-size:12px;cursor:pointer">Probar ahora</button>'
+      +'</div><div id="jac-avisos-res" style="font-size:12px;color:#475569;margin-top:9px"></div>';
+
+    if(st.avisadosHoy&&st.avisadosHoy.length){
+      h+='<div style="font-size:11px;color:#94A3B8;margin-top:8px">Ya avisado hoy: '
+        +st.avisadosHoy.map(function(k){ return e(k); }).join(' · ')+'</div>';
+    }
+    h+='</div>';
+    if(d.innerHTML!==h) d.innerHTML=h;
+  }
+
+  window.jacAvisosActivar=async function(){
+    var o=document.getElementById('jac-avisos-res');
+    var r=await window.jacAvisosPedirPermiso();
+    if(o) o.innerHTML = (r==='ok')
+      ? '<span style="color:#15803D">Activadas ✓ — ya no hay que volver a pulsarlo.</span>'
+      : '<span style="color:#B91C1C">'+e(r)+'</span>';
+    setTimeout(tarjeta, 500);
+  };
+  window.jacAvisosProbar=function(){
+    var o=document.getElementById('jac-avisos-res');
+    if(!('Notification' in window) || Notification.permission!=='granted'){
+      if(o) o.innerHTML='<span style="color:#B91C1C">Falta el permiso del navegador.</span>'; return;
+    }
+    try{
+      new Notification('🔔 JAC Seguros', {body:'Las notificaciones funcionan. Esto es una prueba.',
+        icon:'https://crm.jacsegurospa.com/favicon.ico'});
+      var r=window.jacRevisarAvisos(true);
+      if(o) o.innerHTML='Prueba enviada. Pendientes ahora: '
+        +'🎂 '+r.cumplesHoy+' hoy / '+r.cumplesManana+' mañana · '
+        +'⚠️ '+r.vencen7+' por vencer · 💰 '+r.cobrosVencidos+' cobros · 📋 '+r.tareasVencidas+' tareas.';
+    }catch(x){ if(o) o.innerHTML='<span style="color:#B91C1C">'+e(x.message)+'</span>'; }
+    setTimeout(tarjeta, 900);
+  };
+
+  setTimeout(tarjeta, 3500);
+  setInterval(tarjeta, 8000);
+})();
+</script>
+
+
+<!-- bloque-panel-unico.html -->
+
+<script>
+/* ============================================================
+   JAC CRM — Un solo sitio para las herramientas
+   ------------------------------------------------------------
+   Le fui colgando botones a la página de Pólizas: duplicados,
+   WorldWide, comisiones, co-corretajes, pagos, Capital Care,
+   renovaciones. Siete chismes encima de la tabla que ella tiene
+   que mirar todos los días. Eso estorba y no es donde van.
+
+   Aquí se hacen dos cosas:
+
+   1. Se quitan de Pólizas. Todos. Y se mantienen quitados,
+      porque cada bloque los vuelve a poner cada pocos segundos.
+
+   2. Se juntan en UNA tarjeta en Configuración, y solo los que
+      de verdad hacen algo: si la función no existe o no tiene
+      nada pendiente que hacer, el botón no aparece.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* Lo que se quita de la página de Pólizas */
+  var FUERA=['jac-cc-chip','jac-btn-dup','jac-btn-ww','jac-btn-com','jac-btn-cocor',
+             'jac-btn-pag','jac-btn-cc59','jac-btn-ren','jac-btn-reportes','jac-btn-ccvig'];
+
+  /* Y en Configuración, el que no hace nada: "Ordenar tareas" llama a
+     jacOrdenarTareas, que no existe. Un botón que no hace nada es peor
+     que no tener botón. */
+  var MUERTOS=['jac-btn-tareas'];
+
+  function limpiar(){
+    FUERA.forEach(function(id){
+      var el=document.getElementById(id);
+      if(el && el.parentNode) el.parentNode.removeChild(el);
+    });
+    MUERTOS.forEach(function(id){
+      var el=document.getElementById(id);
+      if(el && el.parentNode) el.parentNode.removeChild(el);
+    });
+  }
+  limpiar();
+  setInterval(limpiar, 1500);
+
+  /* ---------- Las acciones, con su comprobación ---------- */
+  /* pendiente() devuelve null si no hay nada que hacer, o un texto
+     corto con lo que está pendiente. Si la función no existe, el
+     botón no se pinta: nada de botones que no hacen nada. */
+  var ACCIONES=[
+    { id:'ren', txt:'Cadenas de renovación', color:'#7C3AED', fn:'jacPanelRenovaciones',
+      pendiente:function(){ var r=window.jacCadenasRenovacion&&window.jacCadenasRenovacion();
+        return (r&&r.claras.length)?(r.claras.length+' cadenas · '+r.seQuitan+' pólizas repetidas'):null; } },
+    { id:'dup', txt:'Números duplicados', color:'#B45309', fn:'jacPanelDuplicados',
+      pendiente:function(){ var r=window.jacDuplicados&&window.jacDuplicados();
+        return (r&&r.totalGrupos)?(r.totalGrupos+' números repetidos'):null; } },
+    { id:'pag', txt:'Cuotas y cobros', color:'#0891B2', fn:'jacPagosAuditoria',
+      pendiente:function(){ var r=window.jacAuditarPagos&&window.jacAuditarPagos();
+        return (r&&r.cambian.length)?(r.cambian.length+' pólizas sin cuotas cuadradas'):null; } },
+    { id:'com', txt:'Comisiones por año de vigencia', color:'#15803D', fn:'jacComPanel',
+      pendiente:function(){ var r=window.jacComRevisar&&window.jacComRevisar();
+        return (r&&r.aplica.length)?(r.aplica.length+' comisiones a corregir'):null; } },
+    { id:'cocor', txt:'Co-corretajes — Capital Care y FF', color:'#0F766E', fn:'jacCoCorPanel',
+      pendiente:function(){
+        var a=(window.jacRepartosMal&&window.jacRepartosMal().length)||0;
+        var b=(window.jacGanchosSinInforme&&window.jacGanchosSinInforme().length)||0;
+        return (a+b)?((a?a+' repartos mal':'')+(a&&b?' · ':'')+(b?b+' ganchos de más':'')):null; } },
+    { id:'cc59', txt:'Informe de Capital Care', color:'#1D4ED8', fn:'jacPanelCC',
+      pendiente:function(){ var r=window.jacAuditarCC&&window.jacAuditarCC();
+        if(!r) return null;
+        var n=r.primas.length+r.ganchos.length;
+        return n?(n+' diferencias con el informe'):null; } },
+    { id:'ww', txt:'WorldWide Medical', color:'#B45309', fn:'jacWWPanel',
+      pendiente:function(){
+        if(typeof window.jacWWPrevio!=='function') return null;
+        var f=window.jacWWPrevio(); if(!f.length) return null;
+        var sin=f.filter(function(x){ return x.pctNuevo===null; }).length;
+        return sin?(sin+' sin porcentaje de comisión'):null; } }
+  ];
+
+  function tarjeta(){
+    var cont=document.getElementById('pg-cfg')||document.getElementById('pg-conf');
+    if(!cont) return;
+    var d=document.getElementById('jac-card-herr');
+    if(!d){
+      d=document.createElement('div');
+      d.className='card'; d.id='jac-card-herr'; d.style.marginTop='10px';
+      cont.appendChild(d);
+    }
+    var filas=[], nada=[];
+    ACCIONES.forEach(function(a){
+      if(typeof window[a.fn]!=='function') return;
+      var p=null;
+      try{ p=a.pendiente(); }catch(x){ return; }
+      if(p) filas.push({a:a, p:p}); else nada.push(a);
+    });
+
+    var h='<div class="ch"><h3>🧰 Mantenimiento de la cartera</h3>'
+      +'<small>Solo aparece lo que tiene algo pendiente</small></div>'
+      +'<div style="padding:12px 15px">';
+
+    if(!filas.length){
+      h+='<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:11px 13px;'
+        +'font-size:12px;color:#166534">Todo al día. No hay nada pendiente de revisar.</div>';
+    } else {
+      h+='<div style="font-size:12px;color:#475569;line-height:1.6;margin-bottom:11px">'
+        +'Cada uno abre su informe. Ninguno cambia nada sin que lo confirmes, y todos '
+        +'traen deshacer.</div>';
+      filas.forEach(function(f){
+        h+='<button type="button" onclick="'+f.a.fn+'()" '
+          +'style="display:block;width:100%;text-align:left;margin-bottom:7px;padding:10px 13px;'
+          +'border-radius:10px;border:1px solid #E2E8F0;background:#fff;cursor:pointer;'
+          +'border-left:4px solid '+f.a.color+'">'
+          +'<div style="font-size:13px;font-weight:700;color:#1E293B">'+f.a.txt+'</div>'
+          +'<div style="font-size:11px;color:'+f.a.color+';margin-top:2px">'+f.p+'</div>'
+          +'</button>';
+      });
+    }
+    if(nada.length){
+      h+='<div style="font-size:11px;color:#94A3B8;margin-top:9px;line-height:1.6">'
+        +'Sin nada pendiente: '+nada.map(function(a){ return a.txt; }).join(' · ')+'</div>';
+    }
+    h+='</div>';
+    if(d.innerHTML!==h) d.innerHTML=h;
+  }
+
+  setTimeout(tarjeta, 3000);
+  setInterval(tarjeta, 6000);
+  window.jacHerramientas=tarjeta;
 })();
 </script>
 
