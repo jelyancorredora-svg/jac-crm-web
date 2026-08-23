@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-BC';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-BD';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -26840,6 +26840,541 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   else arrancar();
   var n=0;
   (function reintentar(){ try{ arrancar(); }catch(e){} if(++n<10) setTimeout(reintentar, 1000); })();
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - Pagos: la frecuencia real de cada poliza
+   ------------------------------------------------------------
+   EL PROBLEMA, CON NUMEROS DE SU PROPIA CARTERA
+
+   De 325 polizas vigentes:
+     · 180 dicen MENSUAL ... pero 91 de ellas traen numPagos = 1.
+       Con un solo pago, la cuota sale prima entre 1, o sea la
+       prima entera del ano. Por eso una poliza que se paga cada
+       mes aparecia en pantalla como si fuera un pago anual.
+     ·  48 dicen ANUAL o CONTADO. Esas si son de un solo pago.
+     ·  39 dicen FRACCIONADO pero no dicen cada cuanto.
+     ·  58 no traen ni forma de pago ni periodo.
+
+   Lo que ella ve como "anual" son sobre todo esas 91: el propio
+   registro se contradice, dice mensual y a la vez un solo pago.
+
+   ------------------------------------------------------------
+   POR QUE SEGUIA MAL SI YA ESTABA ESCRITO
+
+   El motor que calcula las frecuencias ya existia, pero vivia
+   detras de un boton "Aplicar" que habia que ir a pulsar. La
+   herramienta estaba corregida; los datos no. Esto lo corre solo.
+
+   ------------------------------------------------------------
+   QUE HACE, Y QUE NO HACE
+
+   HACE, solo: pone en cada poliza su frecuencia (Mensual,
+   Trimestral, Semestral o Anual), el numero de cuotas y el valor
+   de la cuota. Es informacion sobre como se paga, no es un cobro:
+   se puede recalcular las veces que haga falta sin romper nada.
+
+   NO HACE solo: crear ni borrar cobros. Eso sigue detras del
+   boton del panel, a proposito: si se regeneraran solos, cada
+   recarga borraria los cobros que ella haya marcado a mano.
+
+   COMO DECIDE LA FRECUENCIA
+     1. Lo que diga el periodo de la poliza.
+     2. Si no, lo que diga la forma de pago.
+     3. Si no, el numero de pagos cuando es creible (12, 4, 2).
+     4. "Fraccionado" sin frecuencia: se paga a plazos, eso es
+        seguro, asi que anual queda descartado. Se toma mensual,
+        que es la mayoria de su cartera, y queda MARCADA COMO
+        SUPUESTA para que la revise.
+     5. Sin ningun dato: no se inventa. Se deja como esta y sale
+        en la lista de las que hay que revisar.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function E(){
+    try{ if(window.S && window.S.polizas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v&&v.polizas) return v; }catch(e){}
+    return null;
+  }
+  function n(x){ var v=parseFloat(x); return isFinite(v)?v:0; }
+  function U(x){ return String(x==null?'':x).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
+  function esISO(x){ return /^\d{4}-\d{2}-\d{2}$/.test(String(x||'')); }
+
+  var TABLA=[
+    [/MENSUAL|MENSUALES|\bMES\b/, 12, 'Mensual'],
+    [/TRIMESTRAL|TRIMESTRE/,       4, 'Trimestral'],
+    [/SEMESTRAL|SEMESTRE/,         2, 'Semestral'],
+    [/ANUAL|CONTADO|ANUALIDAD/,    1, 'Anual']
+  ];
+  function leer(txt){
+    var t=U(txt); if(!t) return null;
+    for(var i=0;i<TABLA.length;i++) if(TABLA[i][0].test(t)) return {nc:TABLA[i][1], et:TABLA[i][2]};
+    return null;
+  }
+
+  /* La frecuencia de una poliza. Devuelve null cuando no hay
+     absolutamente nada en que apoyarse: preferimos no saber a
+     inventar. */
+  window.jacFrecuenciaReal=function(p){
+    var r=leer(p.periodo);
+    if(r) return {nc:r.nc, et:r.et, supuesta:false, motivo:'lo dice el periodo'};
+    r=leer(p.formaPago);
+    if(r) return {nc:r.nc, et:r.et, supuesta:false, motivo:'lo dice la forma de pago'};
+
+    var np=parseInt(p.numPagos,10);
+    if(np===12) return {nc:12, et:'Mensual',    supuesta:false, motivo:'12 pagos'};
+    if(np===4)  return {nc:4,  et:'Trimestral', supuesta:false, motivo:'4 pagos'};
+    if(np===2)  return {nc:2,  et:'Semestral',  supuesta:false, motivo:'2 pagos'};
+
+    if(U(p.formaPago).indexOf('FRACCION')===0)
+      return {nc:12, et:'Mensual', supuesta:true, motivo:'fraccionado sin frecuencia'};
+
+    return null;
+  };
+
+  /* La base sobre la que se reparte: el total con impuesto es lo
+     que el cliente realmente paga. Si no hay total, la prima. */
+  function baseDe(p){
+    var t=n(p.total); if(t>0) return t;
+    return n(p.prima);
+  }
+
+  window.jacCuotaDe=function(p){
+    var f=window.jacFrecuenciaReal(p);
+    if(!f) return null;
+    var base=baseDe(p);
+    if(!(base>0)) return null;
+    return { frec:f, nc:f.nc, cuota:+(base/f.nc).toFixed(2), base:base };
+  };
+
+  /* ---------- la revision, sin escribir ---------- */
+  window.jacRevisarFrecuencias=function(){
+    var st=E(); if(!st) return null;
+    var arreglar=[], supuestas=[], sinDato=[], yaBien=0, conteo={};
+    (st.polizas||[]).forEach(function(p){
+      var est=String(p.estado||'');
+      if(est==='Cancelada'||est==='Anulada') return;
+      var c=window.jacCuotaDe(p);
+      if(!c){
+        sinDato.push({ref:p, num:p.num||'(sin numero)', cli:p.nombreCliente||'',
+                      aseg:p.aseg||'', base:baseDe(p)});
+        return;
+      }
+      conteo[c.frec.et]=(conteo[c.frec.et]||0)+1;
+      var npActual=parseInt(p.numPagos,10)||0;
+      var lpActual=n(p.letraPrima);
+      var mal = (npActual!==c.nc) || (Math.abs(lpActual-c.cuota)>=0.01)
+                || (U(p.periodo)!==U(c.frec.et));
+      if(mal){
+        arreglar.push({ref:p, num:p.num||'(sin numero)', cli:p.nombreCliente||'',
+          aseg:p.aseg||'', ramo:p.ramo||'', base:c.base,
+          deA:c.frec.et, nc:c.nc, cuota:c.cuota, supuesta:c.frec.supuesta,
+          motivo:c.frec.motivo,
+          antesPer:p.periodo||'(vacio)', antesNp:npActual, antesLp:lpActual});
+      } else yaBien++;
+      if(c.frec.supuesta) supuestas.push({ref:p, num:p.num||'(sin numero)',
+        cli:p.nombreCliente||'', aseg:p.aseg||'', cuota:c.cuota, motivo:c.frec.motivo});
+    });
+    return {arreglar:arreglar, supuestas:supuestas, sinDato:sinDato,
+            yaBien:yaBien, conteo:conteo};
+  };
+
+  /* ---------- aplicar: solo la frecuencia, nunca los cobros ---------- */
+  window.jacAplicarFrecuencias=function(opts){
+    opts=opts||{};
+    var st=E(); if(!st) return {ok:false, motivo:'sin datos'};
+    var r=window.jacRevisarFrecuencias();
+    if(!r) return {ok:false, motivo:'sin datos'};
+    var n0=0;
+    r.arreglar.forEach(function(a){
+      var p=a.ref;                       /* referencia directa, nunca por id */
+      p.extra=p.extra||{};
+      if(!p.extra.frecPrevio)
+        p.extra.frecPrevio={ periodo:p.periodo, formaPago:p.formaPago,
+                             numPagos:p.numPagos, letraPrima:p.letraPrima };
+      p.periodo=a.deA;
+      /* la forma de pago solo se toca si estaba vacia o decia
+         "Fraccionado": si ella escribio algo, se respeta */
+      var fp=U(p.formaPago);
+      if(!fp || fp.indexOf('FRACCION')===0) p.formaPago=a.deA;
+      p.numPagos=a.nc;
+      p.letraPrima=a.cuota;
+      p.cuotaMensual    = a.nc===12 ? a.cuota : +(a.base/12).toFixed(2);
+      p.cuotaTrimestral = a.nc===4  ? a.cuota : +(a.base/4).toFixed(2);
+      p.cuotaSemestral  = a.nc===2  ? a.cuota : +(a.base/2).toFixed(2);
+      p.cuotaAnual      = +a.base.toFixed(2);
+      p.extra.frecuencia={ etiqueta:a.deA, cuotas:a.nc, cuota:a.cuota,
+        supuesta:a.supuesta, motivo:a.motivo,
+        calculado:new Date().toISOString().slice(0,10) };
+      n0++;
+    });
+    if(n0){
+      window.__jacSucio=true;
+      try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      if(!opts.sinSubir && typeof window.jacGuardarYa==='function'){
+        try{ window.jacGuardarYa({silencioso:true}); }catch(e){}
+      }
+      ['RPag','RP','calcKPIs','renderKPIs'].forEach(function(fn){
+        try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} });
+    }
+    return {ok:true, corregidas:n0, supuestas:r.supuestas.length,
+            sinDato:r.sinDato.length, yaBien:r.yaBien, conteo:r.conteo};
+  };
+
+  window.jacDeshacerFrecuencias=function(){
+    var st=E(); if(!st) return {ok:false};
+    var n0=0;
+    (st.polizas||[]).forEach(function(p){
+      if(!p.extra || !p.extra.frecPrevio) return;
+      var v=p.extra.frecPrevio;
+      p.periodo=v.periodo; p.formaPago=v.formaPago;
+      p.numPagos=v.numPagos; p.letraPrima=v.letraPrima;
+      delete p.extra.frecPrevio; delete p.extra.frecuencia;
+      n0++;
+    });
+    if(n0){
+      window.__jacSucio=true;
+      try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      if(typeof window.jacGuardarYa==='function'){ try{ window.jacGuardarYa({silencioso:true}); }catch(e){} }
+      ['RPag','RP'].forEach(function(fn){ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} });
+    }
+    return {ok:true, revertidas:n0};
+  };
+
+  /* ---------- que corra solo ---------- */
+  var yaCorrio=false;
+  function auto(){
+    if(yaCorrio) return;
+    var st=E();
+    if(!st || !(st.polizas||[]).length) return;   /* aun no han bajado los datos */
+    var r=window.jacRevisarFrecuencias();
+    if(!r) return;
+    yaCorrio=true;
+    if(!r.arreglar.length) return;
+    var res=window.jacAplicarFrecuencias();
+    window.__jacFrecUltimo=res;
+    if(res.corregidas && typeof toast==='function'){
+      var d=Object.keys(res.conteo).map(function(k){ return res.conteo[k]+' '+k.toLowerCase(); }).join(', ');
+      toast('Frecuencia de pago corregida en '+res.corregidas+' pólizas ('+d+')','ok');
+    }
+  }
+  window.jacFrecuenciaAuto=auto;
+
+  /* se intenta hasta que los datos esten cargados */
+  var t=0;
+  (function esperar(){
+    try{ auto(); }catch(e){}
+    if(!yaCorrio && ++t<40) setTimeout(esperar, 1500);
+  })();
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM - La tabla "Cuotas Pendientes", diciendo la verdad
+   ------------------------------------------------------------
+   La tabla vieja tenia dos defectos que hacian que no cuadrara
+   con la realidad, por encima del lio de los datos:
+
+     · La columna "Período" ponia SIEMPRE el mes en curso, para
+       todas las polizas por igual. Una poliza semestral aparecia
+       igual que una mensual.
+     · La columna "Prima" ponia la letra si existia y, si no, la
+       PRIMA ENTERA. Ese era el segundo sitio por donde una
+       poliza mensual se veia como anual.
+     · El estado decia "Pendiente" todos los meses aunque a esa
+       poliza no le tocara pagar ese mes.
+
+   Ahora cada fila dice: cual es la cuota, cada cuanto se paga,
+   por cual cuota va y cuando vence la proxima de verdad.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function E(){
+    try{ if(window.S && window.S.polizas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v&&v.polizas) return v; }catch(e){}
+    return null;
+  }
+  function n(x){ var v=parseFloat(x); return isFinite(v)?v:0; }
+  function esc2(s){ return (typeof esc==='function') ? esc(s) :
+    String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function money(v){ return (typeof fmtM==='function') ? fmtM(v) :
+    ('$'+(n(v)).toFixed(2)); }
+  function fecha(f){ return (typeof fmt==='function') ? fmt(f) : (f||'—'); }
+  function esISO(x){ return /^\d{4}-\d{2}-\d{2}$/.test(String(x||'')); }
+
+  function masMeses(iso, m){
+    if(!esISO(iso)) return null;
+    var a=+iso.slice(0,4), me=+iso.slice(5,7)-1, di=+iso.slice(8,10);
+    var d=new Date(a, me+m, 1);
+    var ultimo=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+    d.setDate(Math.min(di, ultimo));
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function hoyISO(){ var d=new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+  /* el calendario de una poliza, cuota a cuota */
+  window.jacCalendarioDe=function(p){
+    var c=(typeof window.jacCuotaDe==='function') ? window.jacCuotaDe(p) : null;
+    if(!c || !esISO(p.fechaInicio)) return null;
+    var paso=12/c.nc, H=hoyISO(), lista=[];
+    for(var k=0;k<c.nc;k++){
+      var v=masMeses(p.fechaInicio, Math.round(paso*k));
+      if(!v) break;
+      if(esISO(p.fechaFin) && v>p.fechaFin) break;
+      lista.push({k:k+1, vence:v, monto:c.cuota, vencida:v<=H});
+    }
+    if(!lista.length) return null;
+    /* el redondeo se ajusta en la ultima para que sumen el total */
+    var suma=lista.reduce(function(s,x){ return s+x.monto; },0);
+    var dif=+(c.base-suma).toFixed(2);
+    if(lista.length===c.nc && Math.abs(dif)>=0.01)
+      lista[lista.length-1].monto=+(lista[lista.length-1].monto+dif).toFixed(2);
+
+    var pagadas=(E().pagos||[]).filter(function(g){
+      return g.polizaId===p.id && String(g.estado||'')==='Pagado';
+    }).length;
+    var prox=null;
+    for(var i=0;i<lista.length;i++){ if(i>=pagadas){ prox=lista[i]; break; } }
+    return { frec:c.frec, nc:c.nc, cuota:c.cuota, base:c.base,
+             cuotas:lista, pagadas:Math.min(pagadas, lista.length), prox:prox };
+  };
+
+  function pintar(){
+    var el=document.getElementById('tpp');
+    if(!el) return;
+    var st=E(); if(!st) return;
+    var H=hoyISO();
+
+    var pols=(st.polizas||[]).filter(function(p){
+      var e=String(p.estado||'');
+      if(e==='Cancelada'||e==='Anulada') return false;
+      return n(p.total)>0 || n(p.prima)>0 || n(p.letraPrima)>0;
+    }).sort(function(a,b){
+      return String(a.nombreCliente||'').localeCompare(String(b.nombreCliente||''));
+    });
+
+    if(!pols.length){
+      el.innerHTML='<tr><td colspan="9" style="text-align:center;padding:24px;color:#888">'
+        +'Sin pólizas con prima registrada.</td></tr>';
+      return;
+    }
+
+    var filas=pols.map(function(p){
+      var cli=(typeof GC==='function' ? GC(p.clienteId) : null)||{};
+      var tel=String(cli.cel||cli.tel||p.celCliente||'').replace(/[^0-9]/g,'');
+      var nombre=p.nombreCliente||cli.nombre||'';
+      var ced=cli.cedula||p.docAsegurado||'';
+      var cal=window.jacCalendarioDe(p);
+
+      var cuotaTxt, perTxt, venceTxt, estTxt, estCol, orden;
+      if(cal){
+        cuotaTxt='<div style="font-weight:700;color:var(--ac)">'+money(cal.cuota)+'</div>'
+                +'<div style="font-size:10px;color:var(--mu)">de '+money(cal.base)+'</div>';
+        var etq=cal.frec.et+(cal.frec.supuesta?' <span title="supuesta: la póliza no dice cada cuánto se paga" style="color:#D97706">(por confirmar)</span>':'');
+        perTxt='<div style="font-weight:600;color:#7C3AED">'+etq+'</div>'
+              +'<div style="font-size:10px;color:var(--mu)">cuota '
+              +Math.min(cal.pagadas+1, cal.nc)+' de '+cal.nc+'</div>';
+        if(cal.prox){
+          venceTxt='<div>'+fecha(cal.prox.vence)+'</div>';
+          if(cal.prox.vence<=H){
+            var dias=Math.round((new Date(H)-new Date(cal.prox.vence))/86400000);
+            estTxt='Vencida'+(dias>0?' ('+dias+' d)':''); estCol='#DC2626'; orden=0;
+            venceTxt+='<div style="font-size:10px;color:#DC2626">atrasada</div>';
+          } else { estTxt='Al día'; estCol='#16A34A'; orden=2; }
+        } else { venceTxt='<span style="color:var(--mu)">—</span>';
+                 estTxt='Completa'; estCol='#16A34A'; orden=3; }
+      } else {
+        cuotaTxt='<div style="color:var(--mu)">—</div>';
+        perTxt='<div style="color:#D97706;font-weight:600">Sin definir</div>'
+              +'<div style="font-size:10px;color:var(--mu)">falta forma de pago o fecha de inicio</div>';
+        venceTxt='<span style="color:var(--mu)">—</span>';
+        estTxt='Revisar'; estCol='#D97706'; orden=1;
+      }
+
+      var msg='Estimado/a '+nombre+', le recordamos el cobro de su póliza '+(p.num||'')
+             +' ('+(p.aseg||'')+')'
+             +(cal?', cuota '+money(cal.cuota)+' '+cal.frec.et.toLowerCase()
+                   +(cal.prox?', con vencimiento '+cal.prox.vence:'') : '')+'.';
+      var wa=tel?('https://wa.me/507'+tel+'?text='+encodeURIComponent(msg)):'';
+
+      var html='<tr>'
+        +'<td><div style="font-weight:600;line-height:1.4">'+esc2(nombre)+'</div>'
+        +(ced?'<div style="font-size:11px;color:var(--mu)">'+esc2(ced)+'</div>':'')
+        +(tel?'<div style="font-size:11px;color:var(--mu)">'+tel+'</div>':'')+'</td>'
+        +'<td style="font-family:monospace;font-size:12px;font-weight:600">'+esc2(p.num||'—')+'</td>'
+        +'<td style="font-size:12px">'+esc2(p.aseg||'—')+'</td>'
+        +'<td style="font-size:12px">'+esc2(p.ramo||'—')+'</td>'
+        +'<td>'+cuotaTxt+'</td>'
+        +'<td>'+perTxt+'</td>'
+        +'<td style="font-size:11px">'+venceTxt+'</td>'
+        +'<td>'+(wa?'<a href="'+wa+'" target="_blank" class="btn bsm" style="background:#25d366;color:#fff;border-color:#25d366;font-size:11px">WA</a>'
+                   :'<span style="color:#bbb;font-size:10px">Sin tel</span>')+'</td>'
+        +'<td><span style="color:'+estCol+';font-weight:700">'+estTxt+'</span>'
+        +' <button class="btn bsm bgn" style="font-size:10px" onclick="OPag()">+ Cobro</button></td>'
+        +'</tr>';
+      return {orden:orden, html:html};
+    });
+
+    /* primero lo que esta atrasado, luego lo que hay que revisar */
+    filas.sort(function(a,b){ return a.orden-b.orden; });
+    el.innerHTML=filas.map(function(f){ return f.html; }).join('');
+
+    var sub=document.getElementById('pagsub');
+    if(sub){
+      var venc=filas.filter(function(f){ return f.orden===0; }).length;
+      var rev =filas.filter(function(f){ return f.orden===1; }).length;
+      sub.textContent=(st.pagos||[]).length+' pagos · '+venc+' cuotas atrasadas'
+                     +(rev?' · '+rev+' pólizas por revisar':'');
+    }
+  }
+  window.jacPintarCuotas=pintar;
+
+  function envolver(){
+    if(typeof window.RTpp!=='function' || window.RTpp.__jacFrec) return false;
+    var nueva=function(){ try{ pintar(); }catch(e){ try{ console.warn('[cuotas]',e); }catch(x){} } };
+    nueva.__jacFrec=1;
+    window.RTpp=nueva;
+    return true;
+  }
+  var t=0;
+  (function reintentar(){
+    envolver();
+    if(++t<15) setTimeout(reintentar, 1000);
+  })();
+  setTimeout(function(){ try{ if(typeof RPag==='function') RPag(); }catch(e){} }, 4000);
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   JAC CRM - Boton de eliminar en Prospectos
+   ------------------------------------------------------------
+   Prospectos tiene dos vistas: tabla y tablero (kanban). La de
+   tabla YA traia su boton de borrar; la de tablero no, y es la
+   que suele estar abierta. Por eso parecia que no existia.
+
+   Aqui se le pone el boton a las tarjetas del tablero, igual que
+   se hizo en el Pipeline.
+
+   Ademas se corrige el borrado en si: DPros solo repintaba la
+   lista de Prospectos, asi que el prospecto borrado seguia
+   viendose en el Pipeline y en Venta Cruzada hasta recargar.
+   Ahora repinta las tres y marca el CRM para que suba el cambio.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function E(){
+    try{ if(window.S && window.S.prospectos) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v&&v.prospectos) return v; }catch(e){}
+    return null;
+  }
+
+  window.jacProsEliminar=function(id){
+    var st=E(); if(!st) return;
+    var p=null, lista=st.prospectos||[];
+    for(var i=0;i<lista.length;i++){ if(String(lista[i].id)===String(id)){ p=lista[i]; break; } }
+    if(!p){ if(typeof toast==='function') toast('No se encontró el prospecto','err'); return; }
+    var nom=p.nombre||'este prospecto';
+
+    function hazlo(){
+      var idx=st.prospectos.indexOf(p);   /* por referencia, no por id */
+      if(idx<0) return;
+      st.prospectos.splice(idx,1);
+      window.__jacSucio=true;
+      try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      if(typeof window.jacGuardarYa==='function'){ try{ window.jacGuardarYa({silencioso:true}); }catch(e){} }
+      ['RPros','RPipe','RVC'].forEach(function(fn){
+        try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} });
+      if(typeof toast==='function') toast('Prospecto eliminado','ok');
+    }
+
+    if(typeof confirm2==='function') confirm2('¿Eliminar "'+nom+'"?', hazlo);
+    else if(window.confirm('¿Eliminar "'+nom+'"?')) hazlo();
+  };
+
+  /* el DPros del nucleo solo repintaba Prospectos */
+  function envolverDPros(){
+    if(typeof window.DPros!=='function' || window.DPros.__jacDel) return false;
+    var nueva=function(id){ window.jacProsEliminar(id); };
+    nueva.__jacDel=1;
+    window.DPros=nueva;
+    return true;
+  }
+
+  function sacarId(card){
+    if(card.__jacPid) return card.__jacPid;
+    var m=(card.getAttribute('ondragstart')||'').match(/prosDragStart\s*\(\s*event\s*,\s*'([^']*)'/);
+    if(!m) m=(card.getAttribute('onclick')||'').match(/showProsDP\s*\(\s*'([^']*)'/);
+    return m?(card.__jacPid=m[1]):null;
+  }
+
+  function poner(){
+    var vista=document.getElementById('pros-view');
+    if(!vista) return;
+    var cards=vista.querySelectorAll('.pcard');
+    for(var i=0;i<cards.length;i++){
+      var c=cards[i];
+      if(c.querySelector('.jac-pros-del')) continue;
+      var id=sacarId(c);
+      if(!id) continue;
+      var fila=null;
+      for(var j=c.children.length-1;j>=0;j--){
+        if(c.children[j].querySelector && c.children[j].querySelector('button,a')){ fila=c.children[j]; break; }
+      }
+      if(!fila){
+        fila=document.createElement('div');
+        fila.style.cssText='display:flex;gap:3px;margin-top:4px;flex-wrap:wrap';
+        fila.setAttribute('onclick','event.stopPropagation()');
+        c.appendChild(fila);
+      }
+      var b=document.createElement('button');
+      b.className='btn bsm bic jac-pros-del';
+      b.title='Eliminar prospecto';
+      b.textContent='🗑';
+      b.style.cssText='background:#FEE2E2;color:#B91C1C;border-color:#FCA5A5;margin-left:auto';
+      b.setAttribute('data-pid', id);
+      b.onclick=function(ev){
+        ev.stopPropagation(); ev.preventDefault();
+        window.jacProsEliminar(this.getAttribute('data-pid'));
+      };
+      fila.appendChild(b);
+    }
+  }
+  window.jacProsBotones=poner;
+
+  function arrancar(){
+    envolverDPros();
+    try{ poner(); }catch(e){}
+    if(typeof window.renderProsK==='function' && !window.renderProsK.__jacDel){
+      var orig=window.renderProsK;
+      var nueva=function(){
+        var r=orig.apply(this, arguments);
+        setTimeout(function(){ try{ poner(); }catch(e){} }, 0);
+        return r;
+      };
+      nueva.__jacDel=1;
+      window.renderProsK=nueva;
+    }
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arrancar);
+  else arrancar();
+  var n=0;
+  (function reintentar(){ try{ arrancar(); }catch(e){} if(++n<10) setTimeout(reintentar, 1000); })();
+  setInterval(function(){
+    var pg=document.getElementById('pg-pros');
+    if(pg && pg.classList.contains('on')){ try{ poner(); }catch(e){} }
+  }, 2000);
 })();
 </script>
 
