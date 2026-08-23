@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-BB';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-BC';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -26574,6 +26574,272 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     var m=document.getElementById('mp');
     if(m && m.style.display!=='none' && m.className.indexOf('on')>=0){ try{ refrescar(); }catch(e){} }
   }, 2500);
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - Modulo CARTERA
+   ------------------------------------------------------------
+   Junta en un solo sitio las tres pantallas que siempre se
+   miran juntas: Pagos, Comisiones y Renovaciones.
+
+   COMO SE HIZO, Y POR QUE ASI
+
+   No se copio ni se reescribio ninguna de las tres pantallas.
+   Se MUEVEN las que ya existen (#pg-pag, #pg-com, #pg-ren)
+   dentro de Cartera y se muestran por pestanas. Asi:
+
+     · siguen siendo las mismas, con sus mismos botones y sus
+       mismas funciones (RPag, RCom, RRen). Nada que funcionaba
+       deja de funcionar.
+     · no hay dos versiones de lo mismo que despues se
+       descuadren entre si.
+
+   Ademas #pg-com vivia colgado del BODY y no dentro del marco
+   del contenido, que es el mismo defecto que tenia Reportes y
+   que le dejaba espacio muerto. Al meterlo en Cartera queda
+   dentro del marco y ese hueco desaparece.
+
+   Todo lo que antes llevaba a Pagos, Comisiones o Renovaciones
+   (el menu de arriba, el de abajo en el telefono, los atajos
+   del Dashboard) ahora abre Cartera en la pestana que toca.
+   Ningun enlace queda muerto.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var TABS=[
+    {id:'pag', pg:'pg-pag', et:'💳 Pagos',        fn:'RPag'},
+    {id:'com', pg:'pg-com', et:'💰 Comisiones',   fn:'RCom'},
+    {id:'ren', pg:'pg-ren', et:'🔔 Renovaciones', fn:'RRen'}
+  ];
+  var LLAVE='jacCarteraTab';
+
+  function guardado(){
+    try{ var v=localStorage.getItem(LLAVE); if(v&&TABS.some(function(t){return t.id===v;})) return v; }catch(e){}
+    return 'pag';
+  }
+  function guardar(id){ try{ localStorage.setItem(LLAVE,id); }catch(e){} }
+
+  /* ---------- estilos ---------- */
+  function estilos(){
+    if(document.getElementById('jac-cartera-css')) return;
+    var s=document.createElement('style');
+    s.id='jac-cartera-css';
+    s.textContent=
+      '#pg-cartera .jac-cart-bar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}'+
+      '#pg-cartera .jac-cart-tab{border:1px solid var(--bd,#E2E8F0);background:#fff;color:#334155;'+
+        'border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;'+
+        'transition:all .15s;white-space:nowrap;line-height:1.2}'+
+      '#pg-cartera .jac-cart-tab:hover{border-color:#7C3AED;color:#7C3AED}'+
+      '#pg-cartera .jac-cart-tab.on{background:linear-gradient(135deg,#7C3AED,#1D4ED8);'+
+        'color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(124,58,237,.28)}'+
+      '#pg-cartera .jac-cart-tab .n{display:inline-block;margin-left:6px;background:rgba(0,0,0,.08);'+
+        'border-radius:9px;padding:1px 7px;font-size:11px;font-weight:800}'+
+      '#pg-cartera .jac-cart-tab.on .n{background:rgba(255,255,255,.22)}'+
+      /* las pantallas adoptadas: mandan estas reglas, no la clase "on" */
+      '#jac-cart-host > .pg{display:none!important}'+
+      '#jac-cart-host > .pg.jac-cart-viva{display:block!important}'+
+      '#jac-cart-host > .pg{background:transparent!important;padding:0!important;margin:0!important}'+
+      '#pg-cartera{padding-bottom:20px}';
+    document.head.appendChild(s);
+  }
+
+  /* ---------- la pantalla ---------- */
+  function crear(){
+    if(document.getElementById('pg-cartera')) return document.getElementById('pg-cartera');
+    var main=document.getElementById('mainc');
+    if(!main) return null;
+    var pg=document.createElement('div');
+    pg.className='pg';
+    pg.id='pg-cartera';
+    pg.innerHTML=
+      '<div class="ph"><div><h2>💼 Cartera</h2>'+
+      '<small id="jac-cart-sub">Pagos, comisiones y renovaciones en un solo sitio</small></div></div>'+
+      '<div class="jac-cart-bar" id="jac-cart-bar"></div>'+
+      '<div id="jac-cart-host"></div>';
+    main.appendChild(pg);
+    return pg;
+  }
+
+  /* ---------- contadores de cada pestana ---------- */
+  function E(){
+    try{ if(window.S && window.S.polizas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v) return v; }catch(e){}
+    return null;
+  }
+  function conteos(){
+    var st=E(); var o={pag:'',com:'',ren:''};
+    if(!st) return o;
+    try{
+      var pend=(st.pagos||[]).filter(function(p){
+        var e=String(p.estado||'').toLowerCase();
+        return e!=='pagado' && e!=='cobrado' && e!=='anulado';
+      }).length;
+      if(pend) o.pag=String(pend);
+    }catch(e){}
+    try{
+      var cp=(st.comisiones||[]).filter(function(c){
+        return String(c.estado||'').toLowerCase()==='pendiente';
+      }).length;
+      if(cp) o.com=String(cp);
+    }catch(e){}
+    try{
+      var hoy=new Date(), lim=new Date(); lim.setDate(lim.getDate()+60);
+      var rn=(st.polizas||[]).filter(function(p){
+        if(String(p.estado||'')==='Cancelada') return false;
+        if(!p.fechaFin) return false;
+        var f=new Date(p.fechaFin+'T00:00:00');
+        return f>=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()) && f<=lim;
+      }).length;
+      if(rn) o.ren=String(rn);
+    }catch(e){}
+    return o;
+  }
+
+  function pintarBarra(activa){
+    var bar=document.getElementById('jac-cart-bar');
+    if(!bar) return;
+    var c=conteos();
+    var h='';
+    TABS.forEach(function(t){
+      h+='<button type="button" class="jac-cart-tab'+(t.id===activa?' on':'')+'" '+
+         'data-tab="'+t.id+'">'+t.et+(c[t.id]?'<span class="n">'+c[t.id]+'</span>':'')+'</button>';
+    });
+    bar.innerHTML=h;
+    [].forEach.call(bar.querySelectorAll('.jac-cart-tab'), function(b){
+      b.onclick=function(){ abrir(this.getAttribute('data-tab')); };
+    });
+  }
+
+  /* ---------- mover las tres pantallas adentro ---------- */
+  function adoptar(){
+    var host=document.getElementById('jac-cart-host');
+    if(!host) return;
+    TABS.forEach(function(t){
+      var pg=document.getElementById(t.pg);
+      if(pg && pg.parentElement!==host) host.appendChild(pg);
+    });
+  }
+
+  var ACTIVA=null;
+
+  function abrir(id){
+    if(!TABS.some(function(t){return t.id===id;})) id=guardado();
+    estilos(); crear(); adoptar();
+    var host=document.getElementById('jac-cart-host');
+    if(!host) return;
+    ACTIVA=id; guardar(id);
+    TABS.forEach(function(t){
+      var pg=document.getElementById(t.pg);
+      if(!pg) return;
+      if(t.id===id){
+        pg.classList.add('jac-cart-viva');
+        /* tambien la clase "on": hay codigo del CRM que pregunta por
+           ella para saber si la pantalla esta a la vista (el panel de
+           "Por cobrar al cliente", por ejemplo, se refresca solo si la
+           encuentra). Sin esto ese panel no aparecia dentro de Cartera. */
+        pg.classList.add('on');
+      } else {
+        pg.classList.remove('jac-cart-viva');
+        pg.classList.remove('on');
+      }
+    });
+    pintarBarra(id);
+    var t=TABS.filter(function(x){return x.id===id;})[0];
+    if(t && typeof window[t.fn]==='function'){
+      try{ window[t.fn](); }catch(e){ try{ console.warn('[cartera]',t.fn,e); }catch(x){} }
+    }
+    /* los pintores extra que antes colgaban de SH('pag') y SH('com') */
+    if(id==='pag' && typeof window.jacPagosPanel==='function'){
+      try{ window.jacPagosPanel(); }catch(e){}
+      setTimeout(function(){ try{ window.jacPagosPanel(); }catch(e){} }, 120);
+    }
+    if(id==='com' && typeof window.renderCom==='function'){
+      try{ window.renderCom(); }catch(e){}
+      setTimeout(function(){ try{ window.renderCom(); }catch(e){} }, 120);
+    }
+  }
+  window.jacCarteraAbrir=abrir;
+  window.jacCarteraActiva=function(){ return ACTIVA||guardado(); };
+  window.jacCarteraRefrescar=function(){
+    var pg=document.getElementById('pg-cartera');
+    if(!pg || !pg.classList.contains('on')) return false;
+    abrir(ACTIVA||guardado());
+    return true;
+  };
+
+  /* ---------- el menu ---------- */
+  function menu(){
+    var nav=document.querySelector('nav');
+    if(!nav || nav.querySelector('[data-jac-cartera]')) return;
+    var enlaces=[].slice.call(nav.querySelectorAll('a'));
+    var pag=null, quitar=[];
+    enlaces.forEach(function(a){
+      var oc=a.getAttribute('onclick')||'';
+      if(/SH\('pag'\)/.test(oc)){ pag=a; quitar.push(a); }
+      else if(/SH\('ren'\)/.test(oc)) quitar.push(a);
+      else if(/SH\('com'\)/.test(oc) && !/SH\('rep'\)/.test(oc)) quitar.push(a);
+      else if(/SH\('com'\)/.test(oc) && /SH\('rep'\)/.test(oc)){
+        /* Comisiones y Reportes comparten renglon: se deja solo Reportes */
+        var rep=a.querySelector("[onclick*=\"'rep'\"]");
+        if(rep){ a.removeAttribute('onclick'); a.innerHTML=''; a.appendChild(rep); a.className=''; }
+        else quitar.push(a);
+      }
+    });
+    var nuevo=document.createElement('a');
+    nuevo.setAttribute('data-jac-cartera','1');
+    nuevo.setAttribute('onclick',"SH('cartera')");
+    nuevo.textContent='💼 Cartera';
+    if(pag && pag.parentElement) pag.parentElement.insertBefore(nuevo, pag);
+    else nav.appendChild(nuevo);
+    quitar.forEach(function(a){ if(a.parentElement) a.parentElement.removeChild(a); });
+  }
+
+  /* ---------- que todo lo viejo siga llevando a algun sitio ---------- */
+  function envolverSH(){
+    if(typeof window.SH!=='function' || window.SH.__jacCart) return false;
+    var orig=window.SH;
+    var nueva=function(id){
+      if(id==='pag'||id==='com'||id==='ren'){
+        var r=orig.call(this,'cartera');
+        try{ abrir(id); }catch(e){}
+        return r;
+      }
+      var r=orig.apply(this, arguments);
+      if(id==='cartera'){ try{ abrir(ACTIVA||guardado()); }catch(e){} }
+      return r;
+    };
+    nueva.__jacCart=1;
+    window.SH=nueva;
+    return true;
+  }
+
+  /* ---------- que el repintado de la nube no la deje en blanco ---------- */
+  function envolverRepintar(){
+    if(typeof window.jacRepintar!=='function' || window.jacRepintar.__jacCart) return false;
+    var orig=window.jacRepintar;
+    var nueva=function(){
+      var r=orig.apply(this, arguments);
+      try{ window.jacCarteraRefrescar(); }catch(e){}
+      return r;
+    };
+    nueva.__jacCart=1;
+    window.jacRepintar=nueva;
+    return true;
+  }
+
+  function arrancar(){
+    estilos(); crear(); adoptar(); menu(); envolverSH(); envolverRepintar();
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arrancar);
+  else arrancar();
+  var n=0;
+  (function reintentar(){ try{ arrancar(); }catch(e){} if(++n<10) setTimeout(reintentar, 1000); })();
 })();
 </script>
 
