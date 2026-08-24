@@ -12241,7 +12241,11 @@ document.addEventListener('click', function(e){
      cubierta por el aviso en vivo de crm_meta. */
   var CATALOGOS = ['aseguradoras', 'etiquetas', 'vcReglas', 'ramosCfg', 'comisCfg',
                   'univivir', 'integraciones', 'plantillas', 'metas', 'emailjs', 'gcalRefs',
-                  'calEventos', 'calNotas', 'calMetas', 'calDiarios', 'calReuniones'];
+                  'calEventos', 'calNotas', 'calMetas', 'calDiarios', 'calReuniones',
+                  /* Las alertas ya atendidas. Estaban solo en el navegador, asi
+                     que marcar una en la computadora no la callaba en el
+                     telefono. Aqui viajan con el resto de los datos. */
+                  'alertasAtendidas'];
   var COLS = window.__JAC_COLS || {};
 
   function snake(c) {
@@ -15112,7 +15116,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-BI';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-24-BK';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -27634,23 +27638,65 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   function q(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
   function tel(x){ return String(x||'').replace(/\D/g,''); }
 
+  /* Las atendidas viven en los DATOS (S.alertasAtendidas), no en el
+     navegador. Antes estaban solo en localStorage: marcar una en la
+     computadora no la callaba en el telefono, y "Sincronizar" no
+     podia hacer nada porque no habia nada que sincronizar. */
   function vistas(){
+    var st=E();
+    if(st){
+      if(!st.alertasAtendidas || typeof st.alertasAtendidas!=='object') st.alertasAtendidas={};
+      /* se arrastra una sola vez lo que hubiera guardado el navegador */
+      if(!st.__jacAlertasMigradas){
+        try{
+          var viejo=JSON.parse(localStorage.getItem('jacAlertasVistas')||'{}');
+          for(var k in viejo) if(!st.alertasAtendidas[k]) st.alertasAtendidas[k]=viejo[k];
+        }catch(e){}
+        st.__jacAlertasMigradas=1;
+      }
+      return st.alertasAtendidas;
+    }
     try{ return JSON.parse(localStorage.getItem('jacAlertasVistas')||'{}'); }catch(e){ return {}; }
   }
-  function guardarVistas(v){
-    try{ localStorage.setItem('jacAlertasVistas', JSON.stringify(v)); }catch(e){}
+  function guardarVistas(){
+    var st=E();
+    if(st){
+      window.__jacSucio=true;
+      try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      if(typeof window.jacGuardarYa==='function'){
+        Promise.resolve(window.jacGuardarYa({silencioso:true}))
+          .then(function(g){ if(g && g.ok) window.__jacSucio=false; }).catch(function(){});
+      }
+    }
+    try{ localStorage.setItem('jacAlertasVistas', JSON.stringify(vistas())); }catch(e){}
   }
+
+  /* ver u ocultar las ya atendidas */
+  window.__jacVerAtendidas=false;
+  window.jacAlertasVerAtendidas=function(v){
+    window.__jacVerAtendidas = (v===undefined) ? !window.__jacVerAtendidas : !!v;
+    if(typeof window.jacAlertasRender==='function') window.jacAlertasRender();
+  };
+
   window.jacAlertaAtendida=function(clave){
-    var v=vistas(); v[clave]=new Date().toISOString().slice(0,10); guardarVistas(v);
-    var f=document.querySelector('[data-jac-alerta="'+clave+'"]');
-    if(f){ f.style.opacity='.45'; f.style.filter='grayscale(1)'; }
-    if(typeof toast==='function') toast('Alerta marcada como atendida','ok');
+    var v=vistas(); v[clave]=new Date().toISOString().slice(0,10);
+    guardarVistas();
+    /* Desaparece de la lista, no se queda apagada estorbando. */
+    if(typeof window.jacAlertasRender==='function') window.jacAlertasRender();
+    if(typeof toast==='function') toast('Alerta atendida','ok');
   };
   window.jacAlertaReabrir=function(clave){
-    var v=vistas(); delete v[clave]; guardarVistas(v);
-    var f=document.querySelector('[data-jac-alerta="'+clave+'"]');
-    if(f){ f.style.opacity=''; f.style.filter=''; }
+    var v=vistas(); delete v[clave];
+    guardarVistas();
+    if(typeof window.jacAlertasRender==='function') window.jacAlertasRender();
     if(typeof toast==='function') toast('Alerta reabierta','ok');
+  };
+  window.jacAlertasLimpiarTodo=function(){
+    var st=E(); if(!st) return;
+    st.alertasAtendidas={};
+    guardarVistas();
+    if(typeof window.jacAlertasRender==='function') window.jacAlertasRender();
+    if(typeof toast==='function') toast('Se reabrieron todas las alertas','ok');
   };
 
   /* ---------- acciones ---------- */
@@ -27731,26 +27777,37 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   }
 
   function fila(clave, cuerpo, botones){
-    var apagada=!!vistas()[clave];
-    return '<div data-jac-alerta="'+esc2(clave)+'" style="background:#fff;border:1px solid #E2E8F0;'
+    var atendida=!!vistas()[clave];
+    if(atendida && !window.__jacVerAtendidas) return '';   /* fuera de la lista */
+    return '<div data-jac-alerta="'+esc2(clave)+'" style="background:'
+      +(atendida?'#F8FAFC':'#fff')+';border:1px solid #E2E8F0;'
       +'border-left:3px solid var(--jac-al-c);border-radius:8px;padding:9px 12px;font-size:11.5px;'
-      +'line-height:1.55'+(apagada?';opacity:.45;filter:grayscale(1)':'')+'">'
+      +'line-height:1.55'+(atendida?';opacity:.6':'')+'">'
+      + (atendida?'<div style="font-size:10px;color:#15803D;font-weight:700;margin-bottom:3px">'
+                 +'✓ atendida el '+esc2(vistas()[clave])+'</div>':'')
       + cuerpo
       + '<div style="display:flex;flex-wrap:wrap;margin-top:6px">'+botones+'</div>'
       + '</div>';
   }
 
+  var _vistos=0;   /* cuantas alertas se pintaron de verdad */
+
   function grupo(titulo, color, items, hacerFila){
     if(!items || !items.length) return '';
+    var filas=[], n=0;
+    items.slice(0,120).forEach(function(x,i){
+      var f=hacerFila(x,i);
+      if(f){ filas.push(f); n++; }
+    });
+    if(!n) return '';                       /* todo atendido: el grupo no sale */
+    _vistos += n;
     var h='<div style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px;'
       +'margin-bottom:8px"><span style="width:9px;height:9px;border-radius:50%;background:'+color+'"></span>'
       +'<b style="font-size:13px">'+titulo+'</b>'
       +'<span style="background:'+color+'22;color:'+color+';border-radius:10px;padding:1px 8px;'
-      +'font-size:11px;font-weight:800">'+items.length+'</span></div>'
-      +'<div style="--jac-al-c:'+color+';display:flex;flex-direction:column;gap:6px">';
-    items.slice(0,60).forEach(function(x,i){ h+=hacerFila(x,i); });
-    if(items.length>60) h+='<div style="font-size:10px;color:#94A3B8;padding:4px 2px">y '
-      +(items.length-60)+' más…</div>';
+      +'font-size:11px;font-weight:800">'+n+'</span></div>'
+      +'<div style="--jac-al-c:'+color+';display:flex;flex-direction:column;gap:6px">'
+      +filas.join('');
     return h+'</div></div>';
   }
 
@@ -27782,10 +27839,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     var st=E(); if(!st) return;
     var a=window.jacAlertas();
 
-    var b=document.getElementById('cal-alertas-badge');
-    if(b){ if(a.total){ b.style.display=''; b.textContent=a.total; } else b.style.display='none'; }
-    var sub=document.getElementById('cal-alertas-sub');
-    if(sub) sub.textContent=a.total ? (a.total+' cosas requieren tu atención') : 'Todo al día';
+    _vistos=0;   /* se cuenta al pintar, no antes: lo atendido no cuenta */
 
     function pol(id){ return (st.polizas||[]).filter(function(x){ return x.id===id; })[0]||null; }
     function cliDe(p){
@@ -27886,10 +27940,53 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       return fila(clave, cuerpo, bt);
     });
 
+    var atendidas=Object.keys(vistas()).length;
+
     if(!h) h='<div style="text-align:center;padding:40px 10px;color:#94A3B8">'
       +'<div style="font-size:30px">✨</div>'
       +'<div style="font-size:12px;margin-top:6px">Nada pendiente. Todo al día.</div></div>';
+
+    /* pie: ver las atendidas sin perderlas de vista */
+    if(atendidas){
+      h+='<div style="border-top:1px solid #E2E8F0;margin-top:10px;padding-top:9px;'
+        +'display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:11.5px">'
+        +'<span style="color:#64748B">'+atendidas+' atendida'+(atendidas===1?'':'s')+'</span>'
+        +btn(window.__jacVerAtendidas?'Ocultar atendidas':'Ver atendidas','#0F766E',
+             'jacAlertasVerAtendidas()')
+        +(window.__jacVerAtendidas
+            ? btn('Reabrir todas','#B45309','jacAlertasLimpiarTodo()') : '')
+        +'</div>';
+    }
     el.innerHTML=h;
+
+    /* el contador refleja lo que queda por atender, no el total historico */
+    var b=document.getElementById('cal-alertas-badge');
+    if(b){ if(_vistos){ b.style.display=''; b.textContent=_vistos; } else b.style.display='none'; }
+    var sub=document.getElementById('cal-alertas-sub');
+    if(sub) sub.textContent = _vistos
+      ? (_vistos+' cosa'+(_vistos===1?'':'s')+' requiere'+(_vistos===1?'':'n')+' tu atención')
+      : 'Todo al día';
+  };
+
+  /* El contador de la pestana lo pintaba el nucleo con el total
+     historico, sin descontar lo atendido: por eso seguia diciendo 127
+     despues de atender varias. Se reemplaza. */
+  window.jacAlertasBadge=function(){
+    try{
+      var a=window.jacAlertas(), v=vistas(), n=0;
+      function cuenta(lista, pre){
+        (lista||[]).forEach(function(x){ if(!v[pre+'_'+x.id]) n++; });
+      }
+      cuenta(a.renovaciones,'ren'); cuenta(a.pagos,'pag');
+      cuenta(a.tareas,'tar');       cuenta(a.notas,'not');
+      cuenta(a.cumples,'cum');
+      var b=document.getElementById('cal-alertas-badge');
+      if(b){ if(n){ b.style.display=''; b.textContent=n; } else b.style.display='none'; }
+      var sub=document.getElementById('cal-alertas-sub');
+      if(sub && !document.querySelector('#cal-alertas-body [data-jac-alerta]'))
+        sub.textContent = n ? (n+' cosas requieren tu atención') : 'Todo al día';
+      return n;
+    }catch(e){ return 0; }
   };
 
   /* si el panel ya esta abierto, repintarlo con la version nueva */
@@ -29198,17 +29295,15 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     });
   }
 
-  /* ---------- quitar el selector Mias / Automaticas / Todas ---------- */
+  /* ---------- quitar el selector Mias / Automaticas / Todas ----------
+     Se retira entero. Al principio lo cambie por un aviso con enlace
+     a Comisiones, pero eso es ruido: ella ya sabe donde estan y no
+     necesita un cartel permanente recordandoselo en cada visita.
+     Tareas queda limpio, que era el objetivo. */
   function quitarSelector(){
     var el=document.getElementById('jac-filtro-tareas');
     if(!el) return false;
-    if(el.getAttribute('data-jac-reemplazado')) return true;
-    el.setAttribute('data-jac-reemplazado','1');
-    el.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px">'
-      +'<span style="color:#64748B">Las comisiones ya no viven aquí:</span>'
-      +'<button type="button" class="btn bsm" onclick="jacIrAComisiones()" '
-      +'style="background:#1E3A8A;color:#fff;border-color:#1E3A8A;font-weight:700">'
-      +'💰 Ver en Cartera → Comisiones</button></div>';
+    if(el.parentElement) el.parentElement.removeChild(el);
     return true;
   }
 
@@ -29496,7 +29591,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-08-23-BI';
+  var VERSION='JAC-BUILD-2026-08-24-BK';
 
   window.jacVersion=function(){ return VERSION; };
 
@@ -29575,6 +29670,210 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   var n=0;
   (function reintentar(){ try{ pintar(); }catch(e){} if(++n<20) setTimeout(reintentar, 1200); })();
   try{ console.log('[JAC] '+VERSION); }catch(e){}
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - Las vigencias viejas dejan de contar como vencidas
+   ------------------------------------------------------------
+   EL CASO
+
+   Una poliza que ya renovo aparecia como "Vencida". No lo estaba:
+   estaba renovada. La vigencia vieja es historia, y la nueva es
+   la que esta viva. Eso inflaba el contador de vencidas y hacia
+   perseguir cobros que no existen.
+
+   El CRM ya sabe manejar el estado "Renovada" y lo excluye del
+   conteo de vencidas. El problema era que ninguna poliza lo
+   usaba: cero de las 341.
+
+   COMO SE EMPAREJA
+
+   Una poliza vencida se considera renovada cuando existe OTRA
+   del MISMO cliente, la MISMA aseguradora y el MISMO ramo con
+   fecha de vencimiento posterior. Se toma la mas avanzada de
+   todas. Numero de poliza no se exige: al renovar suele cambiar.
+
+   POR QUE SE CALCULA AQUI Y NO CON UNA CONSULTA
+
+   Consultando la base directamente el numero cambiaba entre una
+   consulta y otra, porque el CRM estaba sincronizando al mismo
+   tiempo. Calcularlo aqui, sobre los datos que hay cargados en
+   ese instante, es lo unico que da un resultado consistente.
+
+   LA GUARDA QUE IMPORTA
+
+   Si la supuesta renovacion TAMBIEN esta vencida, la vieja NO se
+   toca. Marcarla renovada escondería un vencimiento que si hay
+   que perseguir. Solo se cierra la vieja cuando la nueva esta
+   realmente vigente.
+
+   Todo con deshacer.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  function E(){
+    try{ if(window.S && window.S.polizas) return window.S; }catch(e){}
+    try{ var v=new Function('return typeof S!=="undefined"?S:null')(); if(v) return v; }catch(e){}
+    return null;
+  }
+  function hoyISO(){ var d=new Date();
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function K(x){ return String(x==null?'':x).toUpperCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim(); }
+  function esISO(x){ return /^\d{4}-\d{2}-\d{2}$/.test(String(x||'')); }
+  function L(x){ return String(x==null?'':x).toLowerCase().trim(); }
+
+  function intocable(p){
+    var e=L(p.estado);
+    return e==='cancelada' || e==='renovada' || e==='renovado';
+  }
+
+  /* ---------- emparejar ---------- */
+  window.jacParesRenovacion=function(){
+    var st=E(); if(!st) return null;
+    var H=hoyISO();
+    var P=st.polizas||[];
+    var pares=[], sinRenovacion=0, renovNoVigente=0;
+
+    P.forEach(function(vieja){
+      if(intocable(vieja)) return;
+      if(!esISO(vieja.fechaFin)) return;
+      if(vieja.fechaFin >= H) return;              /* no esta vencida */
+
+      var mejor=null;
+      for(var i=0;i<P.length;i++){
+        var c=P[i];
+        if(c===vieja) continue;
+        if(L(c.estado)==='cancelada') continue;
+        if(!esISO(c.fechaFin)) continue;
+        if(c.fechaFin <= vieja.fechaFin) continue;
+        if(String(c.clienteId||'') !== String(vieja.clienteId||'')) continue;
+        if(K(c.aseg) !== K(vieja.aseg)) continue;
+        if(K(c.ramo) !== K(vieja.ramo)) continue;
+        if(!mejor || c.fechaFin > mejor.fechaFin) mejor=c;
+      }
+
+      if(!mejor){ sinRenovacion++; return; }
+      /* la guarda: si la renovacion tambien esta vencida, no se toca */
+      if(mejor.fechaFin < H){ renovNoVigente++; return; }
+      pares.push({vieja:vieja, nueva:mejor});
+    });
+
+    return {pares:pares, sinRenovacion:sinRenovacion, renovacionTambienVencida:renovNoVigente,
+            totalVencidas:pares.length+sinRenovacion+renovNoVigente};
+  };
+
+  /* ---------- aplicar ---------- */
+  window.jacMarcarRenovadas=function(opts){
+    opts=opts||{};
+    var st=E(); if(!st) return {ok:false, motivo:'sin datos'};
+    var r=window.jacParesRenovacion();
+    if(!r) return {ok:false, motivo:'sin datos'};
+    var H=hoyISO();
+    var marcadas=0, reactivadas=0, detalle=[];
+
+    r.pares.forEach(function(par){
+      var v=par.vieja, n=par.nueva;
+
+      if(L(v.estado)!=='renovada'){
+        v.extra=v.extra||{};
+        if(!v.extra.estadoPrevioRenov) v.extra.estadoPrevioRenov=v.estado||'';
+        v.estado='Renovada';
+        v.extra.renovadaPor = n.num || n.id || '';
+        v.extra.renovadaPorId = n.id || '';
+        v.extra.marcadaRenovada = H;
+        marcadas++;
+      }
+      /* la que la reemplaza queda vigente, si su fecha lo respalda */
+      if(esISO(n.fechaFin) && n.fechaFin >= H && L(n.estado)!=='vigente'){
+        n.extra=n.extra||{};
+        if(!n.extra.estadoPrevioRenov) n.extra.estadoPrevioRenov=n.estado||'';
+        n.estado='Vigente';
+        n.extra.reactivadaPorRenovacion = H;
+        reactivadas++;
+      }
+      if(detalle.length<40) detalle.push({
+        vieja:v.num||'(sin número)', venciaEl:v.fechaFin,
+        nueva:n.num||'(sin número)', venceEl:n.fechaFin,
+        cliente:v.nombreCliente||'', aseg:v.aseg||'', ramo:v.ramo||''
+      });
+    });
+
+    if(marcadas||reactivadas){
+      window.__jacSucio=true;
+      try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      if(!opts.sinSubir && typeof window.jacGuardarYa==='function'){
+        Promise.resolve(window.jacGuardarYa({silencioso:true}))
+          .then(function(g){ if(g && g.ok) window.__jacSucio=false; })
+          .catch(function(){});
+      }
+      ['RP','RD','calcKPIs','renderKPIs','RRen'].forEach(function(f){
+        try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
+    }
+
+    return {ok:true, marcadasRenovadas:marcadas, dejadasVigentes:reactivadas,
+            sinRenovacion:r.sinRenovacion,
+            renovacionTambienVencida:r.renovacionTambienVencida,
+            quedanVencidas:r.sinRenovacion + r.renovacionTambienVencida,
+            detalle:detalle};
+  };
+
+  /* ---------- deshacer ---------- */
+  window.jacDeshacerRenovadas=function(){
+    var st=E(); if(!st) return {ok:false};
+    var n=0;
+    (st.polizas||[]).forEach(function(p){
+      if(!p.extra || !p.extra.estadoPrevioRenov) return;
+      p.estado=p.extra.estadoPrevioRenov;
+      delete p.extra.estadoPrevioRenov;
+      delete p.extra.renovadaPor;
+      delete p.extra.renovadaPorId;
+      delete p.extra.marcadaRenovada;
+      delete p.extra.reactivadaPorRenovacion;
+      n++;
+    });
+    if(st.__jacRenovadasHecho) delete st.__jacRenovadasHecho;
+    if(n){
+      window.__jacSucio=true;
+      try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      if(typeof window.jacGuardarYa==='function'){
+        Promise.resolve(window.jacGuardarYa({silencioso:true}))
+          .then(function(g){ if(g && g.ok) window.__jacSucio=false; }).catch(function(){});
+      }
+      ['RP','RD','calcKPIs','renderKPIs'].forEach(function(f){
+        try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
+    }
+    return {ok:true, revertidas:n};
+  };
+
+  /* ---------- correr una vez, cuando la nube ya trajo los datos ---------- */
+  var ya=false;
+  function auto(){
+    if(ya) return;
+    if(!window.__jacNubeLista) return;
+    var st=E();
+    if(!st || !(st.polizas||[]).length) return;
+    if(st.__jacRenovadasHecho){ ya=true; return; }
+    ya=true;
+    var res=window.jacMarcarRenovadas();
+    st.__jacRenovadasHecho=hoyISO();
+    window.__jacRenovadasUltimo=res;
+    if(res.marcadasRenovadas && typeof toast==='function'){
+      toast(res.marcadasRenovadas+' pólizas pasadas a Renovada · quedan '
+            +res.quedanVencidas+' vencidas reales','ok');
+    }
+  }
+  window.jacRenovadasAuto=auto;
+  var t=0;
+  (function esperar(){
+    try{ auto(); }catch(e){}
+    if(!ya && ++t<80) setTimeout(esperar, 1500);
+  })();
 })();
 </script>
 
