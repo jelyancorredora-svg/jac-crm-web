@@ -15112,7 +15112,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-23-BG';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-23-BI';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -26853,6 +26853,194 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 
 <script>
 /* ============================================================
+   JAC CRM - Que la sincronizacion en vivo vuelva a funcionar
+   ------------------------------------------------------------
+   LO QUE ROMPI, Y COMO
+
+   El CRM tiene una proteccion sana: si hay cambios locales sin
+   subir, NO se baja nada de la nube, para no pisar el trabajo.
+   La bandera que lo controla se llama __jacSucio y solo se apaga
+   cuando una subida termina bien.
+
+   Los bloques automaticos que escribi -frecuencias de pago,
+   completar cartera, sincronizar gestiones- arrancaban a los
+   1,5 segundos de abrir, llamaban a save() y encendian esa
+   bandera JUSTO durante la ventana en que el CRM esta bajando
+   los datos de la nube por primera vez. Resultado: la bajada se
+   cancelaba y el CRM se quedaba con la copia local vieja.
+
+   Medido: la bandera aparecia encendida nada mas cargar, sin
+   que nadie hubiera tocado nada, y cargarDesdeNube() devolvia
+   false. Eso es exactamente "no me sincroniza entre dispositivos".
+
+   Encima, jacSincronizarGestiones encendia la bandera y no subia
+   nunca, y como iba enganchada a save(), la volvia a encender
+   despues de cada guardado.
+
+   LO QUE HACE ESTE BLOQUE
+
+   1. Marca cuando la primera bajada de la nube ya termino. Los
+      automaticos esperan a esa senal antes de tocar nada.
+   2. Un vigilante: si la bandera lleva mas de 8 segundos
+      encendida, sube de verdad y la apaga. Si la subida falla,
+      reintenta espaciando, y al tercer fallo avisa EN PANTALLA
+      en vez de callarse. Callar un fallo de subida es como
+      perdio ella la confianza en el guardado.
+   3. Un diagnostico, jacEstadoSincronia(), para ver en cualquier
+      momento si esta al dia, que canales estan vivos y cuando
+      fue la ultima subida y la ultima bajada.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  window.__jacNubeLista = false;
+  window.__jacUltimaBajada = null;
+  var esperando = [];
+
+  function avisarListo(){
+    window.__jacNubeLista = true;
+    var cs = esperando; esperando = [];
+    cs.forEach(function(f){ try{ f(); }catch(e){} });
+  }
+
+  /* Promesa que se resuelve cuando la nube ya trajo los datos.
+     Con un tope: si no hay nube, no se puede dejar el CRM
+     paralizado esperando para siempre. */
+  window.jacEsperarNube = function(topeMs){
+    topeMs = topeMs || 25000;
+    if(window.__jacNubeLista) return Promise.resolve(true);
+    return new Promise(function(res){
+      var listo=false;
+      esperando.push(function(){ if(!listo){ listo=true; res(true); } });
+      setTimeout(function(){ if(!listo){ listo=true; res(false); } }, topeMs);
+    });
+  };
+
+  /* ---------- 1. saber cuando termino la bajada ---------- */
+  function envolverCarga(){
+    if(typeof window.cargarDesdeNube!=='function' || window.cargarDesdeNube.__jacSenal) return false;
+    var orig = window.cargarDesdeNube;
+    var nueva = async function(){
+      var r = await orig.apply(this, arguments);
+      if(r !== false){
+        window.__jacUltimaBajada = new Date().toISOString();
+        avisarListo();
+      }
+      return r;
+    };
+    nueva.__jacSenal = 1;
+    /* se conservan las marcas que otros bloques le hayan puesto */
+    if(orig.__jacProtegida) nueva.__jacProtegida = true;
+    window.cargarDesdeNube = nueva;
+    return true;
+  }
+
+  /* Si no hay nube configurada, no tiene sentido esperarla. */
+  setTimeout(function(){
+    try{
+      if(!window.db || window.db.__esStub) avisarListo();
+    }catch(e){ avisarListo(); }
+  }, 6000);
+  /* red de seguridad: pasado un tiempo se libera igual */
+  setTimeout(avisarListo, 30000);
+
+  /* ---------- 2. el vigilante de la bandera ---------- */
+  var desde = null, fallos = 0, subiendo = false;
+
+  function marcaVisible(texto, color){
+    try{
+      var el = document.getElementById('syncBadge');
+      if(!el){
+        el = document.createElement('div');
+        el.id = 'syncBadge';
+        el.style.cssText = 'position:fixed;right:12px;bottom:86px;z-index:9998;padding:7px 12px;'
+          + 'border-radius:9px;font-size:11.5px;font-weight:700;color:#fff;box-shadow:0 3px 12px rgba(0,0,0,.25)';
+        document.body.appendChild(el);
+      }
+      el.textContent = texto;
+      el.style.background = color;
+      el.style.display = '';
+      el.style.opacity = '1';
+      clearTimeout(el.__jt);
+      el.__jt = setTimeout(function(){ el.style.opacity='0'; }, 6000);
+    }catch(e){}
+  }
+
+  async function vigilar(){
+    if(subiendo) return;
+    if(!window.__jacSucio){ desde = null; fallos = 0; return; }
+    if(desde === null){ desde = Date.now(); return; }
+    if(Date.now() - desde < 8000) return;
+
+    if(typeof window.jacGuardarYa !== 'function') return;
+    subiendo = true;
+    try{
+      var r = await window.jacGuardarYa({silencioso:true});
+      if(r && r.ok){
+        window.__jacSucio = false;
+        desde = null; fallos = 0;
+      } else {
+        fallos++;
+      }
+    }catch(e){
+      fallos++;
+    } finally {
+      subiendo = false;
+    }
+
+    if(fallos === 3){
+      marcaVisible('⚠️ No se pudo subir a la nube', '#B45309');
+    } else if(fallos >= 6){
+      marcaVisible('⚠️ Sin subir — revise la conexión', '#DC2626');
+      /* se espacian los reintentos para no castigar la conexion */
+      desde = Date.now() + 20000;
+    }
+  }
+  setInterval(function(){ vigilar(); }, 5000);
+
+  /* ---------- 3. diagnostico ---------- */
+  window.jacEstadoSincronia = function(){
+    return {
+      alDia: !window.__jacSucio,
+      cambiosSinSubir: !!window.__jacSucio,
+      segundosSinSubir: desde ? Math.round((Date.now()-desde)/1000) : 0,
+      fallosSeguidos: fallos,
+      nubeLista: !!window.__jacNubeLista,
+      ultimaBajada: window.__jacUltimaBajada,
+      ultimaSubida: window.__jacUltimoGuardado || null,
+      canalPrincipal: window.__jacRealtime || 'sin conectar',
+      canalAgenda: window.__jacRealtimeAgenda || 'sin conectar',
+      enLinea: navigator.onLine
+    };
+  };
+
+  /* forzar una puesta al dia a mano */
+  window.jacPonerAlDia = async function(){
+    marcaVisible('Sincronizando…', '#1D4ED8');
+    try{
+      if(window.__jacSucio && typeof window.jacGuardarYa==='function'){
+        var r = await window.jacGuardarYa({silencioso:true});
+        if(r && r.ok) window.__jacSucio = false;
+      }
+      if(typeof window.sincronizar === 'function') await window.sincronizar();
+      else if(typeof window.cargarDesdeNube === 'function') await window.cargarDesdeNube();
+      marcaVisible('Al día ✓', '#15803D');
+      return window.jacEstadoSincronia();
+    }catch(e){
+      marcaVisible('⚠️ No se pudo sincronizar', '#DC2626');
+      return {ok:false, error:String(e).slice(0,120)};
+    }
+  };
+
+  function instalar(){ envolverCarga(); }
+  instalar();
+  var n=0;
+  (function reintentar(){ try{ instalar(); }catch(e){} if(++n<20) setTimeout(reintentar, 1000); })();
+})();
+</script>
+
+<script>
+/* ============================================================
    JAC CRM - Pagos: la frecuencia real de cada poliza
    ------------------------------------------------------------
    EL PROBLEMA, CON NUMEROS DE SU PROPIA CARTERA
@@ -27023,7 +27211,11 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       window.__jacSucio=true;
       try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
       if(!opts.sinSubir && typeof window.jacGuardarYa==='function'){
-        try{ window.jacGuardarYa({silencioso:true}); }catch(e){}
+        /* se espera la subida y se apaga la bandera: dejarla encendida
+           bloquea todas las bajadas de la nube */
+        Promise.resolve(window.jacGuardarYa({silencioso:true}))
+          .then(function(r){ if(r && r.ok) window.__jacSucio=false; })
+          .catch(function(){});
       }
       ['RPag','RP','calcKPIs','renderKPIs'].forEach(function(fn){
         try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} });
@@ -27056,8 +27248,13 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   var yaCorrio=false;
   function auto(){
     if(yaCorrio) return;
+    /* NO tocar nada hasta que la nube haya traido los datos. Si se
+       escribe antes, se enciende la bandera de "sin subir" justo en
+       la ventana de la bajada inicial y el CRM cancela esa bajada:
+       eso es lo que rompio la sincronizacion entre dispositivos. */
+    if(!window.__jacNubeLista) return;
     var st=E();
-    if(!st || !(st.polizas||[]).length) return;   /* aun no han bajado los datos */
+    if(!st || !(st.polizas||[]).length) return;
     var r=window.jacRevisarFrecuencias();
     if(!r) return;
     yaCorrio=true;
@@ -27075,7 +27272,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   var t=0;
   (function esperar(){
     try{ auto(); }catch(e){}
-    if(!yaCorrio && ++t<40) setTimeout(esperar, 1500);
+    if(!yaCorrio && ++t<80) setTimeout(esperar, 1500);
   })();
 })();
 </script>
@@ -28324,7 +28521,9 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       window.__jacSucio=true;
       try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
       if(!opts.sinSubir && typeof window.jacGuardarYa==='function'){
-        try{ window.jacGuardarYa({silencioso:true}); }catch(e){}
+        Promise.resolve(window.jacGuardarYa({silencioso:true}))
+          .then(function(r){ if(r && r.ok) window.__jacSucio=false; })
+          .catch(function(){});
       }
       ['RTar','RCom','renderCom','calRenderAllTareas','calcKPIs','renderKPIs']
         .forEach(function(f){ try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
@@ -28372,6 +28571,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   var yaCorrio=false;
   function auto(){
     if(yaCorrio) return;
+    if(!window.__jacNubeLista) return;   /* esperar a la bajada inicial */
     var st=E();
     if(!st || !(st.tareas||[]).length) return;
     if(st.__jacCarteraHecha){ yaCorrio=true; return; }
@@ -28393,7 +28593,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   var t=0;
   (function esperar(){
     try{ auto(); }catch(e){}
-    if(!yaCorrio && ++t<40) setTimeout(esperar, 1500);
+    if(!yaCorrio && ++t<80) setTimeout(esperar, 1500);
   })();
 })();
 </script>
@@ -28701,6 +28901,9 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   function hoyISO(){ var d=new Date();
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
+  /* guarda contra el ida y vuelta save -> sincronizar -> save */
+  var dentro=false;
+
   function pagoCerrado(p){ var e=L(p.estado); return e==='pagado' || e==='cobrado'; }
   function tareaCerrada(t){
     var e=L(t.estado), et=L(t.etapaTarea);
@@ -28806,8 +29009,20 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 
     var hubo=r.tareasCerradas||r.pagosCerrados||r.comisionesCerradas;
     if(hubo){
-      window.__jacSucio=true;
+      /* Se guarda SIN volver a disparar esta misma sincronizacion:
+         save() esta envuelto para llamarnos, y llamarnos desde aqui
+         creaba un ida y vuelta sin fin. */
+      dentro=true;
       try{ st._ts=Date.now(); if(typeof save==='function') save(); }catch(e){}
+      dentro=false;
+      /* Y se SUBE de verdad. Antes solo se encendia la bandera de
+         "hay cambios sin subir" y nadie la apagaba, asi que el CRM
+         dejaba de bajar datos de la nube: ahi se perdio el vivo. */
+      if(typeof window.jacGuardarYa==='function'){
+        Promise.resolve(window.jacGuardarYa({silencioso:true}))
+          .then(function(g){ if(g && g.ok) window.__jacSucio=false; })
+          .catch(function(){});
+      }
       ['RTar','RPag','RCom','renderCom','calRenderAllTareas']
         .forEach(function(f){ try{ if(typeof window[f]==='function') window[f](); }catch(e){} });
     }
@@ -28831,11 +29046,14 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
      guardados. */
   var pendiente=null;
   function programar(){
+    if(dentro) return;                     /* el save vino de nosotros */
+    if(!window.__jacNubeLista) return;     /* aun bajando de la nube */
     if(pendiente) return;
     pendiente=setTimeout(function(){
       pendiente=null;
+      if(dentro) return;
       try{ window.jacSincronizarGestiones(); }catch(e){}
-    }, 600);
+    }, 900);
   }
 
   function envolverSave(){
@@ -28863,6 +29081,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   var k=0;
   (function primera(){
     var st=E();
+    if(!window.__jacNubeLista){ if(++k<60) setTimeout(primera, 1500); return; }
     if(st && ((st.pagos||[]).length || (st.tareas||[]).length)){
       if(!hecho){ hecho=true; try{ window.jacSincronizarGestiones(); }catch(e){} }
       return;
@@ -29111,6 +29330,42 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     return true;
   }
 
+  /* ---------- 1b. Cartera en la barra de abajo ----------
+     Estaba solo dentro de "Más", y ahi no se ve. Cartera es de lo
+     que mas se usa -pagos, comisiones y renovaciones juntos-, asi
+     que va en la barra fija. Se cede el sitio de Prospectos, que
+     se consulta mucho menos y sigue estando en "Más". */
+  function barraPrincipal(){
+    var bng=document.querySelector('.bnav .bng');
+    if(!bng || bng.getAttribute('data-jac-cartera')) return false;
+    if(document.getElementById('bn-cartera')) return false;
+
+    var pros=document.getElementById('bn-pros');
+    var a=document.createElement('a');
+    a.className='bni';
+    a.id='bn-cartera';
+    a.setAttribute('onclick', "SH('cartera');closeBnMore()");
+    a.innerHTML='<div class="ico">💼</div><div class="lbl">Cartera</div>';
+
+    if(pros && pros.parentElement){
+      pros.parentElement.replaceChild(a, pros);
+      /* Prospectos no se pierde: se manda al menu "Más" */
+      var mas=document.getElementById('bmm');
+      if(mas && !/Prospectos/.test(mas.textContent||'')){
+        var q=document.createElement('a');
+        q.setAttribute('onclick', "SH('pros');closeBnMore()");
+        q.innerHTML='<span style="font-size:16px">🎯</span>Prospectos';
+        mas.insertBefore(q, mas.firstChild);
+      }
+    } else {
+      var mm=document.getElementById('bn-more');
+      if(mm && mm.parentElement) mm.parentElement.insertBefore(a, mm);
+      else bng.appendChild(a);
+    }
+    bng.setAttribute('data-jac-cartera','1');
+    return true;
+  }
+
   /* ---------- 2. los estilos ---------- */
   function estilos(){
     if(document.getElementById('jac-movil-css')) return;
@@ -29134,6 +29389,14 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       /* dedos, no punteros */
       '  .btn{min-height:34px;padding-left:11px;padding-right:11px}',
       '  .btn.bsm{min-height:30px}',
+      /* Los botones de las alertas llevan estilo propio, no la clase
+         .btn, asi que se quedaban en ~24 px: imposibles de acertar
+         con el dedo. En un telefono eso se siente como "no funcionan". */
+      '  #cal-alertas-body button,#cal-alertas-body a{min-height:36px!important;',
+      '    padding:8px 12px!important;font-size:12px!important;',
+      '    display:inline-flex!important;align-items:center;justify-content:center}',
+      '  #cal-alertas-body [data-jac-alerta]{padding:11px 13px!important}',
+      '  #cal-alertas-body [data-jac-alerta]>div:last-child{gap:5px}',
       '  input,select,textarea{font-size:16px!important;min-height:38px}',  /* 16px evita el zoom de iOS */
       /* las tarjetas de la cartera y del pipeline, a una columna */
       '  #pg-cartera .jac-cart-bar{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}',
@@ -29200,6 +29463,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   function arrancar(){
     estilos();
     menuMovil();
+    barraPrincipal();
     semanaVertical();
   }
 
@@ -29209,6 +29473,108 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   (function reintentar(){ try{ arrancar(); }catch(e){} if(++n<15) setTimeout(reintentar, 1000); })();
   window.addEventListener('resize', function(){ try{ semanaVertical(); }catch(e){} });
   window.addEventListener('orientationchange', function(){ setTimeout(semanaVertical, 300); });
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - Saber que version se esta usando
+   ------------------------------------------------------------
+   POR QUE HACE FALTA
+
+   Varias veces ha reportado algo que en la version nueva ya
+   estaba arreglado. No es que se equivoque: es que el navegador
+   guarda la pagina en cache y sigue mostrando la anterior, o el
+   archivo nuevo todavia no esta subido. Sin forma de ver que
+   version corre, no hay manera de distinguir "sigue roto" de
+   "todavia no lo estas viendo".
+
+   Ahora la version se ve, y hay una comprobacion de un vistazo.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  var VERSION='JAC-BUILD-2026-08-23-BI';
+
+  window.jacVersion=function(){ return VERSION; };
+
+  /* Comprobacion rapida: que piezas nuevas estan realmente vivas */
+  window.jacComprobar=function(){
+    function hay(n){ return typeof window[n]==='function'; }
+    var r={
+      version:VERSION,
+      alertasNuevas:  hay('jacAlVerPoliza') && hay('jacAlTareaDe'),
+      cartera:        hay('jacCarteraAbrir'),
+      frecuenciaPagos:hay('jacFrecuenciaReal'),
+      comisionesFuera:hay('jacTareaDeComision'),
+      sincronia:      hay('jacEstadoSincronia'),
+      pipelineBorrar: hay('jacPipeEliminar'),
+      prospectoBorrar:hay('jacProsEliminar'),
+      ramos:          hay('jacListaRamos'),
+      movilCartera:   !!document.getElementById('bn-cartera')
+    };
+    var faltan=Object.keys(r).filter(function(k){ return k!=='version' && r[k]!==true; });
+    r.todoPresente = faltan.length===0;
+    r.faltan = faltan;
+    return r;
+  };
+
+  /* Se pinta en Configuracion, arriba del todo */
+  function pintar(){
+    var pg=document.getElementById('pg-cfg');
+    if(!pg || document.getElementById('jac-version-caja')) return;
+    var c=window.jacComprobar();
+    var d=document.createElement('div');
+    d.id='jac-version-caja';
+    d.style.cssText='background:'+(c.todoPresente?'#F0FDF4':'#FEF3C7')
+      +';border:1px solid '+(c.todoPresente?'#BBF7D0':'#FDE68A')
+      +';border-radius:10px;padding:11px 14px;margin-bottom:12px;font-size:12px';
+    d.innerHTML='<div style="font-weight:800;margin-bottom:3px">'
+      +(c.todoPresente?'✅ Versión al día':'⚠️ Versión incompleta')+'</div>'
+      +'<div style="font-family:monospace;font-size:11px;color:#475569">'+VERSION+'</div>'
+      +(c.todoPresente
+         ? '<div style="color:#15803D;margin-top:4px">Todas las mejoras están activas.</div>'
+         : '<div style="color:#B45309;margin-top:4px">No se cargaron: '+c.faltan.join(', ')
+           +'. Recargue con Ctrl+Shift+R (o mantenga pulsado el botón de recargar en el móvil).</div>')
+      +'<div style="margin-top:7px"><button class="btn bsm" onclick="jacRecargarLimpio()" '
+      +'style="background:#1E3A8A;color:#fff;border-color:#1E3A8A;font-weight:700">'
+      +'🔄 Recargar sin caché</button>'
+      +' <button class="btn bsm" onclick="jacVerSincronia()">📡 Estado de sincronización</button></div>';
+    pg.insertBefore(d, pg.firstChild);
+  }
+
+  window.jacRecargarLimpio=function(){
+    try{
+      var u=new URL(location.href);
+      u.searchParams.set('v', Date.now());
+      location.replace(u.toString());
+    }catch(e){ location.reload(true); }
+  };
+
+  window.jacVerSincronia=function(){
+    var s=(typeof window.jacEstadoSincronia==='function') ? window.jacEstadoSincronia() : null;
+    if(!s){ if(typeof toast==='function') toast('No disponible','err'); return; }
+    var h='<div style="font-size:12.5px;line-height:1.7">'
+      +'<div><b>'+(s.alDia?'✅ Todo subido':'⏳ Hay cambios sin subir')+'</b></div>'
+      +'<div>Datos de la nube cargados: <b>'+(s.nubeLista?'sí':'todavía no')+'</b></div>'
+      +'<div>Última subida: '+(s.ultimaSubida||'—')+'</div>'
+      +'<div>Última bajada: '+(s.ultimaBajada||'—')+'</div>'
+      +'<div>Canal en vivo: <b>'+(s.canalPrincipal==='SUBSCRIBED'?'conectado':s.canalPrincipal)+'</b></div>'
+      +'<div>Canal de agenda: <b>'+(s.canalAgenda==='SUBSCRIBED'?'conectado':s.canalAgenda)+'</b></div>'
+      +'<div>Internet: '+(s.enLinea?'sí':'no')+'</div>'
+      +(s.fallosSeguidos?'<div style="color:#DC2626">Fallos de subida seguidos: '+s.fallosSeguidos+'</div>':'')
+      +'<div style="margin-top:9px"><button class="btn bsm" onclick="jacPonerAlDia()" '
+      +'style="background:#15803D;color:#fff;border-color:#15803D;font-weight:700">Poner al día ahora</button></div>'
+      +'</div>';
+    if(typeof openDP==='function') openDP(h,'Sincronización');
+    else alert(JSON.stringify(s,null,1));
+  };
+
+  var n=0;
+  (function reintentar(){ try{ pintar(); }catch(e){} if(++n<20) setTimeout(reintentar, 1200); })();
+  try{ console.log('[JAC] '+VERSION); }catch(e){}
 })();
 </script>
 
