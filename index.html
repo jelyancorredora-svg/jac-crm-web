@@ -15472,7 +15472,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-05-DA';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-05-DB';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -26884,6 +26884,13 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     try{ if(typeof window.jacNormalizarAseg==='function') return window.jacNormalizarAseg(v)||v; }catch(e){}
     return v;
   }
+  /* Comparacion sin acentos ni mayusculas, para que "Motos", "MOTOS" y
+     "motos" sean el mismo ramo al buscar la opcion. */
+  function llave(x){
+    return String(x==null?'':x).toUpperCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+  }
+
   function canonRamo(v){
     if(!v) return v;
     try{ if(typeof window.jacNormalizarRamo==='function') return window.jacNormalizarRamo(v)||v; }catch(e){}
@@ -26913,22 +26920,73 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
               x.replace(/&/g,'&amp;').replace(/</g,'&lt;')+marca+'</option>';
     });
     sel.innerHTML=html;
-    if(actual) sel.value=actual;
-    if(sel.value!==actual && actual){ sel.value=actual; }
+    /* Seleccionar con tolerancia. "Motos" y "MOTOS" son el mismo ramo;
+       poner sel.value="Motos" cuando la opcion dice "MOTOS" no selecciona
+       nada y el navegador se queda en la PRIMERA opcion de la lista.
+       Esa es justo la forma en que un ramo se convertia solo en otro. */
+    if(actual){
+      sel.value = actual;
+      if(sel.value !== actual){
+        var meta = llave(actual), puesto = false;
+        for(var i=0;i<sel.options.length;i++){
+          if(llave(sel.options[i].value) === meta){ sel.selectedIndex=i; puesto=true; break; }
+        }
+        if(!puesto){
+          /* No esta ni con tolerancia: se agrega para no perderlo jamas. */
+          var o=document.createElement('option');
+          o.value=actual; o.textContent=actual+' (sin unificar)';
+          sel.appendChild(o); sel.value=actual;
+        }
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     DE DONDE SALE EL VALOR BUENO
+     ------------------------------------------------------------------
+     Aqui estaba el fallo que hacia que MOTOS, RESPONSABILIDAD CIVIL,
+     TRANSPORTE, PROPIEDAD y otros se convirtieran solos en
+     AUTOS/VEHICULOS al reabrir la poliza.
+
+     OP() vuelve a llenar #p-ra con una lista corta escrita a mano dentro
+     de la propia funcion. Si el ramo guardado no esta en esa lista corta,
+     ninguna opcion queda seleccionada y el navegador se planta en la
+     PRIMERA: AUTOS/VEHICULOS.
+
+     Este bloque corre despues para arreglarlo... pero leia
+     ra.value — o sea, el valor YA ESTROPEADO — y lo "restauraba"
+     fielmente. Restauraba el error.
+
+     Ahora el valor se toma de la POLIZA, que es donde esta el dato de
+     verdad. El desplegable solo manda cuando la poliza es nueva y
+     todavia no existe registro que consultar.
+     ------------------------------------------------------------------ */
+  function polizaEnEdicion(){
+    try{
+      var id=new Function('return typeof EID!=="undefined"?EID:null')();
+      if(!id) return null;
+      if(typeof GP==='function'){ var p=GP(id); if(p && p.id) return p; }
+      var st=new Function('return typeof S!=="undefined"?S:null')();
+      if(st && st.polizas){
+        for(var i=0;i<st.polizas.length;i++) if(st.polizas[i].id===id) return st.polizas[i];
+      }
+    }catch(e){}
+    return null;
   }
 
   function refrescar(){
     var as=document.getElementById('p-as');
     var ra=document.getElementById('p-ra');
+    var pol=polizaEnEdicion();
 
     if(as && typeof window.jacListaAseguradoras==='function'){
-      var vA=canonAseg(as.value||'');
+      var vA=canonAseg((pol && pol.aseg) || as.value || '');
       var listaA=null;
       try{ listaA=window.jacListaAseguradoras(); }catch(e){}
       if(listaA && listaA.length) llenar(as, listaA, vA);
     }
     if(ra && typeof window.jacListaRamos==='function'){
-      var vR=canonRamo(ra.value||'');
+      var vR=canonRamo((pol && pol.ramo) || ra.value || '');
       var listaR=null;
       try{ listaR=window.jacListaRamos(); }catch(e){}
       if(listaR && listaR.length){
@@ -29973,7 +30031,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-05-DA';
+  var VERSION='JAC-BUILD-2026-09-05-DB';
 
   window.jacVersion=function(){ return VERSION; };
 
