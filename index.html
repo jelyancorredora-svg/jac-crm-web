@@ -15483,10 +15483,55 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-05-DD';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-05-DE';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
-  /* --- 1. Vigilante de version --- */
+  /* ==================================================================
+     VIGILANTE DE VERSION — que nunca se trabaje sobre una version vieja
+     ------------------------------------------------------------------
+     POR QUE ESTO IMPORTA TANTO
+
+     Se perdio una tarde entera probando arreglos que si estaban hechos
+     pero que el navegador no habia descargado todavia. Se probaba
+     contra la version vieja, fallaba, y no habia forma de darse cuenta:
+     el numero de version no se veia en ninguna parte y la revision se
+     hacia en silencio cada diez minutos.
+
+     Se corrige de dos maneras:
+
+     1. LA VERSION SE VE. Abajo a la izquierda, discreta. Si algo no
+        cuadra, lo primero es mirar ahi.
+     2. SE REVISA CADA MINUTO, y ademas al volver a la ventana. Si hay
+        una nueva: primero se sube lo que este sin guardar, y solo
+        entonces se recarga — avisando, para que no parezca que la
+        pagina se recargo sola sin motivo.
+
+     La subida ANTES de recargar no es un detalle: recargar con trabajo
+     sin subir es la manera mas facil de perderlo.
+     ================================================================== */
+  var _avisandoVersion = false;
+
+  function pintarMarca(nueva){
+    var el = document.getElementById('jac-marca-version');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'jac-marca-version';
+      el.style.cssText = 'position:fixed;left:8px;bottom:6px;z-index:2147482000;'
+        + 'font:600 10px/1.3 system-ui,-apple-system,sans-serif;color:#94A3B8;'
+        + 'background:rgba(255,255,255,.82);border:1px solid #E2E8F0;border-radius:6px;'
+        + 'padding:3px 7px;pointer-events:none;user-select:none;letter-spacing:.2px';
+      (document.body||document.documentElement).appendChild(el);
+    }
+    if(nueva){
+      el.textContent = 'Actualizando a ' + nueva.replace('JAC-BUILD-','') + '…';
+      el.style.color = '#fff';
+      el.style.background = '#15803D';
+      el.style.borderColor = '#15803D';
+    } else {
+      el.textContent = MARCA.replace('JAC-BUILD-','v ');
+    }
+  }
+
   async function revisarVersion(){
     try{
       var t = await fetch('/index.html?_=' + Date.now(), {cache:'no-store'}).then(function(r){return r.text();});
@@ -15495,17 +15540,32 @@ document.addEventListener('click', function(e){
       if(m[0] !== MARCA){
         if(window.__jacRecargando) return;
         window.__jacRecargando = true;
-        try{ if(typeof window.jacVolcar==='function') await window.jacVolcar(); }catch(e){}
-        var url = location.pathname + '?v=' + Date.now();
-        location.replace(url);
+        try{ pintarMarca(m[0]); }catch(e){}
+        /* Primero lo que no ha subido. Recargar encima de trabajo sin
+           guardar es la forma mas facil de perderlo. */
+        try{
+          if(typeof window.jacGuardarYa==='function') await window.jacGuardarYa({silencioso:true});
+          else if(typeof window.jacVolcar==='function') await window.jacVolcar();
+        }catch(e){}
+        await new Promise(function(r){ setTimeout(r, 900); });
+        location.replace(location.pathname + '?v=' + Date.now());
       }
     }catch(e){}
   }
-  setTimeout(revisarVersion, 15000);
-  setInterval(revisarVersion, 600000);          /* cada 10 minutos */
+  window.jacRevisarVersion = revisarVersion;
+
+  function arrancarMarca(){ try{ pintarMarca(null); }catch(e){} }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arrancarMarca);
+  else arrancarMarca();
+  setTimeout(arrancarMarca, 2500);
+
+  setTimeout(revisarVersion, 8000);
+  setInterval(revisarVersion, 60000);           /* cada minuto, no cada diez */
   document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState==='visible') setTimeout(revisarVersion, 2000);
+    if(document.visibilityState==='visible') setTimeout(revisarVersion, 1200);
   });
+  window.addEventListener('focus', function(){ setTimeout(revisarVersion, 1500); });
+  window.addEventListener('online', function(){ setTimeout(revisarVersion, 1500); });
 
   /* --- 2. Repintar KPIs y la vista abierta tras cada sincronizacion --- */
   function repintar(){
@@ -30132,7 +30192,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-05-DD';
+  var VERSION='JAC-BUILD-2026-09-05-DE';
 
   window.jacVersion=function(){ return VERSION; };
 
