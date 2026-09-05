@@ -1,0 +1,13 @@
+{
+  "name": "JAC Seguros CRM",
+  "short_name": "JAC CRM",
+  "description": "CRM de JAC Seguros Panama",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1A3A6B",
+  "theme_color": "#1A3A6B",
+  "lang": "es-PA",
+  "icons": []
+}

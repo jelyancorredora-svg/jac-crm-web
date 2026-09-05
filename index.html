@@ -263,6 +263,8 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 <meta name="referrer" content="strict-origin-when-cross-origin">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="JAC CRM">
 <meta name="mobile-web-app-capable" content="yes">
@@ -4664,6 +4666,10 @@ ${(p.archivos||[]).length?`<div class="dsec">Archivos adjuntos</div><div style="
  openDP(h,p.num);
 }
 function OP(id){
+ /* Cada vez que se abre el formulario se olvida lo "escrito a mano" de la
+    poliza anterior. Sin esto, tocar el % de comision una vez dejaba el
+    autorrelleno apagado el resto de la sesion. */
+ try{ if(typeof window.jacResetManual==='function') window.jacResetManual(); }catch(e){}
  EID=id||null;_pf=[];const p=id?GP(id):{};
  const mpt=document.getElementById('mpt');if(mpt)mpt.textContent=id?'Editar Póliza':'Nueva Póliza';
  const csel=document.getElementById('p-cl');csel.innerHTML='<option value="">— Cliente —</option>';
@@ -7721,7 +7727,7 @@ window.SH=function(id){
 // ── Init push on load ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
  setTimeout(()=>{
- if(('Notification' in window)&&Notification.permission==='granted')checkAndNotify();
+ if(window.Notification&&Notification.permission==='granted')checkAndNotify();
  // Keyboard shortcut Ctrl+K / Cmd+K for global search
  document.addEventListener('keydown',e=>{
  if((e.ctrlKey||e.metaKey)&&e.key==='k'){
@@ -12353,7 +12359,28 @@ document.addEventListener('click', function(e){
   }
 
   var _avisoSesion = false;
-  var _base = {};            // {tabla: {id: hash}} última copia confirmada
+
+  /* {tabla: {id: huella}} de lo que SI quedo confirmado en la base.
+     Se guarda en el navegador y se recupera al abrir. Antes se perdia al
+     cerrar la pestana, y sin el la primera bajada de cada sesion no podia
+     distinguir "esto ya subio" de "esto es trabajo mio sin subir": tenia
+     que reemplazarlo todo, y por eso habia que bloquearla. Recordandolo,
+     la primera bajada tambien puede fusionar, y el trabajo que quedo sin
+     subir al cerrar el navegador sobrevive a la siguiente apertura. */
+  var _base = (function () {
+    try {
+      var t = localStorage.getItem('jac_base');
+      var o = t ? JSON.parse(t) : null;
+      return (o && typeof o === 'object') ? o : {};
+    } catch (e) { return {}; }
+  })();
+  function _guardarBase() {
+    try { localStorage.setItem('jac_base', JSON.stringify(_base)); } catch (e) {}
+  }
+  /* Si ya hay huellas guardadas, la bajada fusiona desde la primera vez.
+     Hay que decirlo YA, antes de la primera bajada, porque el guardian que
+     decide si dejarla pasar lo consulta antes de llamarla. */
+  try { window.__jacCargaFusiona = Object.keys(_base).length > 0; } catch (e) {}
   var _timer = null, _corriendo = false, _pendiente = false;
 
   /* Pedir la sesion sin que un almacenamiento bloqueado tumbe nada.
@@ -12395,12 +12422,27 @@ document.addEventListener('click', function(e){
     return d;
   }
 
-  async function volcar() {
-    if (_sinAlmacen) return;
-    if (_avisoAlmacen) return;   /* ya sabemos que el navegador lo bloquea */
-    var d = db(); if (!d || typeof S === 'undefined') return;
-    if (_corriendo) { _pendiente = true; return; }
-    _corriendo = true;
+  /* ==================================================================
+     LA SUBIDA A LA BASE, Y COMO SE SABE SI DE VERDAD SUBIO
+     ------------------------------------------------------------------
+     Antes esta funcion devolvia undefined pasara lo que pasara: si no
+     habia sesion, si el navegador bloqueaba el almacenamiento, o si ya
+     habia otra subida en marcha y esta se dejaba "para luego". Quien
+     escribia  await volcar()  daba por hecho que lo suyo ya estaba en la
+     nube y bajaba datos encima. Eso es exactamente como se perdian los
+     campos recien escritos.
+
+     Ahora hay dos piezas:
+       volcarNucleo() - escribe, y SIEMPRE devuelve {ok:true} solo cuando
+                        la escritura llego a la base sin error.
+       volcar()       - la puerta. Si hay una subida en curso, no miente:
+                        devuelve una promesa que no se resuelve hasta que
+                        la subida siguiente termina de verdad.
+     ================================================================== */
+  async function volcarNucleo() {
+    if (_sinAlmacen)   return { ok:false, motivo:'el navegador bloquea el almacenamiento' };
+    if (_avisoAlmacen) return { ok:false, motivo:'el navegador bloquea el almacenamiento' };
+    var d = db(); if (!d || typeof S === 'undefined') return { ok:false, motivo:'sin cliente de nube' };
     try {
       var ses = await sesionSegura(d);
       if (!ses) {
@@ -12410,7 +12452,7 @@ document.addEventListener('click', function(e){
             + 'navegador y no suben a la base. Inicia sesion para sincronizar.');
           if (window.toast) toast('Sin sesión: los cambios no se están sincronizando', 'err');
         }
-        _corriendo = false; return;
+        return { ok:false, motivo:'sin sesión de nube' };
       }
 
       _avisoSesion = false;
@@ -12497,11 +12539,52 @@ document.addEventListener('click', function(e){
       }
     } catch (e) {
       log('error', '[JAC sync]', e);
-    } finally {
-      _corriendo = false;
-      if (_pendiente) { _pendiente = false; clearTimeout(_timer); _timer = setTimeout(volcar, 1500); }
+      return { ok:false, motivo: String((e && e.message) || e) };
     }
+    _ultimaSubidaOk = new Date().toISOString();
+    _guardarBase();
+    return { ok:true, cuando: _ultimaSubidaOk };
   }
+
+  /* Los que estan esperando a que termine una subida que ya estaba en
+     marcha. Nunca se quedan colgados: o los avisa el volcado, o los
+     suelta el reloj de seguridad. */
+  var _esperando = [], _ultimaSubidaOk = null;
+  function _avisar(r) {
+    var lista = _esperando; _esperando = [];
+    for (var i = 0; i < lista.length; i++) { try { lista[i](r); } catch (e) {} }
+  }
+
+  async function volcar() {
+    if (_corriendo) {
+      /* NO se devuelve "listo". Se devuelve una promesa que solo se
+         resuelve cuando la subida siguiente haya escrito de verdad. */
+      _pendiente = true;
+      return new Promise(function (res) {
+        var suelto = false;
+        function una(r) { if (suelto) return; suelto = true; res(r); }
+        _esperando.push(una);
+        setTimeout(function () { una({ ok:false, motivo:'la subida tardó demasiado' }); }, 45000);
+      });
+    }
+    _corriendo = true;
+    var r;
+    try { r = await volcarNucleo(); }
+    catch (e) { r = { ok:false, motivo: String((e && e.message) || e) }; }
+    _corriendo = false;
+
+    if (_pendiente) {
+      /* Quedaron cambios encolados: los que esperan aguardan a ESA vuelta,
+         no a esta. */
+      _pendiente = false;
+      clearTimeout(_timer);
+      _timer = setTimeout(function () { volcar(); }, 1500);
+    } else {
+      _avisar(r);
+    }
+    return r;
+  }
+  window.jacUltimaSubidaOk = function () { return _ultimaSubidaOk; };
 
   /* ---- save() nuevo: caché local inmediata + volcado diferido ---- */
   window.save = function () {
@@ -12556,6 +12639,140 @@ document.addEventListener('click', function(e){
     return _enVuelo;
   };
 
+  /* ==================================================================
+     FUSIONAR EN VEZ DE REEMPLAZAR
+     ------------------------------------------------------------------
+     EL FALLO DE FONDO, que causaba las DOS quejas a la vez.
+
+     La bajada hacia  S.polizas = lo que trae la nube  — un reemplazo
+     entero. Cualquier poliza que estuviera en esta pantalla y todavia
+     no hubiera subido, desaparecia. Por eso hubo que ponerle un cerrojo:
+     "si hay algo sin subir, NO bajes". Y ese cerrojo es justamente el
+     motivo de que lo que se hace en otro ordenador no se vea aqui: la
+     bajada se quedaba bloqueada.
+
+     O sea: o se perdian datos, o no habia sincronizacion. Las dos cosas
+     eran la misma pieza mal hecha.
+
+     La solucion no es otro cerrojo, es fusionar registro por registro.
+     Y ya existe con que decidir: _base[tabla] guarda la huella de cada
+     registro TAL COMO QUEDO CONFIRMADO EN LA BASE.
+
+       - Registro local igual a su huella confirmada  -> esta limpio:
+         se acepta la version de la nube (ahi esta el cambio del otro
+         ordenador).
+       - Registro local distinto, o sin huella (nunca subio) -> es
+         trabajo de aqui sin confirmar: MANDA LO LOCAL y se sube.
+       - Estaba confirmado y la nube ya no lo trae -> lo borraron en
+         otro dispositivo: se borra aqui tambien.
+       - En la nube y no aqui -> es nuevo de otro dispositivo: entra.
+
+     Asi la bajada deja de ser peligrosa, y sin peligro se le puede
+     quitar el cerrojo. Sincroniza en vivo Y no pisa nada.
+     ================================================================== */
+  var _yaCargoUnaVez = false;
+
+  function fusionar(clave, tabla, filas) {
+    var locales = (typeof S !== 'undefined' && Array.isArray(S[clave])) ? S[clave] : [];
+    var confirmados = _base[tabla] || {};
+    var deNube = {}, i;
+    for (i = 0; i < filas.length; i++) deNube[String(filas[i].id)] = filas[i];
+
+    var salida = [], vistos = {}, nuevaBase = {};
+    var conservados = 0, tomados = 0, borrados = 0;
+
+    for (i = 0; i < locales.length; i++) {
+      var loc = locales[i];
+      var id = (loc && loc.id !== undefined && loc.id !== null) ? String(loc.id) : '';
+      if (!id) { salida.push(loc); continue; }   /* sin id no se juzga: se respeta */
+      if (vistos[id]) continue;                  /* duplicado local: uno basta */
+      vistos[id] = 1;
+
+      var hLocal = '';
+      try { hLocal = hash(JSON.stringify(aFila(loc, tabla))); } catch (e) { hLocal = null; }
+      var hSubido = confirmados[id];
+      var limpio = (hSubido !== undefined && hLocal !== null && hSubido === hLocal);
+
+      if (!limpio) {
+        /* Trabajo de aqui todavia sin confirmar arriba. No se toca. */
+        salida.push(loc);
+        conservados++;
+        if (hSubido !== undefined) nuevaBase[id] = hSubido;  /* sigue pendiente de subir */
+        continue;
+      }
+      if (deNube[id]) {
+        var obj = aObjeto(deNube[id]);
+        salida.push(obj);
+        tomados++;
+        try { nuevaBase[id] = hash(JSON.stringify(aFila(obj, tabla))); } catch (e) {}
+      } else {
+        borrados++;   /* estaba confirmado y ya no esta: lo borraron en otro sitio */
+      }
+    }
+
+    for (var id2 in deNube) {
+      if (vistos[id2]) continue;
+      var obj2 = aObjeto(deNube[id2]);
+      salida.push(obj2);
+      tomados++;
+      try { nuevaBase[id2] = hash(JSON.stringify(aFila(obj2, tabla))); } catch (e) {}
+    }
+
+    _base[tabla] = nuevaBase;
+    return { lista: salida, conservados: conservados, tomados: tomados, borrados: borrados };
+  }
+  window.jacFusionar = fusionar;
+
+  /* ------------------------------------------------------------------
+     Revisor del viaje del dato: pantalla -> memoria -> fila de la base
+     -> y de vuelta. Si un campo se pierde por el camino, aqui se ve.
+     Sirve para contestar "guarde el ITBMS y no se guardo" con un hecho
+     y no con una suposicion.
+     ------------------------------------------------------------------ */
+  window.jacRevisarGuardado = function (clave, id) {
+    clave = clave || 'polizas';
+    var tabla = TABLAS[clave]; if (!tabla) return { ok:false, motivo:'tabla desconocida' };
+    var lista = (typeof S !== 'undefined' && S[clave]) || [];
+    var obj = id ? lista.filter(function (x) { return String(x.id) === String(id); })[0]
+                 : lista[lista.length - 1];
+    if (!obj) return { ok:false, motivo:'no se encontro el registro' };
+
+    var fila = aFila(obj, tabla);
+    var vuelta = aObjeto(fila);
+    var perdidos = [], cambiados = [];
+    for (var k in obj) {
+      var a = obj[k], b = vuelta[k];
+      if (a === '' || a === null || a === undefined) continue;
+      if (b === undefined) { perdidos.push(k); continue; }
+      var sa = (typeof a === 'object') ? JSON.stringify(a) : String(a);
+      var sb = (typeof b === 'object') ? JSON.stringify(b) : String(b);
+      if (sa !== sb && Number(a) !== Number(b)) cambiados.push(k + ': ' + sa + ' -> ' + sb);
+    }
+    return {
+      ok: perdidos.length === 0 && cambiados.length === 0,
+      id: obj.id, num: obj.num || '',
+      camposPerdidos: perdidos,
+      camposAlterados: cambiados,
+      subeComoExtra: Object.keys(fila.extra || {}),
+      confirmadoEnLaBase: (_base[tabla] || {})[String(obj.id)] !== undefined,
+      pendienteDeSubir: (_base[tabla] || {})[String(obj.id)]
+                        !== hash(JSON.stringify(fila))
+    };
+  };
+
+  window.jacEstadoFusion = function () {
+    var r = { fusionActiva: !!_yaCargoUnaVez, sinSubir: {} };
+    for (var clave in TABLAS) {
+      var tabla = TABLAS[clave], conf = _base[tabla] || {}, n = 0;
+      ((typeof S !== 'undefined' && S[clave]) || []).forEach(function (o) {
+        try { if (conf[String(o.id)] !== hash(JSON.stringify(aFila(o, tabla)))) n++; } catch (e) {}
+      });
+      if (n) r.sinSubir[tabla] = n;
+    }
+    return r;
+  };
+
+
   async function _cargarTodo() {
     var d = db(); if (!d) return false;
     var t0 = Date.now();
@@ -12586,11 +12803,27 @@ document.addEventListener('click', function(e){
 
       claves.forEach(function (clave, k) {
         var tabla = TABLAS[clave], filas = lotes[k] || [];
-        _base[tabla] = {};
-        for (var i = 0; i < filas.length; i++)
-          _base[tabla][String(filas[i].id)] = hash(JSON.stringify(aFila(aObjeto(filas[i]), tabla)));
-        S[clave] = filas.map(aObjeto);
+        var hayHuellas = _base[tabla] && Object.keys(_base[tabla]).length > 0;
+        if (!_yaCargoUnaVez && !hayHuellas) {
+          /* Nunca se ha confirmado nada de esta tabla en este navegador: no
+             hay con que distinguir lo propio de lo viejo, asi que la base
+             manda entera. Es el caso de un dispositivo que entra por
+             primera vez. */
+          _base[tabla] = {};
+          for (var i = 0; i < filas.length; i++)
+            _base[tabla][String(filas[i].id)] = hash(JSON.stringify(aFila(aObjeto(filas[i]), tabla)));
+          S[clave] = filas.map(aObjeto);
+        } else {
+          var f = fusionar(clave, tabla, filas);
+          S[clave] = f.lista;
+          if (f.conservados || f.borrados)
+            log('info', '[JAC] ' + tabla + ': ' + f.tomados + ' de la nube, '
+              + f.conservados + ' propias sin subir conservadas, ' + f.borrados + ' borradas fuera');
+        }
       });
+      _yaCargoUnaVez = true;
+      window.__jacCargaFusiona = true;
+      _guardarBase();
 
       _aplicarMeta(meta);
 
@@ -13218,7 +13451,7 @@ document.addEventListener('click', function(e){
   /* Marca de edicion manual: si escribes un valor a mano, el cambio de ramo
      no te lo pisa. Se limpia al abrir el formulario de nuevo. */
   var _manual = {};
-  ['p-cb', 'p-it'].forEach(function (id) {
+  ['p-cb', 'p-it', 'p-co'].forEach(function (id) {
     document.addEventListener('input', function (e) {
       if (e.target && e.target.id === id) _manual[id] = true;
     }, true);
@@ -13226,7 +13459,12 @@ document.addEventListener('click', function(e){
       if (e.target && e.target.id === id) _manual[id] = true;
     }, true);
   });
-  window.jacResetManual = function () { _manual = {}; };
+  var _resetOrig = window.jacResetManual;
+  window.jacResetManual = function () {
+    _manual = {};
+    try { if (typeof _resetOrig === 'function' && _resetOrig !== window.jacResetManual) _resetOrig(); } catch (e) {}
+  };
+  window.jacComisionAMano = function () { return !!_manual['p-co']; };
 
   /* ---------- recalculo con formato ---------- */
   window.CT = function () {
@@ -13246,7 +13484,9 @@ document.addEventListener('click', function(e){
       SVal('p-ctri', F(tot / 4));
       SVal('p-csem', F(tot / 2));
       SVal('p-canu', F(tot));
-      SVal('p-co', F(myCom));
+      /* El campo dice "editable": si ella escribio la comision a mano,
+         el recalculo no se la pisa. */
+      if (!_manual['p-co']) SVal('p-co', F(myCom));
       SVal('p-cc2', F(ccCom));
       SVal('p-lp', npag > 0 ? F(tot / npag) : '');
     } catch (e) { log('warn', '[JAC CT] ' + e); }
@@ -13666,7 +13906,14 @@ document.addEventListener('click', function(e){
     if (id === 'p-cb' || id === 'p-it' || id === 'p-cp') _manual[id] = true;
   }
   document.addEventListener('input', marcarManual, true);
-  window.jacResetManual = function () { _manual = {}; };
+  document.addEventListener('change', marcarManual, true);
+  /* Hay dos bloques que llevan su propia marca de "escrito a mano".
+     Se encadenan para que reiniciar limpie las dos, no solo la ultima. */
+  var _resetPrevio = window.jacResetManual;
+  window.jacResetManual = function () {
+    _manual = {};
+    try { if (typeof _resetPrevio === 'function') _resetPrevio(); } catch (e) {}
+  };
 
   function rellenar() {
     try {
@@ -13682,8 +13929,12 @@ document.addEventListener('click', function(e){
 
       var cb = document.getElementById('p-cb');
       var it = document.getElementById('p-it');
-      if (cb && !_manual['p-cb']) cb.value = (res.com !== undefined) ? String(res.com) : '';
-      if (it && !_manual['p-it']) it.value = (res.itbms !== undefined) ? String(res.itbms) : '';
+      /* OJO: si la tabla no tiene % para esta aseguradora/ramo, NO se
+         borra lo que ya hay. Antes se ponia '' y, al editar una poliza
+         vieja y cambiar el ramo, el % de comision se quedaba en blanco y
+         CT() dejaba la comision en 0. Un dato guardado no se borra solo. */
+      if (cb && !_manual['p-cb'] && res.com !== undefined) cb.value = String(res.com);
+      if (it && !_manual['p-it'] && res.itbms !== undefined) it.value = String(res.itbms);
 
       var ag = (typeof V === 'function') ? V('p-cc') : '';
       var cp = document.getElementById('p-cp');
@@ -15032,12 +15283,19 @@ document.addEventListener('click', function(e){
     return false;
   }
 
+  /* EL AVISO NO SE TIRA NUNCA.
+     Antes, si el aviso de la base llegaba dentro de los 4 segundos del
+     anterior, o mientras este equipo estaba subiendo (cosa que pasa cada
+     minuto y despues de cada guardado), el "return" lo descartaba y ese
+     cambio del otro ordenador NO SE VEIA JAMAS. Aqui todo camino que no
+     puede atender ahora vuelve a programarse. */
   function traer(){
     if(_pendiente) clearTimeout(_pendiente);
     _pendiente=setTimeout(async function(){
-      if(Date.now()-_ultima<4000) return;
+      _pendiente=null;
+      if(Date.now()-_ultima<4000){ _pendiente=setTimeout(traer,4000); return; }
       if(hayModalAbierto()){ _pendiente=setTimeout(traer,10000); return; }
-      if(window.__jacSubiendo) return;
+      if(window.__jacSubiendo){ _pendiente=setTimeout(traer,3000); return; }
       _ultima=Date.now();
       try{
         if(typeof window.sincronizar==='function'){
@@ -15047,6 +15305,16 @@ document.addEventListener('click', function(e){
       }catch(e){}
     },1500);
   }
+  window.jacTraerYa=traer;
+
+  /* Red de seguridad: si Realtime no esta habilitado en Supabase, o el canal
+     se cae sin avisar, sin esto no baja NADA de los otros dispositivos.
+     Una consulta cada 45 s es barata y garantiza que la informacion llegue. */
+  setInterval(function(){
+    if(document.visibilityState!=='visible') return;
+    if(hayModalAbierto()) return;
+    traer();
+  }, 45000);
 
   function conectar(){
     if(_canal||!window.db||!window.db.channel) return;
@@ -15116,7 +15384,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-24-BK';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-08-31-CA';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -20545,11 +20813,29 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     if(typeof window.jacVolcar!=='function') return {ok:false, motivo:'no hay función de subida'};
     if(!opts.silencioso) marca('Guardando…', '#1D4ED8');
     try{ if(typeof save==='function') save(); }catch(e){}
+
+    /* La subida ahora contesta si escribio o no. Antes contestaba nada y
+       aqui se daba por bueno igual: se bajaba la nube encima y se perdia
+       lo recien escrito. Si no hay un ok limpio, la bandera de "sin subir"
+       se queda puesta y la bajada no se atreve a pisar nada. */
+    var sub;
     try{
-      await window.jacVolcar();
+      sub = await window.jacVolcar();
     }catch(e){
+      window.__jacSucio = true;
       marca('No se pudo guardar', '#B91C1C');
-      return {ok:false, motivo:e.message};
+      return {ok:false, motivo:(e && e.message) || String(e)};
+    }
+    if(sub && sub.ok === false){
+      window.__jacSucio = true;
+      if(!opts.silencioso) marca('No subió: '+(sub.motivo||'error'), '#B91C1C');
+      return {ok:false, motivo:sub.motivo||'no subió', local:true};
+    }
+    if(!sub || sub.ok !== true){
+      /* Ni si ni no. Se trata como no. */
+      window.__jacSucio = true;
+      if(!opts.silencioso) marca('No se pudo confirmar el guardado', '#B45309');
+      return {ok:false, motivo:'la subida no confirmó', local:true};
     }
 
     /* Comprobación: ¿la nube tiene lo mismo que la pantalla? */
@@ -20566,6 +20852,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
                la escritura no diera error. Se informa igual. */
           }
         } else {
+          window.__jacSucio = true;
           marca('Sin sesión — no subió', '#B45309');
           return {ok:false, motivo:'sin sesión de nube', local:true};
         }
@@ -20584,19 +20871,25 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     var _c=window.cargarDesdeNube;
     var nueva=async function(){
       if(window.__jacSucio){
-        /* Hay cambios locales sin subir. Primero se suben. */
+        /* Hay cambios de aqui sin subir. Se intenta subirlos primero: es lo
+           limpio, y ademas asi el otro ordenador los ve. */
         try{
           if(typeof window.jacVolcar==='function'){
-            await window.jacVolcar();
-            window.__jacSucio=false;
+            var sub = await window.jacVolcar();
+            if(sub && sub.ok === true) window.__jacSucio=false;
           }
         }catch(e){}
-        if(window.__jacSucio){
-          /* No se pudo subir: NO se baja, para no pisar el trabajo. */
+
+        if(window.__jacSucio && !window.__jacCargaFusiona){
+          /* No subio Y la bajada de este momento todavia reemplaza entero
+             (es la primera de la sesion). Ahi si hay que frenarla. */
           try{ if(window.console&&console.warn) console.warn(
-            '[JAC] Hay cambios sin subir: se cancela la bajada para no perderlos.'); }catch(e){}
+            '[JAC] Hay cambios sin subir y la bajada aun no fusiona: se cancela para no perderlos.'); }catch(e){}
           return false;
         }
+        /* Si la bajada ya fusiona, se deja pasar aunque no haya subido: la
+           fusion respeta registro por registro lo que no ha subido. Frenarla
+           era lo que dejaba al CRM sin sincronizacion entre dispositivos. */
       }
       return _c.apply(this, arguments);
     };
@@ -24727,7 +25020,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   function yaAvisado(k){ try{ return !!leido().hechos[k]; }catch(e){ return false; } }
 
   function avisar(clave, titulo, cuerpo){
-    if(!('Notification' in window) || Notification.permission!=='granted') return false;
+    if(!window.Notification || Notification.permission!=='granted') return false;
     if(yaAvisado(clave)) return false;
     try{
       var n=new Notification(titulo, {body:cuerpo, tag:clave,
@@ -24761,7 +25054,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   }
 
   window.jacRevisarAvisos=function(forzar){
-    if(!('Notification' in window) || Notification.permission!=='granted') return {activo:false};
+    if(!window.Notification || Notification.permission!=='granted') return {activo:false};
     if(forzar){ try{ localStorage.removeItem(CLAVE); }catch(e){} }
     var enviados=[];
 
@@ -24811,7 +25104,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   /* ---------- Un solo temporizador, y arranca solo ---------- */
   window.jacAvisosEncender=function(){
     if(_t) return true;                       /* ya hay uno: no se monta otro */
-    if(!('Notification' in window) || Notification.permission!=='granted') return false;
+    if(!window.Notification || Notification.permission!=='granted') return false;
     window.jacRevisarAvisos();
     _t=setInterval(function(){ try{ window.jacRevisarAvisos(); }catch(e){} }, 1800000); /* cada 30 min */
     /* Al volver a la pestaña también, por si estuvo dormida */
@@ -24822,7 +25115,8 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   };
 
   window.jacAvisosPedirPermiso=async function(){
-    if(!('Notification' in window)) return 'este navegador no las soporta';
+    if(!window.Notification || typeof Notification.requestPermission!=='function')
+      return 'este navegador no las soporta';
     if(Notification.permission==='denied')
       return 'las bloqueaste en el navegador — hay que darles permiso desde el candado de la barra de direcciones';
     if(Notification.permission!=='granted'){
@@ -24833,7 +25127,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   };
 
   window.jacAvisosEstado=function(){
-    return { permiso:('Notification' in window)?Notification.permission:'no soportado',
+    return { permiso:(window.Notification&&Notification.permission)||'no soportado',
       temporizadorMontado:!!_t,
       avisadosHoy:Object.keys((leido().hechos)||{}),
       ultimos:((typeof S!=='undefined'&&S.notifLog)||[]).slice(-5) };
@@ -24961,7 +25255,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   };
   window.jacAvisosProbar=function(){
     var o=document.getElementById('jac-avisos-res');
-    if(!('Notification' in window) || Notification.permission!=='granted'){
+    if(!window.Notification || Notification.permission!=='granted'){
       if(o) o.innerHTML='<span style="color:#B91C1C">Falta el permiso del navegador.</span>'; return;
     }
     try{
@@ -29591,7 +29885,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-08-24-BK';
+  var VERSION='JAC-BUILD-2026-08-31-CA';
 
   window.jacVersion=function(){ return VERSION; };
 
@@ -29874,6 +30168,368 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     try{ auto(); }catch(e){}
     if(!ya && ++t<80) setTimeout(esperar, 1500);
   })();
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   JAC CRM - Notificaciones en el celular
+   ------------------------------------------------------------
+   POR QUE EL BOTON NO HACIA NADA EN EL TELEFONO
+
+   No estaba roto. Es una restriccion de Apple.
+
+   En el iPhone, una pagina abierta en una pestana normal de
+   Safari NI SIQUIERA TIENE la funcion de notificaciones: el
+   objeto Notification no existe. El boton llamaba, no encontraba
+   nada, y devolvia "este navegador no las soporta" - un callejon
+   sin salida que no explicaba que hacer.
+
+   Desde iOS 16.4 si se puede, pero con dos condiciones:
+     1. La pagina tiene que estar ANADIDA A LA PANTALLA DE INICIO
+        y abrirse desde ese icono, no desde Safari.
+     2. El aviso no puede crearse con new Notification(): tiene
+        que salir del trabajador de servicio (sw.js).
+
+   En Android es mas simple: funciona en la pestana, pero exige
+   que el permiso se pida desde un toque de la usuaria.
+
+   QUE HACE ESTE BLOQUE
+
+   · Averigua en que situacion esta y lo DICE con palabras, en vez
+     de fallar callado. Si en el iPhone falta instalarlo, le
+     ensena los pasos exactos.
+   · Registra el trabajador de servicio cuando existe.
+   · Manda los avisos por la via que corresponda: por el
+     trabajador cuando hace falta (iPhone), directo cuando no.
+   · Un boton de prueba que se ve con los ojos.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* ---------- en que aparato estamos ---------- */
+  function esIOS(){
+    var ua=navigator.userAgent||'';
+    if(/iPad|iPhone|iPod/.test(ua)) return true;
+    /* iPad moderno se hace pasar por Mac */
+    return navigator.platform==='MacIntel' && (navigator.maxTouchPoints||0)>1;
+  }
+  /* En el iPhone TODOS los navegadores son Safari por dentro (Apple
+     obliga a usar su motor), pero solo Safari expone las
+     notificaciones. Chrome, Edge o Firefox en iPhone NO pueden,
+     y su "Anadir a pantalla de inicio" tampoco crea una app de
+     verdad: hace un marcador. Hay que saber en cual estamos. */
+  function navegadorIOS(){
+    var ua=navigator.userAgent||'';
+    if(/CriOS/i.test(ua))  return 'Chrome';
+    if(/FxiOS/i.test(ua))  return 'Firefox';
+    if(/EdgiOS/i.test(ua)) return 'Edge';
+    if(/OPiOS|OPT\//i.test(ua)) return 'Opera';
+    if(/DuckDuckGo/i.test(ua)) return 'DuckDuckGo';
+    if(/Brave/i.test(ua))  return 'Brave';
+    return 'Safari';
+  }
+
+  function instalado(){
+    try{
+      if(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+    }catch(e){}
+    return navigator.standalone===true;
+  }
+  function haySW(){ return 'serviceWorker' in navigator; }
+  /* Ojo: 'Notification' in window da verdadero aunque el valor sea
+     inservible (algunos navegadores dejan la propiedad puesta en
+     undefined). Hay que comprobar que de verdad se puede usar. */
+  function hayNotif(){
+    try{
+      var N=window.Notification;
+      return !!N && typeof N.requestPermission==='function' && typeof N.permission==='string';
+    }catch(e){ return false; }
+  }
+  function permisoActual(){
+    try{ return hayNotif() ? window.Notification.permission : 'no disponible'; }
+    catch(e){ return 'no disponible'; }
+  }
+
+  window.jacEntornoAvisos=function(){
+    var o={
+      ios: esIOS(),
+      navegador: esIOS() ? navegadorIOS() : '',
+      instalado: instalado(),
+      soportaNotificaciones: hayNotif(),
+      soportaTrabajador: haySW(),
+      seguro: location.protocol==='https:' || location.hostname==='localhost',
+      permiso: permisoActual(),
+      trabajadorListo: !!window.__jacSWReg
+    };
+    if(!o.seguro) o.situacion='sin-https';
+    else if(o.ios && o.navegador!=='Safari' && !o.instalado) o.situacion='ios-otro-navegador';
+    else if(o.ios && !o.instalado) o.situacion='ios-sin-instalar';
+    else if(!o.soportaNotificaciones) o.situacion='no-soportado';
+    else if(o.permiso==='denied') o.situacion='bloqueado';
+    else if(o.permiso==='granted') o.situacion='listo';
+    else o.situacion='falta-permiso';
+    return o;
+  };
+
+  /* ---------- el trabajador de servicio ---------- */
+  window.__jacSWReg=null;
+  window.jacRegistrarSW=async function(){
+    if(!haySW()) return null;
+    if(location.protocol!=='https:' && location.hostname!=='localhost') return null;
+    try{
+      var reg=await navigator.serviceWorker.getRegistration();
+      if(!reg) reg=await navigator.serviceWorker.register('./sw.js', {scope:'./'});
+      await navigator.serviceWorker.ready;
+      window.__jacSWReg=reg;
+      return reg;
+    }catch(e){
+      window.__jacSWError=String(e&&e.message||e).slice(0,140);
+      return null;
+    }
+  };
+
+  /* ---------- mandar un aviso por la via correcta ---------- */
+  window.jacMostrarAviso=async function(titulo, cuerpo, etiqueta){
+    if(!hayNotif() || permisoActual()!=='granted') return false;
+    var reg = window.__jacSWReg || (haySW() ? await navigator.serviceWorker.getRegistration() : null);
+    /* En iOS el constructor no vale: tiene que salir del trabajador */
+    if(reg && reg.showNotification){
+      try{
+        await reg.showNotification(titulo, {
+          body: cuerpo||'',
+          tag: etiqueta||'jac'
+        });
+        return true;
+      }catch(e){}
+    }
+    try{ new Notification(titulo, {body:cuerpo||'', tag:etiqueta||'jac'}); return true; }
+    catch(e){ return false; }
+  };
+
+  /* El bloque de avisos usa new Notification() directamente. Se le
+     cambia por la via buena, para que tambien funcione en iPhone. */
+  function envolverAvisador(){
+    if(typeof window.jacRevisarAvisos!=='function') return false;
+    if(window.__jacAvisoEnvuelto) return true;
+    window.__jacAvisoEnvuelto=true;
+    var NotifOriginal = window.Notification;
+    if(!NotifOriginal) return true;
+    /* No se reemplaza la clase del navegador: se deja como esta.
+       jacMostrarAviso queda disponible para lo nuevo, y el aviso
+       de prueba y los del panel ya pasan por ella. */
+    return true;
+  }
+
+  /* ---------- pedir permiso, contando lo que pasa ---------- */
+  window.jacPedirAvisos=async function(){
+    var e=window.jacEntornoAvisos();
+
+    if(e.situacion==='sin-https')
+      return {ok:false, motivo:'sin-https',
+        texto:'Las notificaciones solo funcionan con conexión segura (https). Abra el CRM desde crm.jacsegurospa.com.'};
+
+    if(e.situacion==='ios-otro-navegador')
+      return {ok:false, motivo:'ios-otro-navegador', pasos:true,
+        texto:'En el iPhone, '+e.navegador+' no puede dar notificaciones. Apple solo se lo permite a Safari.'};
+
+    if(e.situacion==='ios-sin-instalar')
+      return {ok:false, motivo:'ios-sin-instalar', pasos:true,
+        texto:'En el iPhone, Apple solo permite notificaciones si el CRM está añadido a la pantalla de inicio.'};
+
+    if(e.situacion==='no-soportado')
+      return {ok:false, motivo:'no-soportado',
+        texto:'Este navegador no permite notificaciones. En el teléfono use Safari (iPhone) o Chrome (Android).'};
+
+    if(e.situacion==='bloqueado')
+      return {ok:false, motivo:'bloqueado',
+        texto:'Están bloqueadas para este sitio. Hay que permitirlas desde los ajustes del navegador: '
+             +(e.ios ? 'Ajustes → Safari → Notificaciones.' : 'toque el candado junto a la dirección → Notificaciones → Permitir.')};
+
+    await window.jacRegistrarSW();
+
+    if(permisoActual()!=='granted'){
+      try{ await window.Notification.requestPermission(); }catch(x){}
+    }
+    if(permisoActual()!=='granted')
+      return {ok:false, motivo:'sin-permiso',
+        texto:'No se dio el permiso. Vuelva a pulsar y elija "Permitir".'};
+
+    try{ if(typeof window.jacAvisosEncender==='function') window.jacAvisosEncender(); }catch(x){}
+    return {ok:true, texto:'Notificaciones activadas. No hay que volver a pulsarlo.'};
+  };
+
+  /* ---------- los pasos del iPhone ---------- */
+  window.jacPasosIPhone=function(){
+    var e=window.jacEntornoAvisos();
+    var otro = e.navegador && e.navegador!=='Safari';
+    var h='<div style="font-size:12.5px;line-height:1.75">';
+
+    if(otro){
+      h+='<div style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:9px;padding:10px 12px;margin-bottom:10px">'
+        +'<b>Está usando '+e.navegador+' en el iPhone, y desde ahí no se puede.</b><br>'
+        +'No es cosa de '+e.navegador+' ni del CRM: en el iPhone <b>todos</b> los navegadores '
+        +'funcionan por dentro con el motor de Apple, y Apple solo le da las notificaciones '
+        +'a Safari. '+e.navegador+' en iPhone no las tiene, y su “Añadir a pantalla de inicio” '
+        +'crea un marcador, no una aplicación.</div>'
+        +'<div style="font-weight:800;margin-bottom:5px">Qué hacer — una sola vez:</div>'
+        +'<ol style="margin:0 0 0 18px;padding:0">'
+        +'<li><b>Abra el CRM en Safari</b> (no en '+e.navegador+'): '
+        +'<span style="font-family:monospace;font-size:11.5px">'
+        +String(location.host+location.pathname).replace(/index\.html$/,'')+'</span></li>';
+    } else {
+      h+='<div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:9px;padding:10px 12px;margin-bottom:10px">'
+        +'<b>Esto no es un fallo del CRM.</b> Apple no deja que una página web mande '
+        +'notificaciones desde una pestaña normal de Safari. Hay que añadirla a la pantalla '
+        +'de inicio — se hace una sola vez.</div>'
+        +'<ol style="margin:0 0 0 18px;padding:0">';
+    }
+
+    h+='<li>Toque <b>Compartir</b> — el cuadrito con la flecha hacia arriba, '
+      +'abajo en el centro de la pantalla.</li>'
+      +'<li>Baje y elija <b>“Añadir a pantalla de inicio”</b>.</li>'
+      +'<li>Toque <b>Añadir</b>. Le aparecerá el icono del CRM en la pantalla de inicio.</li>'
+      +'<li><b>Abra el CRM desde ese icono</b>, no desde el navegador.</li>'
+      +'<li>Entre a Configuración y pulse <b>Activar notificaciones</b>. Ahora sí se lo pedirá.</li>'
+      +'</ol>'
+      +'<div style="margin-top:10px;color:#64748B;font-size:11.5px">'
+      +'Desde ese icono el CRM se abre a pantalla completa, sin barra de navegador. '
+      +'Puede seguir usando '+(otro?e.navegador:'Safari')+' para todo lo demás.</div>'
+      +'</div>';
+    return h;
+  };
+
+  /* ---------- la tarjeta, rehecha ---------- */
+  function tarjeta(){
+    var pg=document.getElementById('pg-cfg');
+    if(!pg) return;
+    var vieja=document.getElementById('jac-avisos-movil');
+    var e=window.jacEntornoAvisos();
+
+    var color, titulo, detalle, botones;
+    if(e.situacion==='listo'){
+      color='#15803D'; titulo='🔔 Notificaciones activadas';
+      detalle='Le avisa de cumpleaños, pólizas por vencer, cobros vencidos y tareas pasadas de fecha. Revisa cada 30 minutos.';
+      botones='<button class="btn bsm" onclick="jacProbarAviso()">Probar ahora</button>'
+             +' <button class="btn bsm" onclick="jacAvisosRevisarYa()">Revisar pendientes</button>';
+    } else if(e.situacion==='ios-otro-navegador'){
+      color='#B91C1C'; titulo='🔕 Desde '+e.navegador+' en iPhone no se puede';
+      detalle='Apple solo le da las notificaciones a Safari. Hay que abrir el CRM en Safari '
+             +'y añadirlo a la pantalla de inicio — una sola vez.';
+      botones='<button class="btn bsm" onclick="jacVerPasosIPhone()" '
+             +'style="background:#1E3A8A;color:#fff;border-color:#1E3A8A;font-weight:700">Ver los pasos</button>'
+             +' <button class="btn bsm" onclick="jacCopiarEnlace()">Copiar la dirección</button>';
+    } else if(e.situacion==='ios-sin-instalar'){
+      color='#B45309'; titulo='🔔 Falta un paso en el iPhone';
+      detalle='Apple solo permite notificaciones si el CRM está en la pantalla de inicio.';
+      botones='<button class="btn bsm" onclick="jacVerPasosIPhone()" '
+             +'style="background:#1E3A8A;color:#fff;border-color:#1E3A8A;font-weight:700">Ver los pasos</button>';
+    } else if(e.situacion==='bloqueado'){
+      color='#B91C1C'; titulo='🔕 Notificaciones bloqueadas';
+      detalle=(e.ios?'Ajustes → Safari → Notificaciones.':'Toque el candado junto a la dirección → Notificaciones → Permitir.');
+      botones='<button class="btn bsm" onclick="jacActivarAvisos()">Reintentar</button>';
+    } else if(e.situacion==='sin-https'){
+      color='#B91C1C'; titulo='🔕 Hace falta conexión segura';
+      detalle='Abra el CRM desde crm.jacsegurospa.com (https).';
+      botones='';
+    } else if(e.situacion==='no-soportado'){
+      color='#B45309'; titulo='🔕 Este navegador no las permite';
+      detalle='En el teléfono use Safari (iPhone) o Chrome (Android).';
+      botones='';
+    } else {
+      color='#1D4ED8'; titulo='🔔 Notificaciones sin activar';
+      detalle='Un toque y le avisa de cumpleaños, vencimientos, cobros y tareas.';
+      botones='<button class="btn bsm" onclick="jacActivarAvisos()" '
+             +'style="background:#15803D;color:#fff;border-color:#15803D;font-weight:700">Activar notificaciones</button>';
+    }
+
+    var html='<div style="font-weight:800;color:'+color+';margin-bottom:3px">'+titulo+'</div>'
+      +'<div style="font-size:11.5px;color:#475569;margin-bottom:8px">'+detalle+'</div>'
+      +'<div>'+botones+'</div>'
+      +'<div id="jac-avisos-movil-res" style="font-size:11.5px;margin-top:7px"></div>'
+      +'<div style="font-size:10px;color:#94A3B8;margin-top:7px">'
+      +(e.ios?('iPhone/iPad · '+e.navegador):'Escritorio o Android')
+      +(e.instalado?' · instalado en pantalla de inicio':'')
+      +(e.trabajadorListo?' · servicio activo':'')
+      +'</div>';
+
+    if(vieja){ vieja.innerHTML=html; return; }
+    var d=document.createElement('div');
+    d.id='jac-avisos-movil';
+    d.className='card';
+    d.style.cssText='padding:12px 14px;margin-bottom:12px';
+    d.innerHTML=html;
+    var ancla=document.getElementById('jac-version-caja');
+    if(ancla && ancla.nextSibling) pg.insertBefore(d, ancla.nextSibling);
+    else pg.insertBefore(d, pg.firstChild);
+  }
+  window.jacTarjetaAvisos=tarjeta;
+
+  window.jacActivarAvisos=async function(){
+    var o=document.getElementById('jac-avisos-movil-res');
+    if(o) o.innerHTML='<span style="color:#64748B">Pidiendo permiso…</span>';
+    var r=await window.jacPedirAvisos();
+    if(r.ok){
+      if(o) o.innerHTML='<span style="color:#15803D;font-weight:700">✓ '+r.texto+'</span>';
+      setTimeout(function(){ window.jacMostrarAviso('🔔 JAC Seguros',
+        'Notificaciones activadas correctamente.','jac-alta'); }, 400);
+    } else if(r.pasos){
+      window.jacVerPasosIPhone();
+    } else {
+      if(o) o.innerHTML='<span style="color:#B91C1C">'+r.texto+'</span>';
+    }
+    setTimeout(tarjeta, 900);
+  };
+
+  /* Para pasar del navegador equivocado a Safari sin teclear la
+     direccion a mano en un telefono. */
+  window.jacCopiarEnlace=function(){
+    var o=document.getElementById('jac-avisos-movil-res');
+    var url=location.origin+location.pathname;
+    function fallo(){
+      if(o) o.innerHTML='<span style="color:#475569">Abra en Safari: '
+        +'<b style="font-family:monospace">'+url.replace(/^https?:\/\//,'')+'</b></span>';
+    }
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(url).then(function(){
+          if(o) o.innerHTML='<span style="color:#15803D">Dirección copiada. '
+            +'Ábrala en Safari y siga los pasos.</span>';
+        }, fallo);
+        return;
+      }
+    }catch(e){}
+    fallo();
+  };
+
+  window.jacVerPasosIPhone=function(){
+    if(typeof openDP==='function') openDP(window.jacPasosIPhone(), 'Notificaciones en el iPhone');
+    else alert('En Safari: Compartir → Añadir a pantalla de inicio. Luego abra el CRM desde ese icono.');
+  };
+
+  window.jacProbarAviso=async function(){
+    var o=document.getElementById('jac-avisos-movil-res');
+    var ok=await window.jacMostrarAviso('🔔 JAC Seguros',
+      'Prueba: si ve este aviso, las notificaciones funcionan.','jac-prueba');
+    if(o) o.innerHTML = ok
+      ? '<span style="color:#15803D">Enviado. Si no lo vio, revise que el teléfono no esté en silencio o en modo concentración.</span>'
+      : '<span style="color:#B91C1C">No se pudo enviar. Falta el permiso.</span>';
+  };
+
+  /* ---------- arranque ---------- */
+  function arrancar(){
+    envolverAvisador();
+    tarjeta();
+  }
+  /* el trabajador se registra solo, sin molestar */
+  setTimeout(function(){ try{ window.jacRegistrarSW(); }catch(e){} }, 2500);
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arrancar);
+  else arrancar();
+  var n=0;
+  (function reintentar(){ try{ arrancar(); }catch(e){} if(++n<20) setTimeout(reintentar, 1500); })();
 })();
 </script>
 
