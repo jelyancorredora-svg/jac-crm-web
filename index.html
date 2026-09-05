@@ -12460,6 +12460,7 @@ document.addEventListener('click', function(e){
         var lista = S[clave] || [];
         _base[tabla] = _base[tabla] || {};
         var previos = _base[tabla], ahora = {}, cambiadas = [];
+        var _jacNoGuardarFoto = false;
 
         for (var i = 0; i < lista.length; i++) {
           var fila = aFila(lista[i], tabla);
@@ -12470,6 +12471,47 @@ document.addEventListener('click', function(e){
         var borradas = [];
         for (var id in previos) if (!(id in ahora)) borradas.push(id);
 
+        /* ==============================================================
+           EL CINTURON DE SEGURIDAD
+           --------------------------------------------------------------
+           Esta linea de arriba es la que puede vaciar la base: todo lo que
+           esta registrado como subido y ya no esta en pantalla, se borra
+           alla. Borrar una poliza porque se borro a proposito esta bien.
+           Borrar sesenta de golpe NUNCA es lo que alguien quiso hacer:
+           es una lectura que fallo, una pantalla a medio cargar, o un
+           error mio.
+
+           Asi que hay un tope. Si una sola sincronizacion quiere borrar
+           mas de 15 registros o mas del 10% de la tabla, NO SE BORRA
+           NADA. Se avisa y se deja todo quieto. Se pierde, como mucho,
+           que una tabla quede con filas de sobra — y eso se arregla
+           mirando. Un borrado masivo no se arregla mirando.
+
+           Para un borrado grande de verdad y a proposito:
+           window.jacPermitirBorradoMasivo = true  (dura una vuelta).
+           ============================================================== */
+        if (borradas.length) {
+          var tope = Math.max(15, Math.ceil(Object.keys(previos).length * 0.10));
+          if (borradas.length > tope && window.jacPermitirBorradoMasivo !== true) {
+            log('error', '[JAC] FRENO: la sincronizacion queria borrar ' + borradas.length
+              + ' registros de ' + tabla + ' (tope ' + tope + '). No se borro ninguno.');
+            try {
+              if (window.toast) toast('Se evitó un borrado de ' + borradas.length
+                + ' registros en ' + tabla, 'err');
+            } catch (e) {}
+            window.__jacBorradoFrenado = { tabla: tabla, cuantas: borradas.length,
+              cuando: new Date().toISOString(), ids: borradas.slice(0, 50) };
+            borradas = [];
+            /* Se frena el BORRADO, nunca el guardado: lo que ella acaba de
+               escribir sigue subiendo mas abajo. Lo que no se hace es dar
+               por buena la foto nueva, porque la vuelta siguiente creeria
+               que esos registros nunca existieron. */
+            _jacNoGuardarFoto = true;
+          } else {
+            window.jacPermitirBorradoMasivo = false;
+          }
+        }
+
         for (var j = 0; j < cambiadas.length; j += 200) {
           var lote = cambiadas.slice(j, j + 200);
           var r = await d.from(tabla).upsert(lote, { onConflict: 'id' });
@@ -12479,7 +12521,7 @@ document.addEventListener('click', function(e){
           var rb = await d.from(tabla).delete().in('id', borradas);
           if (rb.error) log('error', '[JAC borrar ' + tabla + ']', rb.error.message);
         }
-        _base[tabla] = ahora;
+        if (!_jacNoGuardarFoto) _base[tabla] = ahora;
         if (cambiadas.length || borradas.length)
           log('info', '[JAC] ' + tabla + ': ' + cambiadas.length + ' escritas, ' + borradas.length + ' borradas');
       }
@@ -12612,17 +12654,31 @@ document.addEventListener('click', function(e){
     } catch (e) {}
   }
 
-  /* Lectura de una tabla, paginada solo si hace falta. */
+  /* Lectura de una tabla, paginada solo si hace falta.
+     ------------------------------------------------------------------
+     ESTO ERA UNA BOMBA. Si la consulta fallaba a la mitad, hacia "break"
+     y devolvia LO QUE LLEVARA: media tabla, o ninguna fila. Quien recibia
+     eso no tenia forma de distinguir "la nube tiene 3 polizas" de "la
+     lectura se rompio". Y como ahora se fusiona, una lectura rota se
+     interpretaba como "borraron todo lo demas en otro dispositivo"...
+     y la subida siguiente lo habria borrado de verdad en la base.
+
+     Ahora dice la verdad: {ok:false} si algo fallo. Media tabla no vale. */
   async function _leerTabla(d, tabla) {
     var todo = [], desde = 0;
     while (true) {
-      var r = await d.from(tabla).select('*').range(desde, desde + 999);
-      if (r.error) { log('error', '[JAC carga ' + tabla + '] ' + r.error.message); break; }
+      var r;
+      try { r = await d.from(tabla).select('*').range(desde, desde + 999); }
+      catch (e) { r = { error: { message: String((e && e.message) || e) } }; }
+      if (r.error) {
+        log('error', '[JAC carga ' + tabla + '] ' + r.error.message);
+        return { ok:false, filas:[], motivo:r.error.message };
+      }
       todo = todo.concat(r.data || []);
       if (!r.data || r.data.length < 1000) break;
       desde += 1000;
     }
-    return todo;
+    return { ok:true, filas:todo };
   }
 
   /* Una sola carga a la vez. Antes se disparaba desde el login y desde el
@@ -12785,8 +12841,22 @@ document.addEventListener('click', function(e){
       );
       var meta = lotes.pop();
 
+      /* Basta con que UNA tabla no se haya podido leer entera para
+         cancelar la bajada completa. Mezclar datos buenos con una tabla
+         a medias es peor que no bajar nada. */
+      var rotas = [];
+      claves.forEach(function (clave, k) {
+        if (!lotes[k] || lotes[k].ok !== true) rotas.push(TABLAS[clave]);
+      });
+      if (rotas.length) {
+        log('warn', '[JAC] No se pudieron leer estas tablas: ' + rotas.join(', ')
+          + '. Se cancela la bajada entera para no borrar nada por error.');
+        try { if (window.toast) toast('Lectura incompleta de la nube: no se tocaron sus datos', 'err'); } catch (e) {}
+        return false;
+      }
+
       var iCli = claves.indexOf('clientes');
-      var enNube = iCli > -1 ? lotes[iCli].length : 0;
+      var enNube = iCli > -1 ? lotes[iCli].filas.length : 0;
       var enLocal = (typeof S !== 'undefined' && S.clientes) ? S.clientes.length : 0;
 
       if (enNube === 0 && enLocal > 0) {
@@ -12800,8 +12870,27 @@ document.addEventListener('click', function(e){
         return false;
       }
 
+      /* La guarda de arriba solo miraba CLIENTES. Si clientes venia bien
+         pero polizas volvia vacia, se aceptaba y se borraban las polizas.
+         Aqui se revisa tabla por tabla: ninguna que aqui tenga datos puede
+         quedar vacia o reducirse a menos de la mitad de golpe sin que eso
+         sea sospechoso. */
+      var sospechosas = [];
       claves.forEach(function (clave, k) {
-        var tabla = TABLAS[clave], filas = lotes[k] || [];
+        var nNube = (lotes[k].filas || []).length;
+        var nLocal = ((typeof S !== 'undefined' && S[clave]) || []).length;
+        if (nLocal >= 5 && (nNube === 0 || nNube * 2 < nLocal))
+          sospechosas.push(TABLAS[clave] + ' (aquí ' + nLocal + ', la nube trae ' + nNube + ')');
+      });
+      if (sospechosas.length) {
+        log('warn', '[JAC] La nube trae mucho menos de lo que hay aqui: '
+          + sospechosas.join(' · ') + '. No se baja nada.');
+        try { if (window.toast) toast('La nube trae menos datos de los que hay aquí: no se tocó nada', 'err'); } catch (e) {}
+        return false;
+      }
+
+      claves.forEach(function (clave, k) {
+        var tabla = TABLAS[clave], filas = lotes[k].filas || [];
         var hayHuellas = _base[tabla] && Object.keys(_base[tabla]).length > 0;
         if (!_yaCargoUnaVez && !hayHuellas) {
           /* Nunca se ha confirmado nada de esta tabla en este navegador: no
@@ -15383,7 +15472,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-08-31-CB';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-05-DA';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -29884,7 +29973,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-08-31-CB';
+  var VERSION='JAC-BUILD-2026-09-05-DA';
 
   window.jacVersion=function(){ return VERSION; };
 
