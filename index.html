@@ -15483,7 +15483,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-05-DC';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-05-DD';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -26690,38 +26690,88 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     return n;
   };
 
-  /* ---------- Subramos, encadenados al ramo ---------- */
-  function poblarSub(){
-    var ram=document.getElementById('p-ra');
+  /* ==================================================================
+     SUBRAMOS: un desplegable de verdad, encadenado al ramo
+     ------------------------------------------------------------------
+     El subramo era un campo de texto libre con una lista de sugerencias
+     colgada. Escribir a mano el subramo 103 veces es pedir erratas:
+     "Automovil", "AUTOMÓVIL", "automovil particular"... y luego nada
+     cuadra al agrupar.
+
+     Ahora es un desplegable que cambia con el ramo: elige VIDA y salen
+     los diez subramos de vida; elige MOTOS y salen los tres de motos.
+     Son los de los cuadros estadisticos de la Superintendencia.
+
+     LO QUE YA ESTA GUARDADO NO SE PIERDE. Muchas polizas suyas traen
+     subramos escritos a mano de antes ("AUTOMÓVIL", "INCENDIO"). Si el
+     valor guardado no esta en la lista oficial, se agrega igualmente al
+     desplegable, marcado, y queda seleccionado. Nunca se cambia solo.
+     ================================================================== */
+  function subramosDe(ramo){
+    var L=window.jacSubramos(ramo)||[];
+    return L.slice();
+  }
+
+  /* El campo nace como <input>. Se cambia por un <select> conservando
+     id, clases y lo que tuviera escrito. */
+  function asegurarSelect(){
     var sub=document.getElementById('p-sr')||document.getElementById('p-sub');
+    if(!sub) return null;
+    if(sub.tagName==='SELECT') return sub;
+    var sel=document.createElement('select');
+    sel.id=sub.id;
+    sel.className=sub.className||'fc';
+    if(sub.getAttribute('style')) sel.setAttribute('style',sub.getAttribute('style'));
+    sel.__jacValorPrevio=sub.value||'';
+    sub.parentNode.replaceChild(sel, sub);
+    return sel;
+  }
+
+  function pintarSub(ram, sub, valorForzado){
+    if(!ram||!sub) return;
+    if(sub.tagName!=='SELECT') return;
+    var actual = (valorForzado!==undefined && valorForzado!==null)
+                 ? String(valorForzado)
+                 : (sub.value || sub.__jacValorPrevio || '');
+    var subs=subramosDe(ram.value);
+    var vistos={}, h='<option value="">— Subramo —</option>';
+    subs.forEach(function(x){
+      vistos[llave(x)]=1;
+      h+='<option value="'+String(x).replace(/"/g,'&quot;')+'">'+x+'</option>';
+    });
+    /* lo que ya tenia la poliza, aunque no sea de la lista oficial */
+    if(actual && !vistos[llave(actual)]){
+      h+='<option value="'+String(actual).replace(/"/g,'&quot;')+'">'+actual+' (propio)</option>';
+    }
+    sub.innerHTML=h;
+    if(actual){
+      sub.value=actual;
+      if(sub.value!==actual){
+        var meta=llave(actual);
+        for(var i=0;i<sub.options.length;i++){
+          if(llave(sub.options[i].value)===meta){ sub.selectedIndex=i; break; }
+        }
+      }
+    }
+    sub.__jacValorPrevio=sub.value;
+  }
+
+  function poblarSub(valorForzado){
+    var ram=document.getElementById('p-ra');
+    var sub=asegurarSelect();
     if(!ram||!sub) return;
     if(!ram.__jacSub){
       ram.__jacSub=1;
-      ram.addEventListener('change', function(){ pintarSub(ram,sub); });
+      /* al cambiar el ramo, la lista de subramos cambia con el */
+      ram.addEventListener('change', function(){
+        var s=document.getElementById('p-sr')||document.getElementById('p-sub');
+        pintarSub(ram, s, '');
+      });
     }
-    if(sub.tagName==='SELECT' && !sub.__jacLleno){ sub.__jacLleno=1; pintarSub(ram,sub); }
-    /* Si es un campo de texto, se le engancha una lista de sugerencias */
-    if(sub.tagName==='INPUT' && !sub.__jacLista){
-      sub.__jacLista=1;
-      var dl=document.getElementById('jac-dl-sub');
-      if(!dl){ dl=document.createElement('datalist'); dl.id='jac-dl-sub'; document.body.appendChild(dl); }
-      sub.setAttribute('list','jac-dl-sub');
-      pintarSub(ram,sub);
-    }
+    pintarSub(ram, sub, valorForzado);
   }
-  function pintarSub(ram,sub){
-    var subs=window.jacSubramos(ram.value);
-    if(sub.tagName==='SELECT'){
-      var v=sub.value;
-      sub.innerHTML='<option value="">— Subramo —</option>'
-        +subs.map(function(x){ return '<option value="'+x.replace(/"/g,'&quot;')+'">'+x+'</option>'; }).join('');
-      if(v) sub.value=v;
-    } else {
-      var dl=document.getElementById('jac-dl-sub');
-      if(dl) dl.innerHTML=subs.map(function(x){
-        return '<option value="'+x.replace(/"/g,'&quot;')+'">'; }).join('');
-    }
-  }
+  window.jacPintarSubramos=poblarSub;
+  window.jacSubramosDe=subramosDe;
 
   function hayFormularioAbierto(){
     try{
@@ -27037,6 +27087,15 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
         try{ if(typeof onRC==='function') onRC(); }catch(e){}
       }
     }
+
+    /* El subramo se pinta DESPUES del ramo: su lista depende de el.
+       Se le pasa el subramo guardado en la poliza, por la misma razon
+       que el ramo: el desplegable puede haber quedado en blanco al
+       reconstruirse, y el dato bueno esta en el registro. */
+    try{
+      if(typeof window.jacPintarSubramos==='function')
+        window.jacPintarSubramos(pol ? (pol.subramo||'') : undefined);
+    }catch(e){}
   }
   window.jacRefrescarDesplegablesPoliza=refrescar;
 
@@ -30073,7 +30132,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-05-DC';
+  var VERSION='JAC-BUILD-2026-09-05-DD';
 
   window.jacVersion=function(){ return VERSION; };
 
