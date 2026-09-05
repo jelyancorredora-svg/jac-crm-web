@@ -4727,7 +4727,18 @@ function CT(){
 }
 function SP(){
  const num=(V('p-nu')||'').trim(),aseg=V('p-as');
- if(!num||!aseg){toast('Nro. Póliza y Aseguradora son obligatorios','err');return;}
+ if(!num||!aseg){
+  /* Antes esto salia con un aviso pequenito que se podia perder de vista,
+     y quedaba la impresion de haber guardado cuando no se guardo nada.
+     Ahora se dice claro y se deja rastro para poder revisarlo despues. */
+  const falta = !num && !aseg ? 'el número de póliza y la aseguradora'
+              : (!num ? 'el número de póliza' : 'la aseguradora');
+  window.__jacNoSeGuardo = {cuando:new Date().toISOString(), falta:falta,
+    num:num, aseg:aseg, ramo:V('p-ra'), id:(typeof EID!=='undefined'?EID:null)};
+  toast('NO se guardó: falta '+falta,'err');
+  try{ alert('No se guardó nada.\n\nFalta '+falta+'.\n\nComplete ese campo y vuelva a pulsar Guardar.'); }catch(e){}
+  return;
+ }
  const phc=document.getElementById('p-hc');const hcc=phc?phc.checked:false;const cId=V('p-cl');
  const d={clienteId:cId,nombreCliente:GC(cId).nombre||'',num,numAnexo:V('p-na'),tipo:V('p-tp'),aseg,ramo:normRamo(V('p-ra')),subramo:V('p-sr').trim(),nueva:V('p-nr'),estado:V('p-es'),etapa:V('p-et'),riesgo:V('p-ri').trim(),valorRiesgo:GF('p-vr'),cobertura:V('p-cob'),tipoPol:V('p-tpo'),prima:GF('p-pr'),itbmsPct:GF('p-it'),itbms:GF('p-ib'),gastosExp:GF('p-ge'),total:GF('p-tot'),cuotaMensual:GF('p-cmes'),cuotaTrimestral:GF('p-ctri'),cuotaSemestral:GF('p-csem'),cuotaAnual:GF('p-canu'),comPct:GF('p-cb'),numPagos:parseInt(V('p-npag'))||0,letraPrima:(parseInt(V('p-npag'))||0)>0?(GF('p-tot')||0)/(parseInt(V('p-npag'))):0,participacion:GF('p-pa')||100,comision:GF('p-co'),comisionPct:GF('p-cb'),nombreAsegurado:V('p-nas'),docAsegurado:V('p-das'),tomador:V('p-nto'),docTomador:V('p-dto'),beneficiario:V('p-ben'),cedBeneficiario:V('p-cben'),fechaExpedicion:V('p-fex'),fechaRecepcion:V('p-fre'),fechaInicio:V('p-fi'),fechaFin:V('p-ff'),fechaCancelada:V('p-fca'),formaPago:V('p-fp'),periodo:V('p-pe'),medio:V('p-me'),banco:V('p-ban'),moneda:V('p-mon')||'USD',vendedor:V('p-ven').trim(),obs:V('p-ob').trim(),obsInt:V('p-oi').trim(),acreedor:V('p-acr').trim(),tipoPago:V('p-tpago'),numCert:V('p-ncert').trim(),endosos:GF('p-endosos'),pagado:GF('p-pagado'),saldo:GF('p-saldo'),fechaFact:V('p-ffact'),coCor:hcc?V('p-cc'):'',coCorPart:hcc?GF('p-cp'):0,coCorCom:hcc?GF('p-cc2'):0};
  d.etiquetas=getSelTags('p-etq-wrap');{var _bd=getBens();if(_bd===null)return;d.beneficiarios=_bd;}
@@ -15472,7 +15483,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-05-DB';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-05-DC';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* --- 1. Vigilante de version --- */
@@ -25990,7 +26001,23 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
      que se repasa cada poco. Si no hay nada que cambiar, no escribe ni
      guarda: no da guerra. */
   var _ultimo=0;
+  function hayFormularioAbierto2(){
+    try{
+      var m=document.querySelectorAll('.mo');
+      for(var i=0;i<m.length;i++){
+        if(m[i].offsetParent!==null && m[i].offsetHeight>80) return true;
+      }
+      var a=document.activeElement;
+      if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName||'')) return true;
+    }catch(e){}
+    return false;
+  }
+
   async function repasar(){
+    /* Si #p-as se repuebla a media edicion y pierde su valor, SP() se
+       niega a guardar por falta de aseguradora: se pulsa Guardar y no
+       pasa nada. Con formulario abierto, este reloj no toca nada. */
+    if(hayFormularioAbierto2()) return;
     try{
       var r=window.jacUnificarAseguradoras();
       window.jacPoblarDesplegables();
@@ -26696,7 +26723,22 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     }
   }
 
+  function hayFormularioAbierto(){
+    try{
+      var m=document.querySelectorAll('.mo');
+      for(var i=0;i<m.length;i++){
+        if(m[i].offsetParent!==null && m[i].offsetHeight>80) return true;
+      }
+      var a=document.activeElement;
+      if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName||'')) return true;
+    }catch(e){}
+    return false;
+  }
+
   function repasar(){
+    /* Con un formulario abierto no se toca nada: reescribir las opciones
+       de un <select> mientras alguien escribe le borra la seleccion. */
+    if(hayFormularioAbierto()) return;
     try{ window.jacPoblarRamos(); poblarSub(); }catch(e){}
   }
   setTimeout(repasar, 4000);
@@ -30031,7 +30073,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-05-DB';
+  var VERSION='JAC-BUILD-2026-09-05-DC';
 
   window.jacVersion=function(){ return VERSION; };
 
