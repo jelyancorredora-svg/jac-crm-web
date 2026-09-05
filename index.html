@@ -12387,6 +12387,39 @@ document.addEventListener('click', function(e){
   function _guardarBase() {
     try { localStorage.setItem('jac_base', JSON.stringify(_base)); } catch (e) {}
   }
+
+  /* ------------------------------------------------------------------
+     LO QUE ACABA DE SUBIR NO SE PISA CON UNA COPIA VIEJA
+     ------------------------------------------------------------------
+     Una base de datos no siempre devuelve al instante lo que le acaban
+     de escribir. Entre que se guarda una poliza y que la nube la sirve
+     ya cambiada pasan unos segundos.
+
+     En esos segundos ocurria esto: se guardaba MOTOS, la sincronizacion
+     bajaba, la nube todavia contestaba AUTOS/VEHICULOS, y la fusion —
+     viendo el registro "limpio", porque acababa de subirlo — se fiaba de
+     la nube y devolvia AUTOS a la pantalla. El ramo cambiaba un segundo
+     y se volvia solo. Exactamente lo que se veia.
+
+     Aqui se anota, por registro, QUE se subio y hasta cuando desconfiar.
+     Si en esa ventana la nube trae algo distinto de lo que acabamos de
+     escribir, es que va con retraso: manda lo local. No hay relojes de
+     por medio, solo el de esta maquina consigo mismo.
+     ------------------------------------------------------------------ */
+  var _recienSubido = {};
+  var VENTANA_RECIEN = 45000;   /* 45 s de desconfianza tras escribir */
+
+  function _marcarSubido(tabla, id, huella) {
+    if (!_recienSubido[tabla]) _recienSubido[tabla] = {};
+    _recienSubido[tabla][String(id)] = { huella: huella, hasta: Date.now() + VENTANA_RECIEN };
+  }
+  function _subidoHaceNada(tabla, id) {
+    var t = _recienSubido[tabla] && _recienSubido[tabla][String(id)];
+    if (!t) return null;
+    if (Date.now() > t.hasta) { delete _recienSubido[tabla][String(id)]; return null; }
+    return t;
+  }
+  window.jacRecienSubido = function () { return JSON.parse(JSON.stringify(_recienSubido)); };
   /* Si ya hay huellas guardadas, la bajada fusiona desde la primera vez.
      Hay que decirlo YA, antes de la primera bajada, porque el guardian que
      decide si dejarla pasar lo consulta antes de llamarla. */
@@ -12527,6 +12560,9 @@ document.addEventListener('click', function(e){
           var lote = cambiadas.slice(j, j + 200);
           var r = await d.from(tabla).upsert(lote, { onConflict: 'id' });
           if (r.error) { log('error', '[JAC sync ' + tabla + ']', r.error.message); throw r.error; }
+          /* queda anotado que estas filas se acaban de escribir */
+          for (var q = 0; q < lote.length; q++)
+            _marcarSubido(tabla, lote[q].id, hash(JSON.stringify(lote[q])));
         }
         if (borradas.length) {
           var rb = await d.from(tabla).delete().in('id', borradas);
@@ -12767,6 +12803,21 @@ document.addEventListener('click', function(e){
         continue;
       }
       if (deNube[id]) {
+        /* ¿Acabamos de escribir este registro y la nube trae otra cosa?
+           Entonces la nube va con retraso. Manda lo de aqui. */
+        var reciente = _subidoHaceNada(tabla, id);
+        if (reciente) {
+          var hNube = '';
+          try { hNube = hash(JSON.stringify(aFila(aObjeto(deNube[id]), tabla))); } catch (e) {}
+          if (hNube && hNube !== reciente.huella && hNube !== hLocal) {
+            salida.push(loc);
+            conservados++;
+            if (hSubido !== undefined) nuevaBase[id] = hSubido;
+            log('info', '[JAC] ' + tabla + '/' + id + ': la nube trae una copia anterior a lo que '
+              + 'acabamos de guardar. Se conserva lo de aqui.');
+            continue;
+          }
+        }
         var obj = aObjeto(deNube[id]);
         salida.push(obj);
         tomados++;
@@ -15483,7 +15534,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-05-DE';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-05-DF';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -30192,7 +30243,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-05-DE';
+  var VERSION='JAC-BUILD-2026-09-05-DF';
 
   window.jacVersion=function(){ return VERSION; };
 
