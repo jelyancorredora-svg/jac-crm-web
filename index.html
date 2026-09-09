@@ -12482,6 +12482,12 @@ document.addEventListener('click', function(e){
      escribir, es que va con retraso: manda lo local. No hay relojes de
      por medio, solo el de esta maquina consigo mismo.
      ------------------------------------------------------------------ */
+  /* Hasta que instante (reloj del SERVIDOR) conocemos cada tabla. Se
+     toma del mayor updated_at que trajo la ultima bajada. Sirve para
+     saber si una fila de la nube cambio DESPUES de que nosotros
+     mirasemos: si es asi, lo que tenemos aqui esta viejo y no debe
+     escribirse encima. */
+  var _visto = {};
   var _recienSubido = {};
   var VENTANA_RECIEN = 45000;   /* 45 s de desconfianza tras escribir */
 
@@ -12631,6 +12637,54 @@ document.addEventListener('click', function(e){
             _jacNoGuardarFoto = true;
           } else {
             window.jacPermitirBorradoMasivo = false;
+          }
+        }
+
+        /* ==============================================================
+           NO SE ESCRIBE ENCIMA DE ALGO MAS NUEVO QUE LO QUE CONOCEMOS
+           --------------------------------------------------------------
+           Este era el fallo de fondo, y explica por que un cambio se
+           guardaba bien y volvia atras minutos despues.
+
+           Cada vez que el CRM se abre, varios correctores automaticos
+           (frecuencias de pago, renovaciones...) tocan decenas de polizas.
+           Eso las marca como "cambiadas" y la siguiente subida las manda
+           ENTERAS, con la copia que tiene ESE dispositivo. Si ese
+           dispositivo llevaba abierto desde antes — otra pestana, el
+           portatil, el telefono — su copia es vieja, y al mandarla borra
+           lo que se acababa de guardar en otro sitio.
+
+           No hacia falta tocar la poliza: bastaba con abrir el CRM en
+           otro lado. Por eso parecia aleatorio.
+
+           Ahora, antes de escribir, se pregunta a la base cuando cambio
+           cada fila. Si cambio DESPUES de la ultima vez que este
+           dispositivo miro, aqui hay una copia vieja: no se escribe, se
+           deja fuera y se recoge en la bajada siguiente.
+           ============================================================== */
+        var _saltadasPorViejas = 0;
+        if (cambiadas.length && _visto[tabla]) {
+          var _fechas = {};
+          for (var w = 0; w < cambiadas.length; w += 200) {
+            var idsW = cambiadas.slice(w, w + 200).map(function (f) { return f.id; });
+            var rw = await d.from(tabla).select('id,updated_at').in('id', idsW);
+            if (rw.error) { log('warn', '[JAC] No se pudo consultar antiguedad en ' + tabla); continue; }
+            (rw.data || []).forEach(function (f) { _fechas[String(f.id)] = String(f.updated_at || ''); });
+          }
+          cambiadas = cambiadas.filter(function (f) {
+            var cuando = _fechas[String(f.id)];
+            if (cuando && cuando > _visto[tabla]) {
+              _saltadasPorViejas++;
+              delete ahora[f.id];        /* fuera de la foto: se recogera al bajar */
+              delete _cambiadasIds[f.id];
+              return false;
+            }
+            return true;
+          });
+          if (_saltadasPorViejas) {
+            log('warn', '[JAC] ' + tabla + ': ' + _saltadasPorViejas + ' fila(s) cambiaron en la nube '
+              + 'despues de nuestra ultima lectura. No se sobrescriben.');
+            window.__jacNoSobrescritas = (window.__jacNoSobrescritas || 0) + _saltadasPorViejas;
           }
         }
 
@@ -13144,6 +13198,14 @@ document.addEventListener('click', function(e){
               + f.conservados + ' propias sin subir conservadas, ' + f.borrados + ' borradas fuera');
         }
       });
+      claves.forEach(function (clave, k) {
+        var tabla = TABLAS[clave], mx = _visto[tabla] || '';
+        (lotes[k].filas || []).forEach(function (f) {
+          if (f && f.updated_at && String(f.updated_at) > mx) mx = String(f.updated_at);
+        });
+        if (mx) _visto[tabla] = mx;
+      });
+
       _yaCargoUnaVez = true;
       window.__jacCargaFusiona = true;
       _guardarBase();
@@ -15722,7 +15784,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-05-EA';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-09-EB';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -30431,7 +30493,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-05-EA';
+  var VERSION='JAC-BUILD-2026-09-09-EB';
 
   window.jacVersion=function(){ return VERSION; };
 
