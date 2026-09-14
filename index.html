@@ -12382,7 +12382,32 @@ document.addEventListener('click', function(e){
   }
 
   /* objeto de S -> fila de la tabla (lo no mapeado va a extra) */
+  /* Los adjuntos que ya estan en el deposito de la nube no viajan otra vez
+     dentro de la fila: se manda la ruta, no el contenido. Antes una sola
+     ficha con cuatro PDF pesaba 4 MB en la base, y la fila fallaba al subir.
+     El contenido vive en el deposito 'adjuntos' y en IndexedDB. */
+  function _sinAdjuntosPesados(obj) {
+    if (!obj || typeof obj !== 'object' || !obj.archivos) return obj;
+    var ax = obj.archivos;
+    var lista = Array.isArray(ax) ? ax : [ax];
+    var hay = false;
+    var limpios = lista.map(function (f) {
+      if (!f || typeof f !== 'object' || !f.b64 || !f.path) return f;
+      hay = true;
+      var g = {}, k;
+      for (k in f) if (Object.prototype.hasOwnProperty.call(f, k)) g[k] = f[k];
+      g.b64 = '';
+      return g;
+    });
+    if (!hay) return obj;
+    var copia = {}, k2;
+    for (k2 in obj) if (Object.prototype.hasOwnProperty.call(obj, k2)) copia[k2] = obj[k2];
+    copia.archivos = Array.isArray(ax) ? limpios : limpios[0];
+    return copia;
+  }
+
   function aFila(obj, tabla) {
+    obj = _sinAdjuntosPesados(obj);
     var def = COLS[tabla] || [], fila = {}, usados = {}, extra = {};
     for (var i = 0; i < def.length; i++) {
       var col = def[i][0], tipo = def[i][1];
@@ -15833,7 +15858,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-14-EG';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-14-EI';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -30656,7 +30681,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-14-EG';
+  var VERSION='JAC-BUILD-2026-09-14-EI';
 
   window.jacVersion=function(){ return VERSION; };
 
@@ -31542,6 +31567,154 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   (function esperar(){
     envolverOP(); envolverCartera(); envolverRefrescar();
     if(++intentos<80) setTimeout(esperar, 400);
+  })();
+})();
+</script>
+<script>
+/* ============================================================
+   JAC CRM - Los adjuntos, desde cualquier equipo
+   ------------------------------------------------------------
+   COMO ESTABAN LAS COSAS
+
+   Los archivos adjuntos se guardaban como texto base64 dentro de
+   la propia ficha. Una sola ficha (un prospecto con cuatro PDF)
+   pesaba 3.9 MB. Consecuencias:
+
+     - la fila no subia bien a la base, asi que esos archivos
+       existian SOLO en el navegador de esta computadora;
+     - al guardar salia en rojo "espacio del navegador lleno";
+     - y no habia deposito de archivos creado en Supabase, asi
+       que jacSubirAdjuntos() no tenia donde dejarlos.
+
+   COMO QUEDAN
+
+   El 14-09-2026 se creo el deposito 'adjuntos' en Supabase, en
+   modo PRIVADO: nadie puede abrir un documento de un cliente por
+   tener el enlace. Se llega a el con enlaces firmados que caducan.
+
+   Ahora en la ficha solo viaja la ruta del archivo. Al abrir el
+   CRM en otro equipo, los adjuntos que falten se traen solos del
+   deposito por detras y quedan tambien en IndexedDB, para que la
+   proxima vez abran al instante.
+   ============================================================ */
+(function(){
+  'use strict';
+  var BUCKET='adjuntos';
+  var COLECCIONES=['prospectos','clientes','polizas','siniestros','tareas','pagos'];
+  var TOPE_BYTES=8*1024*1024;   /* no traer por detras nada mas grande */
+  var _traidos={};
+  var _corriendo=false;
+
+  function log(){ try{ console.log.apply(console,['[JAC adjuntos]'].concat([].slice.call(arguments))); }catch(e){} }
+  function E(){ try{ return new Function('return typeof S!=="undefined"?S:null')(); }catch(e){ return null; } }
+
+  function recorrer(estado, fn){
+    if(!estado) return;
+    COLECCIONES.forEach(function(col){
+      var arr=estado[col];
+      if(!Array.isArray(arr)) return;
+      arr.forEach(function(reg){
+        var ax=reg&&reg.archivos; if(!ax) return;
+        (Array.isArray(ax)?ax:[ax]).forEach(function(f){ if(f&&typeof f==='object') fn(f,reg,col); });
+      });
+    });
+  }
+
+  function aDataURL(blob){
+    return new Promise(function(res,rej){
+      var r=new FileReader();
+      r.onload=function(){ res(r.result); };
+      r.onerror=function(){ rej(r.error); };
+      r.readAsDataURL(blob);
+    });
+  }
+
+  /* enlace firmado, para abrir o descargar sin hacer el bucket publico */
+  window.jacEnlaceAdjunto=async function(ruta, segundos){
+    if(!ruta || !window.db || !window.db.storage) return null;
+    try{
+      var r=await window.db.storage.from(BUCKET).createSignedUrl(ruta, segundos||3600);
+      if(r.error) return null;
+      return (r.data&&r.data.signedUrl)||null;
+    }catch(e){ return null; }
+  };
+
+  /* traer de la nube los adjuntos que aqui no estan */
+  window.jacTraerAdjuntos=async function(opts){
+    opts=opts||{};
+    if(_corriendo) return {ok:false, motivo:'ya esta trayendo'};
+    var St=E(); if(!St) return {ok:false, motivo:'sin datos'};
+    if(!window.db || window.db.__esStub || !window.db.storage) return {ok:false, motivo:'sin cliente de nube'};
+    var ses=null;
+    try{ ses=await window.db.auth.getSession(); }catch(e){}
+    if(!(ses&&ses.data&&ses.data.session)) return {ok:false, motivo:'sin sesion de nube'};
+
+    var pend=[];
+    recorrer(St, function(f){
+      if(f.b64) return;
+      if(!f.path) return;
+      if(_traidos[f.path]) return;
+      if(!opts.todo && (f.size||0) > TOPE_BYTES) return;
+      pend.push(f);
+    });
+    if(!pend.length) return {ok:true, traidos:0, pendientes:0};
+
+    _corriendo=true;
+    var traidos=0, fallos=[];
+    try{
+      for(var i=0;i<pend.length;i++){
+        var f=pend[i];
+        try{
+          var r=await window.db.storage.from(BUCKET).download(f.path);
+          if(r.error||!r.data){ fallos.push({n:f.name, e:(r.error&&r.error.message)||'sin datos'}); continue; }
+          f.b64=await aDataURL(r.data);
+          _traidos[f.path]=1;
+          traidos++;
+        }catch(e){ fallos.push({n:f.name, e:e&&e.message}); }
+      }
+    } finally { _corriendo=false; }
+
+    if(traidos){
+      /* que queden tambien en IndexedDB para la proxima vez, y que la
+         pantalla los muestre sin recargar */
+      try{ if(typeof save==='function') save(); }catch(e){}
+      ['RD','RPros','RCli','RPol'].forEach(function(fn){
+        try{ if(typeof window[fn]==='function') window[fn](); }catch(e){}
+      });
+      log('traidos '+traidos+' adjunto(s) del deposito');
+    }
+    return {ok:true, traidos:traidos, fallos:fallos};
+  };
+
+  /* el deposito es privado: la url publica no sirve, se limpia */
+  function limpiarUrlsPublicas(){
+    var St=E(); if(!St) return 0;
+    var n=0;
+    recorrer(St, function(f){
+      if(f.url && f.path && String(f.url).indexOf('/object/public/')>=0){ f.url=''; n++; }
+    });
+    return n;
+  }
+
+  /* inventario, para saber donde esta cada cosa */
+  window.jacAdjuntos=function(){
+    var St=E(); if(!St) return [];
+    var r=[];
+    recorrer(St, function(f,reg,col){
+      r.push({archivo:f.name||'?', donde:col, ficha:(reg.nombre||reg.nombreCliente||reg.num||reg.id||'?'),
+        kb:Math.round((f.size||0)/1024), aqui: !!f.b64, enLaNube: !!f.path});
+    });
+    return r;
+  };
+
+  var n=0;
+  (function esperar(){
+    if(window.__jacNubeLista && window.db && !window.db.__esStub){
+      try{ limpiarUrlsPublicas(); }catch(e){}
+      setTimeout(function(){ window.jacTraerAdjuntos()['catch'](function(){}); }, 3000);
+      return;
+    }
+    if(++n<120) setTimeout(esperar, 1000);
   })();
 })();
 </script>
