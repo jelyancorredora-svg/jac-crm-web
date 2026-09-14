@@ -15833,7 +15833,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-14-EF';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-14-EG';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -30656,7 +30656,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-14-EF';
+  var VERSION='JAC-BUILD-2026-09-14-EG';
 
   window.jacVersion=function(){ return VERSION; };
 
@@ -31365,8 +31365,13 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   var tocado = false;
   var polizaAbierta = null;
 
+  /* OJO: solo cuenta como "tocado" lo que hace la persona. Otros bloques
+     del CRM (los desplegables de ramo/subramo) disparan eventos change por
+     programa al reconstruir los selects; si eso contara como tocar, el
+     formulario volveria a recalcular solo, que es justo lo que se evita. */
   ['input','change'].forEach(function(ev){
     document.addEventListener(ev, function(e){
+      if(!e || e.isTrusted !== true) return;
       var id = e.target && e.target.id;
       if(!id || String(id).indexOf('p-')!==0) return;
       tocado = true;
@@ -31513,10 +31518,30 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     });
   };
 
+  /* El bloque de los desplegables envuelve OP y se reengancha cada 900ms;
+     cada vez que corre, su refrescar() llama a onRC() -> CT() y vuelve a
+     recalcular. Por eso se reponen los valores guardados tambien justo
+     despues de el, y se reengancha OP mientras haga falta. */
+  function envolverRefrescar(){
+    var f=window.jacRefrescarDesplegablesPoliza;
+    if(typeof f!=='function' || f.__jacCongela) return false;
+    var envuelto=function(){
+      var r=f.apply(this, arguments);
+      try{
+        if(!tocado && polizaAbierta) devolverGuardados(polizaAbierta);
+      }catch(e){}
+      return r;
+    };
+    envuelto.__jacCongela=true;
+    window.jacRefrescarDesplegablesPoliza=envuelto;
+    log('refrescar envuelto');
+    return true;
+  }
+
   var intentos=0;
   (function esperar(){
-    var a=envolverOP(), b=envolverCartera();
-    if((!a || !b) && ++intentos<60) setTimeout(esperar, 500);
+    envolverOP(); envolverCartera(); envolverRefrescar();
+    if(++intentos<80) setTimeout(esperar, 400);
   })();
 })();
 </script>
