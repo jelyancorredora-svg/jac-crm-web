@@ -15833,7 +15833,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-09-EC';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-14-EF';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -30656,7 +30656,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-09-EC';
+  var VERSION='JAC-BUILD-2026-09-14-EF';
 
   window.jacVersion=function(){ return VERSION; };
 
@@ -31304,6 +31304,222 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 })();
 </script>
 
+<script>
+/* ============================================================
+   JAC CRM - No tocar el dinero que ya estaba guardado
+   ------------------------------------------------------------
+   EL PROBLEMA (medido sobre los datos reales, 14-09-2026)
+
+   Al ABRIR una poliza para editarla, el formulario no muestra lo
+   que hay guardado: lo vuelve a calcular. OP() termina llamando a
+   onRC() -> rellenar(), que repone el % de comision desde la tabla
+   de tarifas y llama a CT(), y CT() recalcula ITBMS, prima total,
+   comision y cuotas a partir de la prima neta.
+
+   Resultado medido: 174 de 362 polizas (48%) ensenan en pantalla
+   numeros distintos a los guardados en cuanto se abren.
+       - 131 cambian la prima total
+       -  71 cambian la comision
+       -  50 cambian el % de comision
+   Si se abrieran y se guardaran todas, las primas subirian
+   $11,437.63 y las comisiones $13,265.51.
+
+   El caso peor es la poliza 0225-01591-01: guardada con comision
+   $253.75, el formulario la ensena en $768.88. Bastaba con entrar
+   a corregir un telefono y pulsar Guardar para triplicarla.
+
+   LO QUE HACE ESTE BLOQUE
+
+   Al abrir una poliza ya existente, devuelve a la pantalla los
+   valores tal como estaban guardados, y si lo guardado no cuadra
+   con la formula lo avisa en el propio formulario - pero no cambia
+   nada. En cuanto usted toca prima, ITBMS, gastos o cualquier %,
+   CT() vuelve a calcular con normalidad. O sea: calcula cuando
+   usted edita, no por el hecho de mirar.
+
+   Y ADEMAS
+
+   Habia una rutina que al cargar el CRM daba por COBRADA cualquier
+   comision de mas de 90 dias y le inventaba fecha de cobro. Por eso
+   1,048 de 1,050 comisiones figuran cobradas y no se puede saber
+   que debe cada aseguradora. Esa parte ya no corre sola. El resto
+   del ordenamiento de cartera sigue igual. A proposito:
+       jacDarPorCobradasViejas()
+   Para ver cuales se cobraron solas:  jacAutoCobradas()
+   ============================================================ */
+(function(){
+  'use strict';
+  function log(){ try{ console.log.apply(console, ['[JAC congelar]'].concat([].slice.call(arguments))); }catch(e){} }
+  function E(){ try{ return window.__S || new Function('return typeof S!=="undefined"?S:null')(); }catch(e){ return null; } }
+  function n(v){ var x=Number(String(v==null?'':v).replace(/[^0-9.\-]/g,'')); return isFinite(x)?x:0; }
+  function el(id){ return document.getElementById(id); }
+  function poner(id, v){ var e=el(id); if(!e) return; e.value=(v===undefined||v===null)?'':String(v); }
+
+  /* lo que CT() y rellenar() recalculan y NO debe cambiar por abrir */
+  var CALCULADOS = [
+    ['p-it','itbmsPct'], ['p-ib','itbms'], ['p-tot','total'],
+    ['p-cb','comPct'],   ['p-co','comision'], ['p-cc2','coCorCom'],
+    ['p-cp','coCorPart'], ['p-lp','letraPrima'], ['p-canu','cuotaAnual']
+  ];
+
+  var tocado = false;
+  var polizaAbierta = null;
+
+  ['input','change'].forEach(function(ev){
+    document.addEventListener(ev, function(e){
+      var id = e.target && e.target.id;
+      if(!id || String(id).indexOf('p-')!==0) return;
+      tocado = true;
+    }, true);
+  });
+
+  function devolverGuardados(p){
+    if(!p) return;
+    CALCULADOS.forEach(function(par){
+      var v=p[par[1]];
+      if(v===undefined || v===null || v==='') return;
+      poner(par[0], (typeof v==='number' && par[1]!=='itbmsPct' && par[1]!=='comPct'
+                     && par[1]!=='coCorPart') ? v.toFixed(2) : v);
+    });
+  }
+
+  function avisoDescuadre(p){
+    var viejo = el('jac-aviso-descuadre');
+    if(viejo && viejo.parentNode) viejo.parentNode.removeChild(viejo);
+    if(!p) return;
+    var prima=n(p.prima), itb=n(p.itbms), ge=n(p.gastosExp), tot=n(p.total);
+    if(!prima || !tot) return;
+    var calc = prima + itb + ge;
+    if(Math.abs(calc - tot) <= Math.max(1, calc*0.02)) return;
+    var caja = el('p-tot');
+    var cont = (caja && caja.closest) ? caja.closest('.fl') : null;
+    if(!cont || !cont.parentNode) return;
+    var d=document.createElement('div');
+    d.id='jac-aviso-descuadre';
+    d.style.cssText='flex:1 1 100%;margin:6px 0;padding:8px 10px;border:1px solid #f59e0b;'
+      +'background:#fffbeb;border-radius:6px;font-size:12px;color:#92400e;line-height:1.45';
+    d.innerHTML='<b>Ojo: los numeros guardados no cuadran entre si.</b><br>'
+      +'Prima total guardada: <b>$'+tot.toFixed(2)+'</b> &nbsp;&middot;&nbsp; '
+      +'Prima + ITBMS + gastos: <b>$'+calc.toFixed(2)+'</b> '
+      +'(diferencia $'+(tot-calc).toFixed(2)+').<br>'
+      +'Se respeta lo guardado. Si toca cualquier importe, el CRM recalcula '
+      +'y al guardar quedara $'+calc.toFixed(2)+'. Compruebe contra la poliza antes.';
+    cont.parentNode.insertBefore(d, cont.nextSibling);
+  }
+
+  function congelar(id){
+    var St=E(); if(!St || !id) return;
+    var p=(St.polizas||[]).filter(function(x){ return String(x.id)===String(id); })[0];
+    if(!p) return;
+    polizaAbierta=p;
+    devolverGuardados(p);
+    avisoDescuadre(p);
+  }
+
+  function envolverOP(){
+    if(typeof window.OP!=='function' || window.OP.__jacCongela) return false;
+    var orig=window.OP;
+    var envuelto=function(id){
+      tocado=false; polizaAbierta=null;
+      var r=orig.apply(this, arguments);
+      if(id){
+        try{ congelar(id); }catch(e){ log('error', e); }
+        /* rellenar() se dispara tambien por setTimeout; se reafirma
+           mientras el usuario no haya tocado nada */
+        [0, 60, 200, 500, 900].forEach(function(ms){
+          setTimeout(function(){
+            if(tocado) return;
+            if(!polizaAbierta || String(polizaAbierta.id)!==String(id)) return;
+            try{ devolverGuardados(polizaAbierta); }catch(e){}
+          }, ms);
+        });
+      } else {
+        var v=el('jac-aviso-descuadre'); if(v&&v.parentNode) v.parentNode.removeChild(v);
+      }
+      return r;
+    };
+    envuelto.__jacCongela=true;
+    window.OP=envuelto;
+    log('OP envuelto');
+    return true;
+  }
+
+  function envolverCartera(){
+    if(typeof window.jacCompletarCartera!=='function' || window.jacCompletarCartera.__jacSinAutoCobro) return false;
+    var orig=window.jacCompletarCartera;
+    var envuelto=function(opts){
+      opts=opts||{};
+      var St=E();
+      var antes={};
+      if(St && St.comisiones) St.comisiones.forEach(function(c){ if(c._cerradaPorAntiguedad) antes[c.id]=true; });
+      var r=orig.apply(this, arguments);
+      if(!opts.cobrarViejas && St && St.comisiones){
+        var deshechas=0;
+        St.comisiones.forEach(function(c){
+          if(c._cerradaPorAntiguedad && !antes[c.id]){
+            c.estado = c._estadoPrevio || 'pendiente';
+            delete c._cerradaPorAntiguedad;
+            delete c._estadoPrevio;
+            delete c.fechaCobro;
+            deshechas++;
+          }
+        });
+        if(deshechas){
+          log('no se dieron por cobradas '+deshechas+' comisiones viejas');
+          if(r) r.comisionesCobradas = 0;
+        }
+      }
+      return r;
+    };
+    envuelto.__jacSinAutoCobro=true;
+    window.jacCompletarCartera=envuelto;
+    log('automatismo de cobro apagado');
+    return true;
+  }
+
+  window.jacDarPorCobradasViejas=function(){
+    if(typeof window.jacCompletarCartera!=='function') return {ok:false};
+    return window.jacCompletarCartera({cobrarViejas:true});
+  };
+
+  window.jacAutoCobradas=function(){
+    var St=E(); if(!St) return [];
+    return (St.comisiones||[]).filter(function(c){ return c._cerradaPorAntiguedad===true; })
+      .map(function(c){ return {id:c.id, mes:c.mes, aseg:c.aseg, poliza:c.numeroPol||'',
+        cliente:c.nombreCliente||'', monto:Number(c.monto)||0, estadoReal:c._estadoPrevio||'pendiente'}; });
+  };
+  window.jacAutoCobradasCSV=function(){
+    var f=window.jacAutoCobradas();
+    var cab='Mes,Aseguradora,Poliza,Cliente,Monto,EstadoReal\n';
+    var cuerpo=f.map(function(r){
+      return [r.mes,r.aseg,r.poliza,r.cliente,r.monto.toFixed(2),r.estadoReal]
+        .map(function(x){ return '"'+String(x==null?'':x).replace(/"/g,'""')+'"'; }).join(',');
+    }).join('\n');
+    return cab+cuerpo;
+  };
+
+  /* lista de polizas cuya pantalla no coincide con lo guardado */
+  window.jacPolizasDescuadradas=function(){
+    var St=E(); if(!St) return [];
+    return (St.polizas||[]).filter(function(p){
+      var prima=n(p.prima), tot=n(p.total);
+      if(!prima || !tot) return false;
+      var calc=prima+n(p.itbms)+n(p.gastosExp);
+      return Math.abs(calc-tot) > Math.max(1, calc*0.02);
+    }).map(function(p){
+      return {num:p.num||'', cliente:p.nombreCliente||'', aseg:p.aseg||'',
+        prima:n(p.prima), itbms:n(p.itbms), gastos:n(p.gastosExp),
+        totalGuardado:n(p.total), totalCalculado:+(n(p.prima)+n(p.itbms)+n(p.gastosExp)).toFixed(2)};
+    });
+  };
+
+  var intentos=0;
+  (function esperar(){
+    var a=envolverOP(), b=envolverCartera();
+    if((!a || !b) && ++intentos<60) setTimeout(esperar, 500);
+  })();
+})();
+</script>
 </body>
 </html>
 <!-- deploy-test -->
