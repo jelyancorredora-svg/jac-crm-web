@@ -12317,6 +12317,55 @@ document.addEventListener('click', function(e){
     return hash(JSON.stringify(o));
   }
   window.jacHuellaColumnas = huellaColumnas;
+
+  /* ==================================================================
+     CAJA NEGRA DE GUARDADOS
+     ------------------------------------------------------------------
+     Llevamos demasiadas vueltas con "guardo y no se guarda". Cada vez
+     que lo he probado yo ha funcionado, asi que lo que falla es algo que
+     pasa en SU pantalla y no en la mia. Adivinar mas no sirve.
+
+     Esto anota cada guardado de poliza: que se mando, desde que version,
+     si la nube lo confirmo, y que contesta la nube despues. Se guarda en
+     el navegador y se puede ver en pantalla. Cuando algo no cuadre, la
+     respuesta esta ahi escrita en vez de suponerse.
+     ================================================================== */
+  var MAX_CAJA = 40;
+  function cajaLeer() {
+    try { var t = localStorage.getItem('jac_caja'); var a = t ? JSON.parse(t) : []; return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
+  }
+  function cajaEscribir(a) {
+    try { localStorage.setItem('jac_caja', JSON.stringify(a.slice(-MAX_CAJA))); } catch (e) {}
+  }
+  window.jacAnotar = function (evento) {
+    try {
+      var a = cajaLeer();
+      evento.cuando = new Date().toISOString();
+      evento.version = window.JAC_BUILD || '?';
+      a.push(evento);
+      cajaEscribir(a);
+    } catch (e) {}
+  };
+  window.jacCaja = function () { return cajaLeer(); };
+  window.jacCajaBorrar = function () { try { localStorage.removeItem('jac_caja'); } catch (e) {} return 'borrada'; };
+
+  /* Comprueba contra la nube lo ultimo que se guardo de una poliza. */
+  window.jacComprobarPoliza = async function (id) {
+    var d = db(); if (!d) return { ok:false, motivo:'sin nube' };
+    var st = (typeof S !== 'undefined') ? S : null;
+    var loc = st && st.polizas ? st.polizas.filter(function (x) { return String(x.id) === String(id); })[0] : null;
+    var r = await d.from('polizas').select('*').eq('id', String(id));
+    if (r.error) return { ok:false, motivo:r.error.message };
+    var fila = (r.data || [])[0];
+    return {
+      ok: true,
+      enPantalla: loc ? { ramo:loc.ramo, subramo:loc.subramo } : null,
+      enLaNube:   fila ? { ramo:fila.ramo, subramo:fila.subramo, cuando:fila.updated_at } : 'no está',
+      coinciden: !!(loc && fila && String(loc.ramo) === String(fila.ramo)
+                    && String(loc.subramo || '') === String(fila.subramo || ''))
+    };
+  };
   function aFecha(v) {
     if (!v) return null;
     var s = String(v).trim(); if (!s) return null;
@@ -15784,7 +15833,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-09-EB';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-09-EC';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -15828,6 +15877,19 @@ document.addEventListener('click', function(e){
       el.style.color = '#fff';
       el.style.background = '#15803D';
       el.style.borderColor = '#15803D';
+      /* Aviso grande, imposible de pasar por alto: trabajar sobre una
+         version vieja es lo que mas tiempo nos ha hecho perder. */
+      try{
+        if(!document.getElementById('jac-aviso-version')){
+          var b=document.createElement('div');
+          b.id='jac-aviso-version';
+          b.style.cssText='position:fixed;left:0;right:0;top:0;z-index:2147483200;background:#15803D;'
+            +'color:#fff;text-align:center;padding:10px 14px;font:600 13px system-ui,-apple-system,sans-serif;'
+            +'box-shadow:0 2px 10px rgba(0,0,0,.2)';
+          b.textContent='Hay una versión nueva del CRM. Guardando lo pendiente y actualizando…';
+          document.body.appendChild(b);
+        }
+      }catch(e){}
     } else {
       el.textContent = MARCA.replace('JAC-BUILD-','v ');
     }
@@ -15855,7 +15917,71 @@ document.addEventListener('click', function(e){
   }
   window.jacRevisarVersion = revisarVersion;
 
-  function arrancarMarca(){ try{ pintarMarca(null); }catch(e){} }
+  /* ------------------------------------------------------------------
+     PANEL DE DIAGNOSTICO — se abre pulsando la marca de version
+     ------------------------------------------------------------------
+     Muestra, de los ultimos guardados: que se pidio, que quedo en la
+     pantalla, que contesta la nube y si cuadran. Con una captura de esto
+     se sabe que paso, sin adivinar.
+     ------------------------------------------------------------------ */
+  function panelDiagnostico(){
+    var v=document.getElementById('jac-panel-diag');
+    if(v){ v.remove(); return; }
+    var caja=(typeof window.jacCaja==='function')?window.jacCaja():[];
+    var d=document.createElement('div');
+    d.id='jac-panel-diag';
+    d.style.cssText='position:fixed;inset:auto 12px 40px 12px;max-height:70vh;overflow:auto;z-index:2147483100;'
+      +'background:#fff;border:1px solid #CBD5E1;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);'
+      +'padding:14px 16px;font:12px/1.5 system-ui,-apple-system,sans-serif;color:#0F172A;max-width:820px;margin:0 auto';
+    var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      +'<b style="font-size:14px">Diagnóstico de guardado</b>'
+      +'<button id="jac-diag-x" style="border:1px solid #CBD5E1;background:#F8FAFC;border-radius:6px;'
+      +'padding:3px 10px;cursor:pointer;font-size:12px">Cerrar</button></div>';
+    h+='<div style="color:#475569;margin-bottom:10px">Versión en uso: <b>'+(window.JAC_BUILD||'?')+'</b>'
+      +' · Últimos '+caja.length+' guardados</div>';
+    if(!caja.length){
+      h+='<div style="color:#64748B">Todavía no hay guardados anotados. Guarde una póliza y vuelva aquí.</div>';
+    } else {
+      h+='<table style="width:100%;border-collapse:collapse">'
+        +'<tr style="text-align:left;color:#64748B;border-bottom:1px solid #E2E8F0">'
+        +'<th style="padding:4px">Hora</th><th>Póliza</th><th>Se pidió</th><th>Quedó aquí</th>'
+        +'<th>Dice la nube</th><th>Subida</th></tr>';
+      caja.slice().reverse().forEach(function(e){
+        function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+        var ped=e.pedido||{}, mem=e.enMemoria||{}, nub=e.enLaNube||{};
+        var cuadra = e.coinciden===true;
+        h+='<tr style="border-bottom:1px solid #F1F5F9;'+(cuadra?'':'background:#FEF2F2')+'">'
+          +'<td style="padding:4px;white-space:nowrap">'+esc(String(e.cuando||'').slice(11,19))+'</td>'
+          +'<td>'+esc(ped.num||e.id||'—')+'</td>'
+          +'<td>'+esc(ped.ramo)+(ped.subramo?' · '+esc(ped.subramo):'')+'</td>'
+          +'<td>'+esc(mem.ramo)+(mem.subramo?' · '+esc(mem.subramo):'')+'</td>'
+          +'<td>'+(typeof nub==='string'? esc(nub) : esc(nub.ramo)+(nub.subramo?' · '+esc(nub.subramo):''))+'</td>'
+          +'<td style="white-space:nowrap;color:'+(String(e.subida||'').indexOf('confirmada')>=0?'#15803D':'#B91C1C')+'">'
+          +esc(e.subida)+'</td></tr>';
+      });
+      h+='</table><div style="margin-top:10px;color:#64748B">Las filas en rojo son las que NO cuadran '
+        +'entre su pantalla y la nube.</div>';
+    }
+    d.innerHTML=h;
+    document.body.appendChild(d);
+    var x=document.getElementById('jac-diag-x');
+    if(x) x.onclick=function(){ d.remove(); };
+  }
+  window.jacDiagnostico=panelDiagnostico;
+
+  function arrancarMarca(){
+    try{
+      pintarMarca(null);
+      var m=document.getElementById('jac-marca-version');
+      if(m && !m.__jacClic){
+        m.__jacClic=1;
+        m.style.pointerEvents='auto';
+        m.style.cursor='pointer';
+        m.title='Pulse para ver el diagnóstico de guardado';
+        m.addEventListener('click', panelDiagnostico);
+      }
+    }catch(e){}
+  }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', arrancarMarca);
   else arrancarMarca();
   setTimeout(arrancarMarca, 2500);
@@ -21374,11 +21500,48 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       if(typeof f!=='function' || window.__jacYaEnvuelto[nom]) return;
       window.__jacYaEnvuelto[nom]=1;
       var env=function(){
+        /* Antes de guardar: que se pidio */
+        var antes = null;
+        if(nom==='SP'){
+          try{
+            antes = { id:(typeof EID!=='undefined'?EID:null),
+                      num:(document.getElementById('p-nu')||{}).value||'',
+                      ramo:(document.getElementById('p-ra')||{}).value||'',
+                      subramo:(document.getElementById('p-sr')||{}).value||'' };
+          }catch(e){}
+        }
         var r;
         try{ r=f.apply(this, arguments); }
-        catch(e){ throw e; }
+        catch(e){
+          try{ if(window.jacAnotar) window.jacAnotar({que:nom, resultado:'ERROR', error:String(e&&e.message||e), pedido:antes}); }catch(x){}
+          throw e;
+        }
         window.__jacSucio=true;
-        setTimeout(function(){ window.jacGuardarYa({silencioso:false}); }, 150);
+        setTimeout(function(){
+          Promise.resolve(window.jacGuardarYa({silencioso:false})).then(async function(g){
+            if(nom!=='SP' || !antes){ return; }
+            var anot = { que:'guardar póliza', pedido:antes,
+                         subida: g && g.ok ? 'confirmada' : ('NO subió: '+((g&&g.motivo)||'?')) };
+            try{
+              var st=(typeof S!=='undefined')?S:null;
+              var pol = st && st.polizas ? st.polizas.filter(function(x){
+                return antes.id ? String(x.id)===String(antes.id) : String(x.num||'')===String(antes.num);
+              })[0] : null;
+              if(pol){
+                anot.enMemoria = { ramo:pol.ramo, subramo:pol.subramo };
+                anot.id = pol.id;
+                if(typeof window.jacComprobarPoliza==='function'){
+                  var c = await window.jacComprobarPoliza(pol.id);
+                  anot.enLaNube = c.enLaNube;
+                  anot.coinciden = c.coinciden;
+                }
+              } else {
+                anot.enMemoria = 'no se encontró la póliza tras guardar';
+              }
+            }catch(e){ anot.fallo=String(e&&e.message||e); }
+            try{ if(window.jacAnotar) window.jacAnotar(anot); }catch(e){}
+          }).catch(function(){});
+        }, 150);
         return r;
       };
       env.__jacSubeYa=true;
@@ -30493,7 +30656,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-09-EB';
+  var VERSION='JAC-BUILD-2026-09-09-EC';
 
   window.jacVersion=function(){ return VERSION; };
 
