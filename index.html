@@ -15858,7 +15858,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-14-EI';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-14-EJ';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -30681,7 +30681,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-14-EI';
+  var VERSION='JAC-BUILD-2026-09-14-EJ';
 
   window.jacVersion=function(){ return VERSION; };
 
@@ -31707,11 +31707,39 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     return r;
   };
 
+  /* cuantos adjuntos faltan todavia en este equipo */
+  function faltan(){
+    var St=E(); if(!St) return 0;
+    var n=0;
+    recorrer(St, function(f){ if(!f.b64 && f.path) n++; });
+    return n;
+  }
+
+  /* No basta con intentarlo una vez: al arrancar puede que la sesion de
+     nube no este lista todavia, o que las rutas aun no hayan bajado. Se
+     reintenta un rato y se para solo en cuanto no falta ninguno. */
+  var intentos=0;
+  async function tirar(){
+    intentos++;
+    if(faltan()===0) return true;
+    try{
+      var r=await window.jacTraerAdjuntos();
+      if(r && r.ok && faltan()===0) return true;
+    }catch(e){}
+    return false;
+  }
+
   var n=0;
   (function esperar(){
     if(window.__jacNubeLista && window.db && !window.db.__esStub){
       try{ limpiarUrlsPublicas(); }catch(e){}
-      setTimeout(function(){ window.jacTraerAdjuntos()['catch'](function(){}); }, 3000);
+      (function ciclo(){
+        setTimeout(function(){
+          tirar().then(function(listo){
+            if(!listo && intentos<12) ciclo();
+          })['catch'](function(){ if(intentos<12) ciclo(); });
+        }, intentos===0 ? 3000 : 15000);
+      })();
       return;
     }
     if(++n<120) setTimeout(esperar, 1000);
