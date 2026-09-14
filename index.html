@@ -15858,7 +15858,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-14-EJ';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-14-EK';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -30681,7 +30681,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-14-EJ';
+  var VERSION='JAC-BUILD-2026-09-14-EK';
 
   window.jacVersion=function(){ return VERSION; };
 
@@ -31715,18 +31715,17 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
     return n;
   }
 
-  /* No basta con intentarlo una vez: al arrancar puede que la sesion de
-     nube no este lista todavia, o que las rutas aun no hayan bajado. Se
-     reintenta un rato y se para solo en cuanto no falta ninguno. */
+  /* Antes esto se paraba en cuanto faltan()===0, y al arrancar eso es
+     justo lo que pasa: las fichas todavia no han bajado de la nube, no
+     falta nada porque no hay nada, y el ciclo se apagaba para siempre.
+     Ahora sencillamente repasa unas cuantas veces durante un par de
+     minutos. Cuando no falta ningun adjunto la pasada no toca la red:
+     es un recorrido en memoria y no cuesta nada. */
   var intentos=0;
-  async function tirar(){
+  function tirar(){
     intentos++;
-    if(faltan()===0) return true;
-    try{
-      var r=await window.jacTraerAdjuntos();
-      if(r && r.ok && faltan()===0) return true;
-    }catch(e){}
-    return false;
+    if(faltan()===0) return Promise.resolve();
+    return Promise.resolve(window.jacTraerAdjuntos())['catch'](function(){});
   }
 
   var n=0;
@@ -31735,10 +31734,9 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
       try{ limpiarUrlsPublicas(); }catch(e){}
       (function ciclo(){
         setTimeout(function(){
-          tirar().then(function(listo){
-            if(!listo && intentos<12) ciclo();
-          })['catch'](function(){ if(intentos<12) ciclo(); });
-        }, intentos===0 ? 3000 : 15000);
+          tirar().then(function(){ if(intentos<12) ciclo(); })
+                 ['catch'](function(){ if(intentos<12) ciclo(); });
+        }, intentos===0 ? 3000 : 12000);
       })();
       return;
     }
