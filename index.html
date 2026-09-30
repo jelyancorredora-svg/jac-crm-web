@@ -12534,7 +12534,7 @@ document.addEventListener('click', function(e){
     } catch (e) { return {}; }
   })();
   function _guardarBase() {
-    try { localStorage.setItem('jac_base', JSON.stringify({ __v: VERSION_NOTAS, notas: _base })); }
+    try { localStorage.setItem('jac_base', JSON.stringify({ __v: VERSION_NOTAS, notas: _base, vistas: _vistoFila })); }
     catch (e) {}
   }
   /* Las notas guardadas antes de esta version pueden decir "ya subido"
@@ -12574,6 +12574,66 @@ document.addEventListener('click', function(e){
      mirasemos: si es asi, lo que tenemos aqui esta viejo y no debe
      escribirse encima. */
   var _visto = {};
+
+  /* ------------------------------------------------------------------
+     LO QUE SABEMOS DE CADA FILA, NO SOLO DE CADA TABLA
+     ------------------------------------------------------------------
+     _visto guarda UNA marca de tiempo por tabla: la mas nueva que trajo
+     la ultima bajada completa. Eso deja fuera el caso peor. Si la bajada
+     no llego a completarse — la sesion caducada, una tabla que fallo, la
+     guarda que cancela la carga entera — la tabla se queda sin marca, y
+     entonces NINGUN cambio sobre un registro que ya existe arriba se
+     llegaba a escribir. En silencio, y devolviendo "subido" igual.
+
+     Aqui se anota, por FILA, el updated_at que esa fila tenia la ultima
+     vez que la vimos o que confirmamos haberla escrito. Con eso la
+     pregunta deja de ser "¿he leido esta tabla entera?" y pasa a ser
+     "¿ha cambiado ESTA fila desde que la mire?", que es la que importa
+     y la que siempre se puede contestar. Se guarda junto a las huellas,
+     asi que sobrevive a cerrar el navegador.
+     ------------------------------------------------------------------ */
+  var _vistoFila = (function () {
+    try {
+      var t = localStorage.getItem('jac_base');
+      var o = t ? JSON.parse(t) : null;
+      if (o && typeof o === 'object' && o.__v === VERSION_NOTAS && o.vistas) return o.vistas;
+      return {};
+    } catch (e) { return {}; }
+  })();
+  function _anotarVista(tabla, id, cuando) {
+    if (!cuando) return;
+    if (!_vistoFila[tabla]) _vistoFila[tabla] = {};
+    _vistoFila[tabla][String(id)] = String(cuando);
+  }
+  window.jacVistoFila = function () { return JSON.parse(JSON.stringify(_vistoFila)); };
+
+  /* ------------------------------------------------------------------
+     LA MARCA DE "LO GUARDE YO A MANO" CADUCA
+     ------------------------------------------------------------------
+     Esa marca es una llave maestra: se salta TODAS las comprobaciones y
+     escribe encima de la nube pase lo que pase. Tiene sentido durante
+     unos minutos — es su orden, recien dada, y debe ganar.
+
+     Lo que no tiene sentido es que dure para siempre. Si un equipo puso
+     la marca y nunca llego a confirmar (se le cayo la sesion, se cerro
+     el portatil), esa marca se le queda pegada al registro. A partir de
+     ahi, cada subida de ESE equipo reimpone su copia vieja encima de lo
+     que se guardo en cualquier otro sitio, y no hay guarda que lo pare.
+     Es exactamente el "lo guardo y al refrescar vuelve lo de antes":
+     el guardado era correcto, lo pisaba otra maquina despues.
+
+     Diez minutos es de sobra para que una subida normal termine, y muy
+     poco para hacer dano. Pasado ese rato la marca deja de mandar y el
+     registro vuelve a competir con las reglas de todos.
+     ------------------------------------------------------------------ */
+  var VIDA_MARCA_MANUAL = 600000;   /* 10 minutos */
+  function _marcaManualVigente(v) {
+    if (!v) return false;
+    var t = Date.parse(v);
+    if (!isFinite(t)) return true;        /* marca sin fecha legible: se respeta */
+    var dt = Date.now() - t;
+    return dt >= -60000 && dt < VIDA_MARCA_MANUAL;
+  }
   var _recienSubido = {};
   var VENTANA_RECIEN = 45000;   /* 45 s de desconfianza tras escribir */
 
@@ -12667,6 +12727,7 @@ document.addEventListener('click', function(e){
       }
 
       _avisoSesion = false;
+      var _saltadasEnEstaVuelta = 0;
       for (var clave in TABLAS) {
         var tabla = TABLAS[clave];
         var lista = S[clave] || [];
@@ -12792,9 +12853,10 @@ document.addEventListener('click', function(e){
             var _origen = (typeof S !== 'undefined' && Array.isArray(S[clave])) ? S[clave] : [];
             for (var _z = 0; _z < _origen.length; _z++) {
               var _reg = _origen[_z];
-              if (_reg && _reg.id !== undefined && _reg._edicionManual) _aMano[String(_reg.id)] = 1;
+              if (_reg && _reg.id !== undefined && _reg._edicionManual) _aMano[String(_reg.id)] = _reg._edicionManual;
             }
           } catch (e) {}
+          var _marcasCaducas = [];
           cambiadas = cambiadas.filter(function (f) {
             var idf = String(f.id);
             var cuando = _fechas[idf];
@@ -12804,13 +12866,40 @@ document.addEventListener('click', function(e){
               delete _cambiadasIds[f.id];
               return false;
             };
-            if (_aMano[idf]) return true;              /* lo guardo ella: su orden manda */
             if (!_respondido[idf]) return fuera();     /* no se pudo comprobar: no se pisa */
             if (!cuando) return true;                  /* no esta arriba: es nueva */
-            if (_visto[tabla] && cuando <= _visto[tabla]) return true;  /* sin novedad arriba */
+
+            /* ¿Ha cambiado ESTA fila desde la ultima vez que la vimos o que
+               confirmamos haberla escrito? Si no, lo de aqui es la version
+               buena y se manda. Esto ya no depende de haber leido la tabla
+               entera, que es lo que dejaba mudas las sesiones con la bajada
+               a medias. */
+            var conocida = (_vistoFila[tabla] || {})[idf];
+            if (conocida && cuando <= conocida) return true;
+            if (!conocida && _visto[tabla] && cuando <= _visto[tabla]) return true;
+
+            /* La nube tiene algo mas nuevo de lo que conocemos. Solo una
+               orden suya RECIEN dada puede pasar por encima. */
+            if (_marcaManualVigente(_aMano[idf])) return true;
+            if (_aMano[idf]) _marcasCaducas.push(idf);   /* marca vieja: que deje de pelear */
             return fuera();
           });
+          /* Una marca manual caducada que ademas ha perdido contra la nube no
+             vuelve a intentarlo: se retira aqui. Sin esto, el equipo que la
+             lleva pegada reimpone su copia vieja en cada vuelta. */
+          if (_marcasCaducas.length) {
+            try {
+              var _arrM = (typeof S !== 'undefined' && Array.isArray(S[clave])) ? S[clave] : [];
+              for (var _m = 0; _m < _arrM.length; _m++) {
+                if (_arrM[_m] && _marcasCaducas.indexOf(String(_arrM[_m].id)) >= 0) delete _arrM[_m]._edicionManual;
+              }
+            } catch (e) {}
+            log('warn', '[JAC] ' + tabla + ': ' + _marcasCaducas.length + ' marca(s) de edicion manual '
+              + 'caducadas que querian escribir encima de algo mas nuevo. Retiradas.');
+            window.__jacMarcasCaducadas = (window.__jacMarcasCaducadas || 0) + _marcasCaducas.length;
+          }
           if (_saltadasPorViejas) {
+            _saltadasEnEstaVuelta += _saltadasPorViejas;
             log('warn', '[JAC] ' + tabla + ': ' + _saltadasPorViejas + ' fila(s) cambiaron en la nube '
               + 'despues de nuestra ultima lectura. No se sobrescriben.');
             window.__jacNoSobrescritas = (window.__jacNoSobrescritas || 0) + _saltadasPorViejas;
@@ -12854,7 +12943,10 @@ document.addEventListener('click', function(e){
             continue;
           }
           (rv.data || []).forEach(function (f2) {
-            try { _confirmadas[String(f2.id)] = huellaFila(aFila(aObjeto(f2), tabla), tabla); } catch (e) {}
+            try {
+              _confirmadas[String(f2.id)] = huellaFila(aFila(aObjeto(f2), tabla), tabla);
+              _anotarVista(tabla, f2.id, f2.updated_at);
+            } catch (e) {}
           });
         }
         if (borradas.length) {
@@ -12879,12 +12971,18 @@ document.addEventListener('click', function(e){
             }
           }
           _base[tabla] = foto;
-          /* Confirmado arriba: la marca de "guardado a mano" ya cumplio. */
+          /* Confirmado arriba: la marca de "guardado a mano" ya cumplio.
+             Solo se retira si la base devolvio EXACTAMENTE lo que se mando.
+             Antes bastaba con que la fila se pudiera releer, aunque viniera
+             distinta: la proteccion se caia justo en el caso en que hacia
+             falta, y el cambio se quedaba sin quien lo defendiera. */
           try {
             var _arr = (typeof S !== 'undefined' && Array.isArray(S[clave])) ? S[clave] : [];
             for (var _y = 0; _y < _arr.length; _y++) {
               var _rg = _arr[_y];
-              if (_rg && _rg._edicionManual && _confirmadas[String(_rg.id)] !== undefined) delete _rg._edicionManual;
+              if (!_rg || !_rg._edicionManual) continue;
+              var _idg = String(_rg.id);
+              if (_confirmadas[_idg] !== undefined && _confirmadas[_idg] === _huellaLocal[_idg]) delete _rg._edicionManual;
             }
           } catch (e) {}
           if (pendientes) {
@@ -12958,7 +13056,7 @@ document.addEventListener('click', function(e){
     }
     _ultimaSubidaOk = new Date().toISOString();
     _guardarBase();
-    return { ok:true, cuando: _ultimaSubidaOk };
+    return { ok:true, cuando: _ultimaSubidaOk, saltadas: _saltadasEnEstaVuelta };
   }
 
   /* Los que estan esperando a que termine una subida que ya estaba en
@@ -13339,8 +13437,16 @@ document.addEventListener('click', function(e){
         var tabla = TABLAS[clave], mx = _visto[tabla] || '';
         (lotes[k].filas || []).forEach(function (f) {
           if (f && f.updated_at && String(f.updated_at) > mx) mx = String(f.updated_at);
+          if (f && f.id !== undefined) _anotarVista(tabla, f.id, f.updated_at);
         });
         if (mx) _visto[tabla] = mx;
+        /* Lo que ya no esta arriba tampoco tiene que seguir ocupando sitio. */
+        var vf = _vistoFila[tabla];
+        if (vf) {
+          var vivos = {};
+          (lotes[k].filas || []).forEach(function (f) { if (f && f.id !== undefined) vivos[String(f.id)] = 1; });
+          for (var idv in vf) if (!vivos[idv]) delete vf[idv];
+        }
       });
 
       _yaCargoUnaVez = true;
@@ -15921,7 +16027,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-24-FA';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-29-FB';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -21637,6 +21743,28 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
                   var c = await window.jacComprobarPoliza(pol.id);
                   anot.enLaNube = c.enLaNube;
                   anot.coinciden = c.coinciden;
+                  /* Que no vuelva a pasar en silencio. Si la nube NO tiene el
+                     ramo y el subramo que se acaban de guardar, se dice aqui
+                     mismo, con el botón para reintentar. Antes esto solo
+                     quedaba anotado en la caja negra y ella se enteraba al
+                     refrescar, cuando ya parecía que el CRM no guardaba. */
+                  if(c && c.ok === true && c.coinciden === false){
+                    marca('El ramo no llegó a la nube — reintentando', '#B91C1C');
+                    try{ if(window.toast) toast('El ramo/subramo no quedó guardado en la nube. Reintentando…','err'); }catch(e){}
+                    try{
+                      pol._edicionManual = new Date().toISOString();
+                      var g2 = await window.jacGuardarYa({silencioso:true});
+                      var c2 = await window.jacComprobarPoliza(pol.id);
+                      anot.reintento = { subida: g2 && g2.ok, coinciden: c2 && c2.coinciden };
+                      if(c2 && c2.coinciden){
+                        marca('Guardado ✓', '#15803D');
+                        try{ if(window.toast) toast('Listo: ya quedó guardado en la nube','ok'); }catch(e){}
+                      } else {
+                        marca('No se pudo guardar en la nube', '#B91C1C');
+                        try{ if(window.toast) toast('No se pudo guardar el ramo en la nube. Revise la conexión y vuelva a pulsar Guardar.','err'); }catch(e){}
+                      }
+                    }catch(e){ anot.reintento = 'falló: '+String(e&&e.message||e); }
+                  }
                 }
               } else {
                 anot.enMemoria = 'no se encontró la póliza tras guardar';
@@ -30759,7 +30887,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-24-FA';
+  var VERSION='JAC-BUILD-2026-09-29-FB';
 
   window.jacVersion=function(){ return VERSION; };
 
