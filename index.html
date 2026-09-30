@@ -4742,6 +4742,10 @@ function SP(){
  const phc=document.getElementById('p-hc');const hcc=phc?phc.checked:false;const cId=V('p-cl');
  const d={clienteId:cId,nombreCliente:GC(cId).nombre||'',num,numAnexo:V('p-na'),tipo:V('p-tp'),aseg,ramo:normRamo(V('p-ra')),subramo:V('p-sr').trim(),nueva:V('p-nr'),estado:V('p-es'),etapa:V('p-et'),riesgo:V('p-ri').trim(),valorRiesgo:GF('p-vr'),cobertura:V('p-cob'),tipoPol:V('p-tpo'),prima:GF('p-pr'),itbmsPct:GF('p-it'),itbms:GF('p-ib'),gastosExp:GF('p-ge'),total:GF('p-tot'),cuotaMensual:GF('p-cmes'),cuotaTrimestral:GF('p-ctri'),cuotaSemestral:GF('p-csem'),cuotaAnual:GF('p-canu'),comPct:GF('p-cb'),numPagos:parseInt(V('p-npag'))||0,letraPrima:(parseInt(V('p-npag'))||0)>0?(GF('p-tot')||0)/(parseInt(V('p-npag'))):0,participacion:GF('p-pa')||100,comision:GF('p-co'),comisionPct:GF('p-cb'),nombreAsegurado:V('p-nas'),docAsegurado:V('p-das'),tomador:V('p-nto'),docTomador:V('p-dto'),beneficiario:V('p-ben'),cedBeneficiario:V('p-cben'),fechaExpedicion:V('p-fex'),fechaRecepcion:V('p-fre'),fechaInicio:V('p-fi'),fechaFin:V('p-ff'),fechaCancelada:V('p-fca'),formaPago:V('p-fp'),periodo:V('p-pe'),medio:V('p-me'),banco:V('p-ban'),moneda:V('p-mon')||'USD',vendedor:V('p-ven').trim(),obs:V('p-ob').trim(),obsInt:V('p-oi').trim(),acreedor:V('p-acr').trim(),tipoPago:V('p-tpago'),numCert:V('p-ncert').trim(),endosos:GF('p-endosos'),pagado:GF('p-pagado'),saldo:GF('p-saldo'),fechaFact:V('p-ffact'),coCor:hcc?V('p-cc'):'',coCorPart:hcc?GF('p-cp'):0,coCorCom:hcc?GF('p-cc2'):0};
  d.etiquetas=getSelTags('p-etq-wrap');{var _bd=getBens();if(_bd===null)return;d.beneficiarios=_bd;}
+ /* Marca de "esto lo guardo ella a mano". La sincronizacion la respeta:
+    una copia vieja de otra pestana no puede pisar lo que se acaba de
+    guardar aqui. La marca se retira sola cuando la base confirma. */
+ d._edicionManual=new Date().toISOString();
  if(EID){const i=S.polizas.findIndex(p=>p.id===EID);if(i>=0){if(!S.polizas[i].archivos)S.polizas[i].archivos=[];S.polizas[i].archivos.push(..._pf);S.polizas[i]={...S.polizas[i],...d};}toast('✓ Póliza actualizada');}
  else{const _newPolId='P'+uid();const _newPol={id:_newPolId,...d,asegurados:[],archivos:[..._pf]};S.polizas.push(_newPol);if((_newPol.comision||0)>0){if(!S.comisiones)S.comisiones=[];const _mes=(_newPol.fechaInicio||TODAY.toISOString().split('T')[0]).substring(0,7);S.comisiones.push({id:'COM'+uid(),aseg:_newPol.aseg,mes:_mes,monto:_newPol.comision,estado:'pendiente',polizaId:_newPolId,polizaNum:_newPol.num,ramo:_newPol.ramo,clienteId:_newPol.clienteId,auto:true});if(typeof RCom==='function')RCom();}toast('✓ Póliza guardada · Comisión registrada automáticamente');}
  // Auto-promote prospecto to cliente when policy is created
@@ -12408,6 +12412,14 @@ document.addEventListener('click', function(e){
 
   function aFila(obj, tabla) {
     obj = _sinAdjuntosPesados(obj);
+    /* La marca de "esto lo guardo ella a mano" es solo de este navegador.
+       Si viajara dentro de la fila cambiaria la huella en cada vuelta y el
+       registro pareceria distinto para siempre. */
+    if (obj && obj._edicionManual !== undefined) {
+      var _sinMarca = {}, _km;
+      for (_km in obj) if (Object.prototype.hasOwnProperty.call(obj, _km) && _km !== '_edicionManual') _sinMarca[_km] = obj[_km];
+      obj = _sinMarca;
+    }
     var def = COLS[tabla] || [], fila = {}, usados = {}, extra = {};
     for (var i = 0; i < def.length; i++) {
       var col = def[i][0], tipo = def[i][1];
@@ -12736,24 +12748,67 @@ document.addEventListener('click', function(e){
            dispositivo miro, aqui hay una copia vieja: no se escribe, se
            deja fuera y se recoge en la bajada siguiente.
            ============================================================== */
+        /* ==============================================================
+           LA GUARDA SE APLICA SIEMPRE, NO SOLO SI YA HUBO UNA BAJADA
+           --------------------------------------------------------------
+           Antes esto solo corria si _visto[tabla] tenia valor, es decir,
+           si este dispositivo habia llegado a leer la nube entera alguna
+           vez en esta sesion. Justo el caso peor quedaba fuera: cuando la
+           sesion de nube caduca, la lectura devuelve cero filas o un
+           permiso denegado, _visto se queda vacio... y entonces este
+           dispositivo subia su copia vieja ENCIMA de lo que se acababa de
+           guardar en otro sitio. Reproducido: cambiar el ramo a MOTOS en
+           un equipo y ver como volvia a AUTOS porque otra pestana, que no
+           podia leer, empujaba lo suyo.
+
+           Ahora se pregunta siempre. Y la regla es:
+             - fila que no existe arriba  -> se manda (es nueva)
+             - la guardo ella a mano      -> se manda (mandar es su orden)
+             - la nube no ha cambiado desde que leimos -> se manda
+             - en cualquier otro caso     -> NO se pisa; se recoge al bajar
+           ============================================================== */
         var _saltadasPorViejas = 0;
-        if (cambiadas.length && _visto[tabla]) {
-          var _fechas = {};
+        if (cambiadas.length) {
+          var _fechas = {}, _respondido = {}, _sinRespuesta = 0;
           for (var w = 0; w < cambiadas.length; w += 200) {
             var idsW = cambiadas.slice(w, w + 200).map(function (f) { return f.id; });
             var rw = await d.from(tabla).select('id,updated_at').in('id', idsW);
-            if (rw.error) { log('warn', '[JAC] No se pudo consultar antiguedad en ' + tabla); continue; }
+            if (rw.error) {
+              /* No se pudo preguntar. ANTES esto seguia adelante y escribia
+                 igual, que es precisamente como una pestana sin permiso de
+                 lectura acababa pisando lo recien guardado en otro equipo.
+                 Si no se puede comprobar, no se pisa. */
+              log('warn', '[JAC] No se pudo consultar antiguedad en ' + tabla
+                + ': ' + rw.error.message + '. Esas filas no se escriben esta vuelta.');
+              _sinRespuesta += idsW.length;
+              continue;
+            }
+            idsW.forEach(function (idw) { _respondido[String(idw)] = 1; });
             (rw.data || []).forEach(function (f) { _fechas[String(f.id)] = String(f.updated_at || ''); });
           }
+          if (_sinRespuesta) window.__jacSinComprobar = (window.__jacSinComprobar || 0) + _sinRespuesta;
+          var _aMano = {};
+          try {
+            var _origen = (typeof S !== 'undefined' && Array.isArray(S[clave])) ? S[clave] : [];
+            for (var _z = 0; _z < _origen.length; _z++) {
+              var _reg = _origen[_z];
+              if (_reg && _reg.id !== undefined && _reg._edicionManual) _aMano[String(_reg.id)] = 1;
+            }
+          } catch (e) {}
           cambiadas = cambiadas.filter(function (f) {
-            var cuando = _fechas[String(f.id)];
-            if (cuando && cuando > _visto[tabla]) {
+            var idf = String(f.id);
+            var cuando = _fechas[idf];
+            var fuera = function () {
               _saltadasPorViejas++;
-              delete ahora[f.id];        /* fuera de la foto: se recogera al bajar */
+              delete ahora[f.id];      /* fuera de la foto: se recogera al bajar */
               delete _cambiadasIds[f.id];
               return false;
-            }
-            return true;
+            };
+            if (_aMano[idf]) return true;              /* lo guardo ella: su orden manda */
+            if (!_respondido[idf]) return fuera();     /* no se pudo comprobar: no se pisa */
+            if (!cuando) return true;                  /* no esta arriba: es nueva */
+            if (_visto[tabla] && cuando <= _visto[tabla]) return true;  /* sin novedad arriba */
+            return fuera();
           });
           if (_saltadasPorViejas) {
             log('warn', '[JAC] ' + tabla + ': ' + _saltadasPorViejas + ' fila(s) cambiaron en la nube '
@@ -12824,6 +12879,14 @@ document.addEventListener('click', function(e){
             }
           }
           _base[tabla] = foto;
+          /* Confirmado arriba: la marca de "guardado a mano" ya cumplio. */
+          try {
+            var _arr = (typeof S !== 'undefined' && Array.isArray(S[clave])) ? S[clave] : [];
+            for (var _y = 0; _y < _arr.length; _y++) {
+              var _rg = _arr[_y];
+              if (_rg && _rg._edicionManual && _confirmadas[String(_rg.id)] !== undefined) delete _rg._edicionManual;
+            }
+          } catch (e) {}
           if (pendientes) {
             log('warn', '[JAC] ' + tabla + ': ' + pendientes + ' registro(s) escritos que la base '
               + 'no devolvio igual. Quedan pendientes y se reintentan.');
@@ -15858,7 +15921,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-09-14-EK';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-09-24-FA';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -16366,11 +16429,26 @@ document.addEventListener('click', function(e){
         try{ toast('No se pudo guardar: espacio del navegador lleno','err'); }catch(_e){}
       }
       /* El original vuelve a escribir localStorage; se le tapa esa
-         parte un instante para que no meta los archivos otra vez. */
-      var _set=localStorage.setItem.bind(localStorage);
-      localStorage.setItem=function(k,v){ if(k==='jacv10') return; return _set(k,v); };
+         parte un instante para que no meta los archivos otra vez.
+
+         OJO CON COMO SE TAPA. Antes se hacia asi:
+             localStorage.setItem = function(...){...}
+         y eso NO sustituye el metodo: en un objeto Storage, asignarle una
+         propiedad GUARDA UN DATO con ese nombre. Resultado: quedaba una
+         clave basura llamada "setItem" en el navegador y, lo importante,
+         la tapadera no tapaba nada — el guardado original volvia a escribir
+         el estado ENTERO, con los PDF en base64 dentro. De ahi el aviso
+         rojo de "espacio del navegador lleno".
+
+         Se sustituye en el prototipo, que es donde vive el metodo de
+         verdad, y se devuelve tal cual al terminar. */
+      var _proto = Object.getPrototypeOf(localStorage);
+      var _origSet = _proto.setItem;
+      _proto.setItem = function(k, v){ if(k==='jacv10') return; return _origSet.call(this, k, v); };
       var r;
-      try{ r=_orig.apply(this,arguments); } finally { localStorage.setItem=_set; }
+      try{ r=_orig.apply(this,arguments); } finally { _proto.setItem = _origSet; }
+      /* limpiar la clave basura que dejo la version anterior */
+      try{ if(localStorage.getItem('setItem')!==null) localStorage.removeItem('setItem'); }catch(e){}
       return r;
     };
   }
@@ -30681,7 +30759,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-09-14-EK';
+  var VERSION='JAC-BUILD-2026-09-24-FA';
 
   window.jacVersion=function(){ return VERSION; };
 
