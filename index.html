@@ -311,7 +311,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  </div>
  <nav>
  <a class="on" onclick="SH('dash')">📊 Dashboard</a>
- <a onclick="SH('cal');renderCal();">📅 Agenda</a>
+ <a onclick="SH('cal');if(typeof renderCal==='function')renderCal();">📅 Agenda</a>
  <a onclick="SH('cli')">👥 Clientes</a>
  <a onclick="SH('pros')">🎯 Prospectos</a>
  <a onclick="SH('pol')">📋 Pólizas</a>
@@ -958,7 +958,7 @@ body.dark ::-webkit-scrollbar-thumb{background:#334155}
  <a onclick="SH('wam');closeBnMore()"><span style="font-size:16px">📣</span>WA Masivo</a>
  <a onclick="SH('not');closeBnMore()"><span style="font-size:16px">📝</span>Notas</a>
  <a onclick="SH('men');closeBnMore()"><span style="font-size:16px">📦</span>Mensajero</a>
- <a onclick="SH('cal');renderCal();calTab('tareas');closeBnMore()"><span style="font-size:16px">✅</span>Tareas</a>
+ <a onclick="SH('cal');if(typeof renderCal==='function')renderCal();calTab('tareas');closeBnMore()"><span style="font-size:16px">✅</span>Tareas</a>
  <a onclick="SH('emp');closeBnMore()"><span style="font-size:16px">🏢</span>Empresas</a>
  
  <a onclick="SH('cfg');closeBnMore()"><span style="font-size:16px">⚙️</span>Config.</a>
@@ -1724,28 +1724,13 @@ function showErr(msg){
 function startSession(){
  sessionStorage.setItem('jac_s','ok');
  try{localStorage.setItem('jac_s_ts',String(Date.now()));}catch(__tse){}
- try{
- var __sbU='about:blank#proyecto-viejo-desactivado/rest/v1/jac_crm_data?select=data&user_id=eq.df11ca77-c38d-41a4-b2fe-380ea4d9bea6';
- var __sbK='';
- fetch(__sbU,{headers:{apikey:__sbK,Authorization:'Bearer '+__sbK}}).then(function(r){return r.json();}).then(function(rows){
-  try{
-   var sbData=(rows&&rows[0]&&rows[0].data)?rows[0].data:null;
-   if(sbData){
-    var lraw=localStorage.getItem('jacv10');
-    var lobj=null; try{lobj=lraw?JSON.parse(lraw):null;}catch(__pe){lobj=null;}
-    var reject=false;
-    if(lobj&&lobj.clientes&&sbData.clientes&&lobj.clientes.length>10&&sbData.clientes.length<lobj.clientes.length*0.5) reject=true;
-    if(lobj&&lobj.polizas&&sbData.polizas&&lobj.polizas.length>10&&sbData.polizas.length<lobj.polizas.length*0.5) reject=true;
-    if(!reject){
-     sbData._ts=sbData._ts||Date.now();
-     localStorage.setItem('jacv10', JSON.stringify(sbData));
-     if(typeof S!=='undefined'){ try{Object.assign(S, sbData);}catch(__ae){} }
-    }
-   }
-  }catch(__me){ if(typeof __crmErr==='function') __crmErr(__me); }
-  __jacRestStart();
- }).catch(function(__fe){ if(typeof __crmErr==='function') __crmErr(__fe); __jacRestStart(); });
- }catch(__te){ if(typeof __crmErr==='function') __crmErr(__te); __jacRestStart(); }
+ /* Aqui habia una peticion al proyecto Supabase VIEJO, el que se retiro en
+    julio. La URL quedo apuntando a "about:blank#proyecto-viejo-desactivado",
+    que el navegador no puede pedir, asi que el fetch fallaba SIEMPRE y
+    __crmErr pintaba el banner rojo "Ocurrio un error: Failed to fetch" en
+    cada inicio de sesion. El dato bueno ya no viene de ahi: lo trae
+    cargarDesdeNube() desde las tablas normalizadas. Se entra directo. */
+ __jacRestStart();
  function __jacRestStart(){
  document.getElementById('ls').style.display='none';
  document.getElementById('app').style.display='block';
@@ -3631,7 +3616,7 @@ function RD(){try{renderKPIs();}catch(e){}
  <div class="st"><em>Mi Comisión Cartera</em><div class="n" style="color:#15803D;font-size:14px">${fmtM(tC)}</div><div class="sv">saldo primas ${fmtM(tSaldo)}</div></div>
  <div class="st" onclick="SH('com')" style="cursor:pointer"><em>Comisión por Cobrar</em><div class="n" style="color:#B45309;font-size:14px">${fmtM(tCom)}</div><div class="sv">${cp.length} pendientes</div></div>
  <div class="st" onclick="SH('vc')" style="cursor:pointer"><em>Venta Cruzada</em><div class="n" style="color:#EA580C">${vcOpps}</div><div class="sv">oportunidades</div></div>
- <div class="st" onclick="SH('cal');renderCal();calTab('tareas')" style="cursor:pointer"><em>Tareas Pend.</em><div class="n" style="color:#7E22CE">${tPend}</div>${(()=>{const h=TODAY.toISOString().split('T')[0];const t=(S.tareas||[]).filter(x=>x.fechaLimite===h&&x.etapaTarea!=='Hecho').length;return t?`<div class="sv" style="color:#DC2626;font-weight:700">🔴 ${t} hoy</div>`:''})()}</div>
+ <div class="st" onclick="SH('cal');if(typeof renderCal==='function')renderCal();calTab('tareas')" style="cursor:pointer"><em>Tareas Pend.</em><div class="n" style="color:#7E22CE">${tPend}</div>${(()=>{const h=TODAY.toISOString().split('T')[0];const t=(S.tareas||[]).filter(x=>x.fechaLimite===h&&x.etapaTarea!=='Hecho').length;return t?`<div class="sv" style="color:#DC2626;font-weight:700">🔴 ${t} hoy</div>`:''})()}</div>
  ${(()=>{const tot=S.clientes.length+(S.prospectos||[]).length;const rate=tot>0?Math.round(S.clientes.length/tot*100):0;return`<div class="st" onclick="SH('cli')" style="cursor:pointer"><em>Conversión</em><div class="n" style="color:#0891B2;font-size:16px">${rate}%</div><div class="sv">${S.clientes.length} clientes de ${tot}</div></div>`;})()}`;
  let al='';if(p30)al+=b('bwn',`⚠️ ${p30} por vencer`)+' ';if(vv)al+=b('bdg',`🔴 ${vv} vencidas`);
  const ha=document.getElementById('ha');if(ha)ha.innerHTML=al+`<button class="btn bsm" onclick="doLogout()">🚪</button>`;
@@ -3649,7 +3634,7 @@ function RD(){try{renderKPIs();}catch(e){}
  const dren=document.getElementById('dren');if(dren)dren.innerHTML=rh;
  // dcom removed from dashboard — commissions managed in Comisiones module
  const pTar=S.tareas.filter(t=>t.etapaTarea!=='Hecho');
- let th=`<div class="ch"><h3>✅ Tareas</h3><button class="btn bsm" onclick="SH('cal');renderCal();calTab('tareas')">Ver →</button></div>`;
+ let th=`<div class="ch"><h3>✅ Tareas</h3><button class="btn bsm" onclick="SH('cal');if(typeof renderCal==='function')renderCal();calTab('tareas')">Ver →</button></div>`;
  if(!pTar.length)th+='<div style="padding:18px;text-align:center;color:var(--mu);font-size:12px">Sin tareas pendientes ✓</div>';
  else{th+='<div>';pTar.slice(0,10).forEach(t=>{
 var tc=t._autoTipo==='cliente'?GC(t._autoRef):(t._autoTipo==='poliza'?GC((GP(t._autoRef)||{}).clienteId):null);
@@ -3691,7 +3676,7 @@ var wu=cl&&cl.cel?cl.cel.replace(/[^0-9]/g,''):'';vc+='<tr style="border-bottom:
  _el.id='dash-tareas-hoy';
  _el.style.cssText='background:#EEF2FF;border:1px solid #C7D2FE;border-radius:10px;padding:8px 14px;margin-bottom:8px;font-size:11px;cursor:pointer';
  _el.innerHTML=`<span style="font-weight:800;color:#4338CA">📋 ${_tarHoy.length} tarea${_tarHoy.length!==1?'s':''} para HOY</span><span style="color:#6366F1"> — ${_tarHoy.slice(0,2).map(t=>esc(t.titulo.slice(0,30))).join(' · ')}</span>`;
- _el.onclick=function(){SH('cal');renderCal();calTab('tareas');};
+ _el.onclick=function(){SH('cal');if(typeof renderCal==='function')renderCal();calTab('tareas');};
  if(!document.getElementById('dash-tareas-hoy'))_dsh.parentNode.insertBefore(_el,_dsh);
  }
  }catch(e){__crmErr(e);}
@@ -5422,11 +5407,8 @@ function _TK(){return "";} // token retirado: estaba en claro en un repo publico
 function syncToCloud(){
   var raw=localStorage.getItem("jacv10");if(!raw)return;
   try{var obj=JSON.parse(raw);obj._ts=Date.now();raw=JSON.stringify(obj);localStorage.setItem("jacv10",raw);}catch(e){return;}
- try{
- var __sbU2='about:blank#proyecto-viejo-desactivado/rest/v1/jac_crm_data?on_conflict=user_id';
- var __sbK2='';
- fetch(__sbU2,{method:'POST',headers:{apikey:__sbK2,Authorization:'Bearer '+__sbK2,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:'df11ca77-c38d-41a4-b2fe-380ea4d9bea6',data:obj,updated_at:new Date().toISOString()})}).catch(function(__pe2){ if(typeof __crmErr==='function') __crmErr(__pe2); });
- }catch(__pte){ if(typeof __crmErr==='function') __crmErr(__pte); }
+ /* Peticion al proyecto viejo retirada: su URL era inalcanzable y solo
+    servia para disparar el banner de error. */
 
   if(!_TK())return; // sin token no se publica el snapshot en el repo publico
   try{
@@ -10459,7 +10441,7 @@ function closeSearch(){var el=document.getElementById('gSearch');if(el)el.classL
 function gsKey(e){if(e.key==='Escape'){closeSearch();return;}if(e.key==='ArrowDown'){e.preventDefault();gsMove(1);return;}if(e.key==='ArrowUp'){e.preventDefault();gsMove(-1);return;}if(e.key==='Enter'){gsGo();return;}}
 function gsMove(d){_gsIdx=Math.max(-1,Math.min(_gsi.length-1,_gsIdx+d));document.querySelectorAll('.gs-it').forEach(function(el,i){el.classList.toggle('gsa',i===_gsIdx);});}
 function gsGo(){if(_gsIdx>=0&&_gsIdx<_gsi.length){var it=_gsi[_gsIdx];closeSearch();gsNav(it.t,it.i);}}
-function gsNav(t,id){if(t==='cli'){SH('cli');setTimeout(function(){OC(id);},200);}else if(t==='pol'){SH('pol');setTimeout(function(){OP(id);},200);}else if(t==='tar'){SH('cal');renderCal();calTab('tareas');setTimeout(function(){OT(id);},200);}}
+function gsNav(t,id){if(t==='cli'){SH('cli');setTimeout(function(){OC(id);},200);}else if(t==='pol'){SH('pol');setTimeout(function(){OP(id);},200);}else if(t==='tar'){SH('cal');if(typeof renderCal==='function')renderCal();calTab('tareas');setTimeout(function(){OT(id);},200);}}
 function doSearch(q){var res=document.getElementById('gsRes');if(!res)return;_gsi=[];_gsIdx=-1;var ql=(q||'').toLowerCase().trim();var html='';
 if(!ql){var rec=(S.polizas||[]).slice(-8).reverse();html='<div class="gs-gt">P&#xF3;lizas recientes</div>';rec.forEach(function(p){var cl=GC(p.clienteId)||{};_gsi.push({t:'pol',i:p.id});html+='<div class="gs-it" onclick="closeSearch();SH(\'pol\');setTimeout(function(){OP(\''+esc(p.id)+'\')},200)"><div class="gs-ico" style="background:#EFF6FF;color:#1D4ED8">&#128203;</div><div class="gs-main"><div class="gs-tit">'+esc(p.numero||p.nombre||'Póliza')+'</div><div class="gs-sub">'+esc(cl.nombre||'')+(p.ramo?' &middot; '+esc(p.ramo):'')+'</div></div></div>';});res.innerHTML=html||'<div class="gs-mt">Escribe para buscar...</div>';return;}
 var clis=[],pols=[],tars=[];
@@ -11274,28 +11256,11 @@ function syncToCloudDebounced(){
  window.__syncPushDebounce=setTimeout(function(){try{syncToCloud();}catch(e){}},4000);
 }
 async function pullFromCloud(){
- try{
-  var url='about:blank#proyecto-viejo-desactivado/rest/v1/jac_crm_data?select=data&user_id=eq.df11ca77-c38d-41a4-b2fe-380ea4d9bea6';
-  var key='';
-  var r=await fetch(url,{headers:{apikey:key,Authorization:'Bearer '+key},cache:'no-store'});
-  if(!r.ok)return;
-  var rows=await r.json();
-  if(!rows||!rows.length||!rows[0].data)return;
-  var remote=rows[0].data;
-  var localRaw=localStorage.getItem('jacv10');
-  var local=localRaw?JSON.parse(localRaw):{};
-  var remoteTs=remote._ts||0, localTs=local._ts||0;
-  if(remoteTs<=localTs)return;
-  function cnt(o,k){return (o&&o[k]&&o[k].length)||0;}
-  var keys=['clientes','polizas','tareas','prospectos'];
-  var suspicious=keys.some(function(k){var lc=cnt(local,k),rc=cnt(remote,k);return lc>5&&rc<lc*0.5;});
-  if(suspicious){console.warn('[JAC] Snapshot remoto incompleto, se ignora para proteger tu informacion');return;}
-  localStorage.setItem('jacv10',JSON.stringify(remote));
-  if(typeof S!=='undefined'&&S){Object.keys(remote).forEach(function(k){S[k]=remote[k];});}
-  try{if(typeof RD==='function')RD();}catch(e){}
-  try{if(typeof renderKPIs==='function')renderKPIs();}catch(e){}
-  if(typeof toast==='function')toast('🔄 Datos actualizados desde otro dispositivo');
- }catch(e){}
+ /* RETIRADA. Leia del proyecto Supabase viejo y REEMPLAZABA jacv10 con lo que
+    encontrara alli. Hoy la esta sustituyendo un no-op mas abajo, asi que no
+    corre; pero si el orden de carga cambiara volveria a poder machacar el
+    estado local con datos de una base retirada. Mejor que no haga nada. */
+ return;
 }
 window.addEventListener('load',function(){setTimeout(function(){try{pullFromCloud();}catch(e){}},1500);});
 function gcalClientId(){return (S.integraciones&&S.integraciones.googleClientId)||'';}
@@ -15945,7 +15910,7 @@ document.addEventListener('click', function(e){
       sincronizacion, sin tener que cambiar de pantalla.
    ============================================================ */
 (function(){
-  var MARCA = 'JAC-BUILD-2026-10-06-FC';   /* cambia en cada publicacion */
+  var MARCA = 'JAC-BUILD-2026-10-06-FD';   /* cambia en cada publicacion */
   window.JAC_BUILD = MARCA;
 
   /* ==================================================================
@@ -29927,7 +29892,7 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
 (function(){
   'use strict';
 
-  var VERSION='JAC-BUILD-2026-10-06-FC';
+  var VERSION='JAC-BUILD-2026-10-06-FD';
 
   window.jacVersion=function(){ return VERSION; };
 
@@ -31377,6 +31342,230 @@ img, video, canvas, svg { max-width: 100%; height: auto; }
   else setTimeout(ponerTarjeta, 2600);
   setTimeout(ponerTarjeta, 7000);
   setInterval(ponerTarjeta, 20000);
+})();
+</script>
+
+<script>
+/* ============================================================
+   JAC CRM — SALUD DEL CRM
+   ------------------------------------------------------------
+   POR QUE EXISTE
+
+   El CRM ya sabe decir casi todo lo que le pasa, pero lo dice en
+   la consola del navegador y repartido en ocho funciones
+   distintas: jacEstadoGuardado, jacEstadoFusion, jacIdsRepetidos,
+   jacEspacio, jacDuplicados, jacEstadoRamos... Nadie deberia
+   tener que abrir la consola para saber si su cartera esta bien.
+
+   Esto lo junta en una sola pantalla, en Configuracion, con tres
+   colores y una frase por linea: que esta bien, que conviene
+   mirar, y que boton pulsar para arreglarlo.
+
+   NO TOCA NADA. Solo lee y cuenta. Los arreglos siguen estando
+   donde estaban, en sus propias tarjetas.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  function S_() { try { return new Function('return typeof S!=="undefined"?S:null')(); } catch (e) { return null; } }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function n(v) { var x = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(x) ? x : 0; }
+  function money(v) { return '$' + (Math.round(n(v) * 100) / 100).toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function hoy() { return new Date().toISOString().slice(0, 10); }
+  function vacio(v) { return v === undefined || v === null || String(v).trim() === ''; }
+
+  /* ---------- la medición ---------- */
+  async function medir() {
+    var S = S_();
+    var r = { cuando: new Date().toISOString(), lineas: [] };
+    if (!S) { r.error = 'no se pudo leer el estado del CRM'; return r; }
+
+    var P = S.polizas || [], C = S.clientes || [], T = S.tareas || [];
+
+    /* --- sesión de nube: lo primero, porque sin ella nada sube --- */
+    var sesion = null;
+    try {
+      if (window.db && !window.db.__esStub) {
+        var q = await window.db.auth.getSession();
+        sesion = !!(q && q.data && q.data.session);
+      } else sesion = null;
+    } catch (e) { sesion = false; }
+    r.lineas.push(sesion === true
+      ? { nivel: 'ok', que: 'Sesión de nube activa', detalle: 'Lo que guardes sube y llega a los demás equipos.' }
+      : { nivel: 'mal', que: 'Sesión de nube caída', detalle: 'Mientras esté así, lo que guardes se queda sólo en este navegador. Pulse Reconectar en la barra roja, o vuelva a entrar.', accion: 'Reconectar' });
+
+    /* --- cambios sin subir --- */
+    try {
+      var f = window.jacEstadoFusion ? window.jacEstadoFusion() : null;
+      var pend = f && f.sinSubir ? Object.keys(f.sinSubir).reduce(function (a, k) { return a + f.sinSubir[k]; }, 0) : 0;
+      r.lineas.push(pend
+        ? { nivel: 'aviso', que: pend + ' registro(s) sin subir a la nube', detalle: 'Se reintentan solos. Si no baja de ahí, revise la sesión.' }
+        : { nivel: 'ok', que: 'Todo subido a la nube', detalle: 'No queda nada pendiente de este equipo.' });
+    } catch (e) {}
+
+    /* --- ids repetidos: la causa del "guardo y vuelve atrás" --- */
+    try {
+      var rep = window.jacIdsRepetidos ? window.jacIdsRepetidos() : {};
+      var cuantos = Object.keys(rep).reduce(function (a, t) { return a + Object.keys(rep[t]).length; }, 0);
+      r.lineas.push(cuantos
+        ? { nivel: 'mal', que: cuantos + ' registro(s) con el id repetido', detalle: 'Esto es lo que hacía que un cambio guardado volviera atrás al recargar. Se corrige solo en el próximo guardado; si quiere forzarlo, guarde cualquier ficha.' }
+        : { nivel: 'ok', que: 'Sin ids repetidos', detalle: 'Ningún registro está duplicado por identificador.' });
+    } catch (e) {}
+
+    /* --- pólizas repetidas --- */
+    try {
+      if (window.jacDuplicados) {
+        var d = window.jacDuplicados();
+        if (!d.error) {
+          r.lineas.push(d.aEliminar
+            ? { nivel: 'aviso', que: d.aEliminar + ' póliza(s) duplicada(s) exacta(s)', detalle: 'Mismo número, cliente, aseguradora y vigencia.', accion: 'Pólizas repetidas → Eliminar las exactas' }
+            : { nivel: 'ok', que: 'Sin pólizas duplicadas exactas', detalle: '' });
+          if (d.conDiferencias.length || d.otroCliente.length)
+            r.lineas.push({ nivel: 'aviso', que: (d.conDiferencias.length + d.otroCliente.length) + ' repetida(s) que hay que mirar a mano',
+              detalle: d.conDiferencias.length + ' con prima o comisión distinta y ' + d.otroCliente.length + ' con el mismo número en clientes distintos. No se tocan solas.', accion: 'Pólizas repetidas → Revisar' });
+        }
+      }
+    } catch (e) {}
+
+    /* --- almacenamiento del navegador --- */
+    try {
+      if (window.jacEspacio) {
+        var e2 = window.jacEspacio();
+        var pct = e2.limiteLocalStorageMB ? Math.round(e2.localStorageMB / e2.limiteLocalStorageMB * 100) : 0;
+        r.lineas.push(pct >= 85
+          ? { nivel: 'mal', que: 'Caché del navegador al ' + pct + '%', detalle: 'Con esto lleno, los cambios pueden no guardarse. Los adjuntos deberían estar en IndexedDB.' }
+          : { nivel: 'ok', que: 'Caché del navegador al ' + pct + '%', detalle: e2.localStorageMB + ' MB de ' + e2.limiteLocalStorageMB + ' MB.' });
+        if (e2.adjuntosSinSubirALaNube)
+          r.lineas.push({ nivel: 'aviso', que: e2.adjuntosSinSubirALaNube + ' adjunto(s) sin subir a la nube', detalle: 'Viven sólo en este navegador. Si se borra la caché, se pierden.' });
+      }
+    } catch (e) {}
+
+    /* --- estado de la cartera --- */
+    function est(p) { try { return (typeof window.jacEstadoPol === 'function') ? window.jacEstadoPol(p) : (p.estado || ''); } catch (e) { return p.estado || ''; } }
+    var porEstado = {};
+    P.forEach(function (p) { var k = est(p) || '(sin estado)'; porEstado[k] = (porEstado[k] || 0) + 1; });
+    var vig = P.filter(function (p) { return est(p) === 'Vigente'; });
+    r.cartera = {
+      total: P.length, porEstado: porEstado,
+      primaNetaVigente: +vig.reduce(function (a, p) { return a + n(p.prima); }, 0).toFixed(2),
+      comisionVigente: +vig.reduce(function (a, p) { return a + n(p.comision); }, 0).toFixed(2),
+      clientes: C.length
+    };
+
+    /* --- calidad de los datos --- */
+    var q2 = {
+      sinNumero: P.filter(function (p) { return vacio(p.num) && vacio(p.numeroPol); }).length,
+      sinFechaInicio: P.filter(function (p) { return vacio(p.fechaInicio); }).length,
+      sinFechaFin: P.filter(function (p) { return vacio(p.fechaFin); }).length,
+      sinPrima: P.filter(function (p) { return !n(p.prima); }).length,
+      sinComision: P.filter(function (p) { return n(p.prima) > 0 && !n(p.comision); }).length,
+      vigentesVencidas: P.filter(function (p) { return est(p) === 'Vigente' && p.fechaFin && String(p.fechaFin).slice(0, 10) < hoy(); }).length,
+      sinAseguradora: P.filter(function (p) { return vacio(p.aseg); }).length,
+      sinRamo: P.filter(function (p) { return vacio(p.ramo); }).length,
+      clientesSinPoliza: C.filter(function (c) { return !P.some(function (p) { return String(p.clienteId) === String(c.id); }); }).length,
+      clientesSinCelular: C.filter(function (c) { return vacio(c.cel) && vacio(c.tel); }).length,
+      clientesSinCorreo: C.filter(function (c) { return vacio(c.email); }).length,
+      clientesSinCedula: C.filter(function (c) { return vacio(c.cedula); }).length,
+      tareasAutoPendientes: T.filter(function (t) { return String(t.id || '').indexOf('auto_') === 0 && t.etapaTarea !== 'Hecho'; }).length
+    };
+    r.calidad = q2;
+
+    if (q2.sinNumero) r.lineas.push({ nivel: 'aviso', que: q2.sinNumero + ' póliza(s) sin número', detalle: 'Sin número no se pueden cruzar con los reportes de la aseguradora ni detectar duplicados.' });
+    if (q2.sinFechaFin) r.lineas.push({ nivel: 'aviso', que: q2.sinFechaFin + ' póliza(s) sin fecha de vencimiento', detalle: 'No van a disparar aviso de renovación.', accion: 'Reportes de aseguradoras → Completar faltantes' });
+    if (q2.vigentesVencidas) r.lineas.push({ nivel: 'aviso', que: q2.vigentesVencidas + ' marcada(s) Vigente con la fecha ya pasada', detalle: 'Puede ser una renovación que falta cargar. No se cambian solas a propósito.' });
+    if (q2.sinComision) r.lineas.push({ nivel: 'aviso', que: q2.sinComision + ' póliza(s) con prima pero sin comisión', detalle: 'Falta el % de la aseguradora o del ramo.', accion: 'Reportes de aseguradoras → Auditar y corregir' });
+    if (q2.sinAseguradora || q2.sinRamo) r.lineas.push({ nivel: 'aviso', que: (q2.sinAseguradora + q2.sinRamo) + ' póliza(s) sin aseguradora o sin ramo', detalle: 'Quedan fuera de los informes por aseguradora y por ramo.' });
+    if (q2.tareasAutoPendientes > 50) r.lineas.push({ nivel: 'aviso', que: q2.tareasAutoPendientes + ' tareas automáticas viejas pendientes', detalle: 'Son ruido generado por una corrida antigua y tapan sus tareas de verdad.', accion: 'Reportes de aseguradoras → Ordenar tareas' });
+
+    if (!q2.sinNumero && !q2.sinFechaFin && !q2.sinComision && !q2.vigentesVencidas)
+      r.lineas.push({ nivel: 'ok', que: 'Cartera sin huecos que afecten avisos ni comisiones', detalle: '' });
+
+    r.version = window.JAC_BUILD || '(desconocida)';
+    return r;
+  }
+
+  window.jacSalud = medir;
+
+  /* ---------- la pantalla ---------- */
+  var COL = { ok: ['#15803D', '#F0FDF4', '✓'], aviso: ['#B45309', '#FFFBEB', '!'], mal: ['#B91C1C', '#FEF2F2', '×'] };
+
+  function html(r) {
+    if (r.error) return '<span style="color:#B91C1C">' + esc(r.error) + '</span>';
+    var mal = r.lineas.filter(function (l) { return l.nivel === 'mal'; }).length;
+    var av = r.lineas.filter(function (l) { return l.nivel === 'aviso'; }).length;
+    var resumen = mal ? ['#B91C1C', 'Hay ' + mal + ' cosa(s) que conviene atender ya']
+                : av ? ['#B45309', 'Todo funciona; hay ' + av + ' cosa(s) por depurar']
+                : ['#15803D', 'Todo en orden'];
+    var h = '<div style="padding:10px 12px;border-radius:10px;background:' + resumen[0] + '12;'
+      + 'border-left:4px solid ' + resumen[0] + ';font-weight:700;color:' + resumen[0] + ';margin-bottom:12px">'
+      + esc(resumen[1]) + '</div>';
+
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:14px">';
+    var c = r.cartera || {};
+    [['Pólizas', c.total], ['Clientes', c.clientes],
+     ['Prima neta vigente', money(c.primaNetaVigente)], ['Comisión vigente', money(c.comisionVigente)]]
+      .forEach(function (t) {
+        h += '<div style="padding:9px 11px;border:1px solid #E8DFD0;border-radius:9px;background:#fff">'
+          + '<div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.4px">' + esc(t[0]) + '</div>'
+          + '<div style="font-size:17px;font-weight:800;color:#1E3A8A">' + esc(String(t[1] == null ? '—' : t[1])) + '</div></div>';
+      });
+    h += '</div>';
+
+    if (c.porEstado) {
+      h += '<div style="font-size:12px;color:#334155;margin-bottom:12px">';
+      Object.keys(c.porEstado).sort().forEach(function (k) {
+        h += '<span style="display:inline-block;margin:0 10px 4px 0"><b>' + c.porEstado[k] + '</b> ' + esc(k) + '</span>';
+      });
+      h += '</div>';
+    }
+
+    var orden = { mal: 0, aviso: 1, ok: 2 };
+    r.lineas.slice().sort(function (a, b) { return orden[a.nivel] - orden[b.nivel]; }).forEach(function (l) {
+      var cc = COL[l.nivel] || COL.ok;
+      h += '<div style="display:flex;gap:9px;padding:8px 10px;border-radius:8px;background:' + cc[1] + ';margin-bottom:5px">'
+        + '<div style="flex:0 0 18px;height:18px;border-radius:50%;background:' + cc[0] + ';color:#fff;'
+        + 'font-weight:800;font-size:12px;text-align:center;line-height:18px">' + cc[2] + '</div>'
+        + '<div style="flex:1;min-width:0"><div style="font-weight:700;color:' + cc[0] + ';font-size:12px">' + esc(l.que) + '</div>'
+        + (l.detalle ? '<div style="font-size:11px;color:#475569;line-height:1.55">' + esc(l.detalle) + '</div>' : '')
+        + (l.accion ? '<div style="font-size:11px;color:#1E3A8A;margin-top:2px">→ ' + esc(l.accion) + '</div>' : '')
+        + '</div></div>';
+    });
+
+    h += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #E8DFD0;font-size:11px;color:#64748B">'
+      + 'Versión ' + esc(r.version) + ' · revisado ' + new Date(r.cuando).toLocaleString('es-PA') + '</div>';
+    return h;
+  }
+
+  function poner() {
+    if (document.getElementById('jac-card-salud')) return;
+    var cont = document.getElementById('pg-cfg') || document.getElementById('pg-conf');
+    if (!cont) return;
+    var d = document.createElement('div');
+    d.className = 'card'; d.id = 'jac-card-salud';
+    d.innerHTML = '<div class="ch"><h3>🩺 Salud del CRM</h3></div>'
+      + '<div style="padding:12px 16px">'
+      + '<p style="color:#6b7280;font-size:13px;margin:0 0 12px">Una sola pantalla con todo lo que el CRM sabe de sí mismo: '
+      + 'si la nube está conectada, si quedó algo sin subir, y qué le falta a la cartera. No cambia nada, solo mira.</p>'
+      + '<button id="jac-btn-salud" style="padding:8px 14px;border-radius:8px;border:none;color:#fff;cursor:pointer;'
+      + 'font-size:13px;background:#1E3A8A;font-weight:700">🩺 Revisar ahora</button>'
+      + '<div id="jac-res-salud" style="margin-top:12px"></div></div>';
+    /* arriba del todo en Configuración: es lo primero que conviene mirar */
+    if (cont.firstChild) cont.insertBefore(d, cont.firstChild); else cont.appendChild(d);
+
+    document.getElementById('jac-btn-salud').onclick = async function () {
+      var z = document.getElementById('jac-res-salud');
+      z.innerHTML = '<span style="color:#64748B;font-size:12px">Revisando…</span>';
+      try { z.innerHTML = html(await medir()); }
+      catch (e) { z.innerHTML = '<span style="color:#B91C1C">No se pudo revisar: ' + esc(String(e && e.message || e)) + '</span>'; }
+    };
+  }
+
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(poner, 2800); });
+  else setTimeout(poner, 2800);
+  setTimeout(poner, 7500);
+  setInterval(poner, 20000);
 })();
 </script>
 
