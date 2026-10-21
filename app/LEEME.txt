@@ -1,0 +1,3 @@
+App movil JAC Seguros (version web instalable).
+Se genera desde el repositorio jac-seguros-crm, carpeta app-movil (npm run build).
+No editar estos archivos a mano: se reemplazan en cada publicacion.
