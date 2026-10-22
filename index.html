@@ -2905,13 +2905,42 @@ function initFileInp(inputId,listId){
  const inp=document.getElementById(inputId);if(!inp||inp._bound)return;inp._bound=true;
  inp.addEventListener('change',e=>{
  for(const f of e.target.files){
- if(f.size>2.5*1024*1024){toast(`"${f.name.slice(0,20)}" supera 2.5MB`,'err');continue;}
+ /* Archivos grandes: van DIRECTO a la nube (sin limite propio del CRM; el
+    limite lo pone el plan de Supabase). No se guardan dentro del navegador. */
+ if(f.size>2.5*1024*1024){jacSubirGrande(f).then(function(it){if(it){_pf.push(it);renderPF(listId);}});continue;}
  const r=new FileReader();
  r.onload=ev=>{_pf.push({id:'F'+uid(),name:f.name,type:f.type,size:f.size,b64:ev.target.result,fecha:TODAY.toISOString().split('T')[0]});renderPF(listId);};
  r.readAsDataURL(f);
  }
  inp.value='';
  });
+}
+async function jacSubirGrande(f){
+ try{
+  if(!window.db||!window.db.storage){toast('Sin conexión con la nube: no se puede subir "'+f.name.slice(0,20)+'"','err');return null;}
+  var ses=await window.db.auth.getSession();
+  var uid=ses&&ses.data&&ses.data.session&&ses.data.session.user.id;
+  if(!uid){toast('Tu sesión de nube venció. Vuelve a entrar.','err');return null;}
+  var fid='F'+uid_();
+  var ruta=uid+'/adjuntos/'+fid+'-'+String(f.name||'archivo').replace(/[^\w.\-]/g,'_');
+  toast('⏳ Subiendo "'+f.name.slice(0,24)+'" ('+(f.size/1048576).toFixed(1)+' MB)…');
+  var r=await window.db.storage.from('adjuntos').upload(ruta,f,{contentType:f.type||'application/octet-stream',upsert:false});
+  if(r.error){
+   var m=String(r.error.message||'').toLowerCase();
+   toast(/maximum allowed size|too large|413/.test(m)?'"'+f.name.slice(0,20)+'" supera el tamaño que permite tu plan de Supabase':'No se pudo subir "'+f.name.slice(0,20)+'"','err');
+   return null;
+  }
+  toast('✓ "'+f.name.slice(0,24)+'" en la nube');
+  return {id:fid,name:f.name,type:f.type,size:f.size,path:ruta,fecha:TODAY.toISOString().split('T')[0]};
+ }catch(e){toast('No se pudo subir "'+f.name.slice(0,20)+'"','err');return null;}
+}
+function uid_(){return (typeof uid==='function')?uid():(Date.now().toString(36)+Math.random().toString(36).slice(2,7));}
+/* Abrir un archivo que esta solo en la nube (grande o subido desde la app) */
+async function jacAbrirNube(ruta){
+ var w=window.open('','_blank');if(w)w.opener=null;
+ var url=(typeof window.jacEnlaceAdjunto==='function')?await window.jacEnlaceAdjunto(ruta,600):null;
+ if(!url){if(w)w.close();toast('No se pudo abrir el archivo','err');return;}
+ if(w)w.location.href=url;else location.href=url;
 }
 function renderPF(lid){const el=document.getElementById(lid);if(!el)return;el.innerHTML=_pf.map((f,i)=>`<div class="fitem"><span title="${esc(f.name)}">${esc(f.name.length>22?f.name.slice(0,19)+'...':f.name)}</span><span style="color:var(--mu);font-size:9px">${(f.size/1024).toFixed(0)}K</span><button onclick="_pf.splice(${i},1);renderPF('${lid}')" class="btn bgh bic" style="padding:1px 4px">✕</button></div>`).join('');}
 function renderFL(files,rid,rtype){
@@ -2920,6 +2949,7 @@ function renderFL(files,rid,rtype){
  const isImg=f.name&&/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(f.name);
  const isPDF=f.name&&/\.pdf$/i.test(f.name);
  const canView=isImg||isPDF;
+ if(!f.b64&&f.path){return`<div class="fitem"><span title="${esc(f.name)}">☁️ ${esc(f.name.length>16?f.name.slice(0,13)+'...':f.name)}</span><button data-p="${esc(f.path)}" onclick="jacAbrirNube(this.dataset.p)" class="btn bgh bic" style="padding:1px 5px" title="Abrir">👁️</button><button onclick="delFile('${rid}','${rtype}','${f.id}')" class="btn bgh bic" style="padding:1px 4px;color:var(--rd)" title="Eliminar">✕</button></div>`;}
  const safe=f.b64?(f.b64.replace(/'/g,"\\'")):('');
  const viewBtn=canView?`<button onclick="viewFile('${safe.substring(0,30)}...','${esc(f.name)}','${esc(rid)}','${esc(rtype)}','${esc(f.id||'')}')" class="btn bgh bic" style="padding:1px 5px" title="Ver">👁️</button>`:'';
  return`<div class="fitem"><span title="${esc(f.name)}">${esc(f.name.length>18?f.name.slice(0,15)+'...':f.name)}</span>${viewBtn}<a href="${esc(f.b64)}" download="${esc(f.name)}" class="btn bgh bic" style="padding:1px 5px" title="Descargar">⬇️</a><button onclick="delFile('${rid}','${rtype}','${f.id}')" class="btn bgh bic" style="padding:1px 4px;color:var(--rd)" title="Eliminar">✕</button></div>`;
@@ -2930,6 +2960,7 @@ function renderFLFull(files,rid,rtype){
  return files.map(f=>{
  const isImg=f.name&&/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(f.name);
  const isPDF=f.name&&/\.pdf$/i.test(f.name);
+ if(!f.b64&&f.path){return`<div style="margin:2px 0"><button data-p="${esc(f.path)}" onclick="jacAbrirNube(this.dataset.p)" class="btn bsm bin">☁️ Abrir: ${esc(f.name.length>25?f.name.slice(0,22)+'...':f.name)}</button></div>`;}
  if(isImg&&f.b64){return`<div style="margin:4px 0"><img src="${esc(f.b64)}" style="max-width:100%;max-height:200px;border-radius:6px;border:1px solid var(--bd);cursor:pointer" onclick="openFileViewer('${esc(f.b64).replace(/'/g,"\\'")}','${esc(f.name)}','img')" title="Click para ampliar"><div style="font-size:10px;color:var(--mu);margin-top:2px">${esc(f.name)}</div></div>`;}
  if(isPDF&&f.b64){return`<div style="margin:4px 0"><button class="btn bsm bin" onclick="openFileViewer('${esc(f.b64).replace(/'/g,"\\'")}','${esc(f.name)}','pdf')">📄 Ver PDF: ${esc(f.name.length>25?f.name.slice(0,22)+'...':f.name)}</button></div>`;}
  return`<div style="margin:2px 0"><a href="${esc(f.b64)}" download="${esc(f.name)}" class="btn bsm bgr">📎 ${esc(f.name.length>25?f.name.slice(0,22)+'...':f.name)}</a></div>`;
@@ -2939,7 +2970,8 @@ function viewFile(b64Short,name,rid,rtype,fid){
  const maps={cliente:S.clientes,poliza:S.polizas,siniestro:S.siniestros,prospecto:S.prospectos};
  const arr=maps[rtype];if(!arr)return;
  const obj=arr.find(x=>x.id===rid);if(!obj||!obj.archivos)return;
- const f=obj.archivos.find(x=>x.id===fid||x.name===name);if(!f||!f.b64)return;
+ const f=obj.archivos.find(x=>x.id===fid||x.name===name);if(!f)return;
+ if(!f.b64){if(f.path)jacAbrirNube(f.path);return;}
  const isImg=name&&/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(name);
  openFileViewer(f.b64,name,isImg?'img':'pdf');
 }
