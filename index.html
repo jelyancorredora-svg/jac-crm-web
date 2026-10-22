@@ -12109,7 +12109,24 @@ document.addEventListener('click', function(e){
                   /* Mensajero: las asignaciones y los datos del mensajero
                      vivian solo en el navegador de cada computadora. Aqui
                      viajan a la nube y llegan al telefono y a la app. */
-                  'encomiendas', 'mensajero', 'mensajeroTel', 'mensajeroEmail'];
+                  'encomiendas', 'mensajero', 'mensajeroTel', 'mensajeroEmail',
+                  /* Notas & Recordatorios y tasas de comision: tambien vivian
+                     solo en el navegador. Ahora viajan a la nube y a la app. */
+                  'notas', 'comRates'];
+  /* Listas que la PRIMERA vez se juntan con la nube en vez de pisarla
+     (lo que solo estaba en esta computadora + lo que ya habia arriba). */
+  var _JAC_UNIR = {
+    encomiendas: function (x) { return x && x.id ? String(x.id) : null; },
+    notas: function (x) { return x && x.id ? String(x.id) : null; },
+    comRates: function (x) { return x ? String(x.aseg || '') + '|' + String(x.ramo || '') : null; }
+  };
+  function _jacUnir(local, nube, llave) {
+    var out = Array.isArray(nube) ? nube.slice() : [], ya = {};
+    out.forEach(function (x) { var k = llave(x); if (k) ya[k] = 1; });
+    (Array.isArray(local) ? local : []).forEach(function (x) { var k = llave(x); if (k && !ya[k]) { ya[k] = 1; out.push(x); } });
+    return out;
+  }
+  window._jacUnir = _jacUnir; window._JAC_UNIR = _JAC_UNIR;
   var COLS = window.__JAC_COLS || {};
 
   function snake(c) {
@@ -13071,27 +13088,25 @@ document.addEventListener('click', function(e){
             }
           }
         }
-        if (cat === 'encomiendas') {
-          /* Primera subida del Mensajero desde esta computadora: antes de
+        if (_JAC_UNIR[cat]) {
+          /* Primera subida de esta lista desde esta computadora: antes de
              escribir se lee lo que ya hay en la nube (de la app o de otra
-             computadora) y se junta por id. Nunca se pisa lo ajeno. */
+             computadora) y se junta. Nunca se pisa lo ajeno. */
           var _yaUnidas = false;
-          try { _yaUnidas = localStorage.getItem('jac_encomiendas_unidas') === '1'; } catch (e) {}
+          try { _yaUnidas = localStorage.getItem('jac_' + cat + '_unidas') === '1'; } catch (e) {}
           if (!_yaUnidas) {
-            var _act = await d.from('crm_meta').select('valor').eq('clave', 'encomiendas').maybeSingle();
+            var _act = await d.from('crm_meta').select('valor').eq('clave', cat).maybeSingle();
             if (_act.error) continue;
             var _nubeE = (_act.data && Array.isArray(_act.data.valor)) ? _act.data.valor : [];
-            var _idsE = {};
-            (S.encomiendas || []).forEach(function (x) { if (x && x.id) _idsE[x.id] = 1; });
-            _nubeE.forEach(function (x) { if (x && x.id && !_idsE[x.id]) S.encomiendas.push(x); });
-            val = JSON.stringify(S.encomiendas);
+            S[cat] = _jacUnir(S[cat], _nubeE, _JAC_UNIR[cat]);
+            val = JSON.stringify(S[cat]);
           }
         }
         var rm = await d.from('crm_meta').upsert(
           { clave: cat, valor: JSON.parse(val) }, { onConflict: 'clave' });
         if (!rm.error) _base['_meta_' + cat] = hash(val);
-        if (!rm.error && cat === 'encomiendas') {
-          try { localStorage.setItem('jac_encomiendas_unidas', '1'); } catch (e) {}
+        if (!rm.error && _JAC_UNIR[cat]) {
+          try { localStorage.setItem('jac_' + cat + '_unidas', '1'); } catch (e) {}
         }
       }
       var badge = document.getElementById('syncBadge');
@@ -13170,26 +13185,23 @@ document.addEventListener('click', function(e){
       if (f.clave === 'iseguros_polizas')          window._ISPols = f.valor || [];
       else if (f.clave === 'iseguros_comisiones')  window._IS = f.valor || { cortes: [] };
       else if (f.clave === 'bluecross_asegurados') window._BCBSDataDefault = f.valor || { asegurados: [] };
-      else if (f.clave === 'encomiendas' && typeof S !== 'undefined') {
-        /* La PRIMERA vez que esta computadora baja el Mensajero de la nube,
-           se juntan las asignaciones que solo existian aqui (por id) para no
-           perder ninguna. Despues manda la nube, como el resto. */
+      else if (window._JAC_UNIR && window._JAC_UNIR[f.clave] && typeof S !== 'undefined') {
+        /* La PRIMERA vez que esta computadora baja esta lista de la nube
+           (Mensajero, Notas, tasas de comision), se junta lo que solo
+           existia aqui para no perder nada. Despues manda la nube. */
         var _nube = Array.isArray(f.valor) ? f.valor.slice() : [];
         var _unidas = false;
-        try { _unidas = localStorage.getItem('jac_encomiendas_unidas') === '1'; } catch (e) {}
+        try { _unidas = localStorage.getItem('jac_' + f.clave + '_unidas') === '1'; } catch (e) {}
         /* La marca se pone recien cuando la lista unida SUBIO bien (ver la
            subida de catalogos). Hasta entonces cada bajada vuelve a juntar,
            asi una bajada intermedia no borra lo que solo estaba aqui. */
-        if (!_unidas) {
-          var _ids = {};
-          _nube.forEach(function (x) { if (x && x.id) _ids[x.id] = 1; });
-          (Array.isArray(S.encomiendas) ? S.encomiendas : []).forEach(function (x) {
-            if (x && x.id && !_ids[x.id]) _nube.push(x);
-          });
-        }
-        S.encomiendas = _nube;
-        try { if (typeof RMen === 'function' && document.getElementById('pg-men')
-                  && document.getElementById('pg-men').classList.contains('on')) { RMen(); renderMenStats(); } } catch (e) {}
+        if (!_unidas) _nube = window._jacUnir(S[f.clave], _nube, window._JAC_UNIR[f.clave]);
+        S[f.clave] = _nube;
+        try {
+          var _pgOn = function (id) { var e = document.getElementById(id); return e && e.classList.contains('on'); };
+          if (f.clave === 'encomiendas' && typeof RMen === 'function' && _pgOn('pg-men')) { RMen(); renderMenStats(); }
+          if (f.clave === 'notas' && typeof RNot === 'function' && _pgOn('pg-not')) RNot();
+        } catch (e) {}
       }
       else if (typeof S !== 'undefined')           S[f.clave] = f.valor;
     });
